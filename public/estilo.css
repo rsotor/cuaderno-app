@@ -35,6 +35,11 @@ button.secundario { color: var(--tinta-suave); }
 .marca { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px 6px; }
 .marca a { display: flex; gap: 8px; align-items: center; font-weight: 600; color: inherit; text-decoration: none; border-radius: 6px; }
 .marca small { font-size: 12px; color: var(--tinta-suave); }
+.guardar-barra { display: flex; gap: 4px; margin-top: 8px; }
+.guardar-barra button { padding: 4px 8px; font-size: 12.5px; flex: 1; white-space: nowrap; }
+#lateral.sin-cuaderno .guardar-barra, #lateral.sin-repo .guardar-barra { display: none; }
+.resultado-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; background: var(--fondo); border: 1px solid var(--linea); border-radius: 8px; padding: 10px 12px; margin: 0; max-height: 50vh; overflow: auto; }
+#guardar-mensaje { font: inherit; padding: 10px 12px; border: 1px solid var(--linea); border-radius: 8px; background: var(--fondo); color: var(--tinta); resize: vertical; }
 #lateral.sin-cuaderno #buscador, #lateral.sin-cuaderno .paginas, #lateral.sin-cuaderno #btn-terminal { display: none; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 20; }
 .editor-caja.estrecha { width: min(480px, 92vw); }

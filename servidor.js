@@ -12,6 +12,7 @@ const { WebSocketServer } = require('ws');
 const { Cuaderno, ErrorPeticion } = require('./cuaderno');
 const { detectar } = require('./kit');
 const config = require('./config');
+const acciones = require('./guardar');
 
 const COOKIE = 'cuaderno';
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' };
@@ -71,6 +72,9 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
   const comandoProfesor = () => { const k = estado.kit; if (!k) return null; return k.tipo === 'kit' ? k.comando : (k.tipo === 'carpeta' ? config.leer().comando_agente || null : null); };
   const cuadernos = () => config.leer().recientes.map(r => ({ ...r, existe: fs.existsSync(r.ruta), abiertoAhora: !!estado.cuaderno && estado.cuaderno.raiz === r.ruta, git: fs.existsSync(r.ruta) ? estadoGit(r.ruta) : null }));
   const conCuaderno = () => { if (!estado.cuaderno) throw new ErrorPeticion('no hay ningún cuaderno abierto'); return estado.cuaderno; };
+  // Guardar, traer y deshacer de uno en uno: dos a la vez sobre el mismo repo se pisarían.
+  let ocupado = false;
+  const accion = fn => { if (ocupado) throw Object.assign(new Error('hay otra operación en marcha; espera a que termine'), { status: 409 }); ocupado = true; try { return fn(conCuaderno().raiz, estado.kit); } finally { ocupado = false; } };
 
   const servir = (res, abs) => {
     if (!fs.existsSync(abs) || fs.statSync(abs).isDirectory()) { res.writeHead(404); return res.end('no existe'); }
@@ -112,12 +116,16 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
       if (p === '/api/tareas') return json(res, conCuaderno().tareas({ soloPropias: estado.kit.tipo === 'carpeta' }));   // una salida del kit sin motor sigue teniendo sus formatos
       if (p === '/api/comentarios') return json(res, conCuaderno().comentarios());
       if (p === '/api/recorrido') return json(res, conCuaderno().recorrido());
+      if (p === '/api/guardar/propuesta') { const raiz = conCuaderno().raiz; return json(res, { mensaje: acciones.proponerMensaje(raiz), cambios: acciones.cambios(raiz), repo: acciones.esRepo(raiz), kit: estado.kit.tipo }); }
       if (p.startsWith('/fichero/')) return servir(res, conCuaderno().dentro(decodeURIComponent(p.slice(9))));
       if (req.method === 'POST') {
         const b = await leerCuerpo(req);
         if (p === '/api/abrir') return json(res, abrir(b.ruta));
         if (p === '/api/olvidar') { config.olvidarReciente(String(b.ruta || '')); return json(res, { ok: true }); }
         if (p === '/api/configuracion') return json(res, config.apariencia(config.ajustar(b)));
+        if (p === '/api/guardar') return json(res, accion((raiz, k) => acciones.guardar(raiz, k, b.mensaje)));
+        if (p === '/api/traer') return json(res, accion((raiz, k) => acciones.traer(raiz, k)));
+        if (p === '/api/deshacer') return json(res, accion((raiz, k) => acciones.deshacer(raiz, k, { ver: b.ver !== false })));
         const cu = conCuaderno();
         if (p === '/api/bloque') { cu.escribirBloque(b.ruta, b.desde, b.hasta, b.texto, b.original); return json(res, { ok: true }); }
         if (p === '/api/casilla') { cu.marcarCasilla(b.ruta, b.linea, !!b.marcada, b.original); return json(res, { ok: true }); }

@@ -12,7 +12,8 @@
 <a class="saltar" href="#nota">Saltar al contenido</a>
 <div id="app">
   <aside id="lateral" aria-label="Cuaderno">
-    <header class="marca"><a href="#/cuadernos" title="Todos los cuadernos"><span class="logo" aria-hidden="true">▣</span><span id="nombre-curso">Cuaderno</span></a><small id="estado-git"></small></header>
+    <header class="marca"><a href="#/cuadernos" title="Todos los cuadernos"><span class="logo" aria-hidden="true">▣</span><span id="nombre-curso">Cuaderno</span></a><small id="estado-git"></small>
+      <div class="guardar-barra"><button type="button" id="btn-guardar" title="Guardar en el repositorio del cuaderno">💾 Guardar</button><button type="button" id="btn-traer" class="secundario" title="Traer lo que cambió en otro sitio">⇣ Traer</button><button type="button" id="btn-deshacer" class="secundario" title="Deshacer el último guardado">↶ Deshacer</button></div></header>
     <label class="oculto" for="buscador">Buscar nota o texto</label>
     <input id="buscador" type="search" placeholder="Buscar nota o texto…  (Ctrl K)" autocomplete="off">
     <nav class="paginas" aria-label="Páginas">
@@ -43,6 +44,21 @@
     <label class="oculto" for="editor-texto">Texto en Markdown</label>
     <textarea id="editor-texto" spellcheck="false"></textarea>
     <footer><span class="pista">Ctrl Enter guarda · Esc cancela</span><button type="button" id="editor-cancelar" class="secundario">Cancelar</button><button type="button" id="editor-guardar">Guardar</button></footer>
+  </div>
+</div>
+<div id="guardar" class="modal" role="dialog" aria-modal="true" aria-labelledby="guardar-titulo" hidden>
+  <div class="editor-caja estrecha">
+    <header><span id="guardar-titulo">Guardar</span><span class="editor-lineas" id="guardar-cambios"></span></header>
+    <label class="oculto" for="guardar-mensaje">Mensaje del guardado</label>
+    <textarea id="guardar-mensaje" rows="2" spellcheck="true"></textarea>
+    <footer><span class="pista">Ctrl Enter guarda · Esc cancela</span><button type="button" id="guardar-cancelar" class="secundario">Cancelar</button><button type="button" id="guardar-ok">Guardar</button></footer>
+  </div>
+</div>
+<div id="resultado" class="modal" role="dialog" aria-modal="true" aria-labelledby="resultado-titulo" hidden>
+  <div class="editor-caja estrecha">
+    <header><span id="resultado-titulo">Resultado</span></header>
+    <pre id="resultado-texto" class="resultado-texto"></pre>
+    <footer><button type="button" id="resultado-profesor" class="secundario" hidden>Abrir con el profesor</button><button type="button" id="resultado-confirmar" hidden>Deshacer</button><button type="button" id="resultado-cerrar">Cerrar</button></footer>
   </div>
 </div>
 <div id="ajustes" class="modal" role="dialog" aria-modal="true" aria-labelledby="ajustes-titulo" hidden>

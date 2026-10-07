@@ -5,18 +5,19 @@
 ## 0. Estado
 
 **Ahora**
-- Fase 3 cerrada el 2026-10-07: pantalla de cuadernos (recientes, abrir carpeta, quitar de la lista, último guardado y cambios sin guardar por git), configuración del usuario (tema, letra, fuente, comando del profesor sin kit) en `~/.config/cuaderno/config.json`, `cuaderno.json` opcional por cuaderno (nombre, portada). 31 tests en verde.
-- Siguiente: fase 4 (Guardar / Traer / Deshacer). Necesita un curso con `.kit/` creado con el instalador del kit en una carpeta temporal.
+- Fase 4 cerrada el 2026-10-07: Guardar (mensaje propuesto por la app), Traer y Deshacer (primero enseña, luego confirma). Con kit, `guardar.js` / `deshacer.js`; sin kit, commit y push si hay remoto; salida sin motor, desactivado. Probado con un curso montado con el motor del kit en el scratchpad (`preparar-curso.js --subir no`). 38 tests.
+- Siguiente: fase 5 (formulario de examen y modo tarjeta de flashcards).
 
-**Después:** fase 5 (formulario de examen y modo tarjeta).
+**Después:** fase 6 (repaso de diseño con plugins).
 
 **Inbox**
+- Fase 6: los botones del pie lateral (Terminal, Profesor, ⚙) se parten en dos líneas con el panel estrecho.
 - Fase 6: el panel Tareas enseña el Markdown crudo de cada casilla (`**negrita**`, rutas largas) y corta a 200 caracteres; el bloque de propiedades `alias` vacío ocupa una fila.
 - Fase 6: en la sesión del 2026-10-07 se ven los conectores MCP del plugin Design pero no sus skills (`design-critique`, `accessibility-review`, `ux-copy`) ni `ux-ui-audit` ni `frontend-design`; comprobar con `/plugin` antes de empezar.
 - Fase 7: analizar a fondo el chat como *channel* de Claude Code (el oficial `fakechat`: chat web en localhost conectado a la sesión local). Si es viable, la fase 10 se adelanta a la 7.
 - Fase 9: en cuanto haya una máquina Windows, probar `npm install` + `node-pty` y los ficheros CRLF.
 - Visto con la bóveda sin kit (2026-10-07): sin `inicio.md` la app enseña un error en vez del árbol; el panel Tareas toma como tarea cualquier casilla de cualquier nota (miles en una bóveda grande): sin kit, Tareas debe limitarse a lo que configure el usuario o no mostrarse. Con `node_modules` fuera, las respuestas tardan menos de 0,2 s.
-- Cuaderno de pruebas con kit: ninguno de los dos cuadernos de este ordenador trae `.kit/`; para las fases 4 y 5 hay que crear uno con el instalador del kit en una carpeta temporal.
+- Cuaderno de pruebas con kit: se monta en una carpeta temporal copiando el motor del kit (`.kit/`, AGENTS.md, CLAUDE.md, .gitignore, .claude/settings.json) más `estudio/` y `config/` del curso de ejemplo, `git init`, `preparar-curso.js --subir no`, `reparar.js` y un commit base. El test `guardar y deshacer con el kit de verdad` corre con `CUADERNO_KIT_PRUEBA=<esa carpeta>`.
 
 **Contexto:** las decisiones y el orden de fases están abajo; los detalles del kit (formatos, herramientas, reglas) viven en el repo del kit.
 
@@ -122,7 +123,7 @@ Capturas del prototipo (en `docs/capturas-prototipo/`), tal como salió, antes d
 | Exámenes | Formulario HTML completo con Validar. El chat no genera nada |
 | Agente | **Terminal en v1.** El chat con el profesor después, como modo opcional. El Agent SDK queda descartado (exige API key de pago, no admite la suscripción). Vía elegida (2026-10-07): la app como *channel* de Claude Code, igual que el channel oficial `fakechat` (chat web en localhost conectado a la sesión local): el chat de la app envía a la sesión que la propia app arranca en su terminal y pinta las respuestas; misma sesión, mismo contexto (AGENTS.md, skills, herramientas), suscripción sin API key. Codex, por comprobar |
 | Cuaderno con kit | Lo es si tiene `.kit/motor.json`. Con kit, todo pasa por sus herramientas. Si tiene `estudio/` y `config/` pero no `.kit/` (una salida del kit sin motor), la app lee sus formatos (tareas, exámenes…) pero no hay Profesor ni Guardar. Sin nada de eso, es una carpeta de notas: solo lectura y edición, Tareas se limita a `tareas.md`, y Guardar hace commit; el push se confirma |
-| Guardar | Un botón. En un cuaderno con kit, llama a `guardar.js` (comprueba, apunta en el diario, sube); nunca git a mano. Un error o un conflicto de `--traer` no lo resuelve la app: abre la terminal y se lo pasa al profesor. En una carpeta sin kit, git normal. Credenciales: las de git de la máquina |
+| Guardar | Un botón. En un cuaderno con kit, llama a `guardar.js "<mensaje>"` (comprueba, apunta en el diario, sube); nunca git a mano. El mensaje lo propone la app a partir de los ficheros cambiados y se puede editar. Un error o un conflicto de `--traer` no lo resuelve la app: enseña la salida y ofrece abrir la terminal con el profesor. En una carpeta sin kit que sea un repo: `git add -A`, commit y push si hay remoto, sin preguntar (como un autosave); traer es `pull --ff-only`; deshacer es `revert` del último commit, siempre enseñando antes qué volvería. Credenciales: las de git de la máquina |
 | Escrituras | Toda escritura en una nota lleva el texto original del tramo; si el fichero cambió debajo, el servidor rechaza y la app avisa. Se conserva el final de línea del fichero (LF o CRLF) |
 | Seguridad del servidor local | Escuchar en 127.0.0.1 no basta: token aleatorio por arranque exigido en la API y en la terminal, comprobación de `Origin`, los `.html` del cuaderno en iframe con `sandbox`. Antes de que el repo sea público |
 | Carpetas | Índice en memoria, actualizado por el vigilante. Se respetan `.gitignore` y `.obsidianignore`; `node_modules` nunca se recorre |
@@ -136,7 +137,7 @@ Capturas del prototipo (en `docs/capturas-prototipo/`), tal como salió, antes d
 1. **Sembrar el repo:** prototipo, licencia, README, este documento como plan vivo, reglas del repo. ✅ 2026-10-07
 2. ✅ 2026-10-07 **Base segura, escrituras robustas y tests:** token + `Origin` + `sandbox`; escrituras con comprobación del texto original, línea en blanco tras cada comentario, CRLF; índice en memoria y respeto a `.gitignore` / `.obsidianignore`; detección del kit; botón Profesor con el comando del adaptador; tests `node --test` del render y de las escrituras sobre los dos cuadernos (§9: "el mismo fichero que a mano", con LF y CRLF). De diseño, solo lo que ya se ve en las capturas: foco de teclado visible, "editar / comentar" accesibles sin ratón, el panel Tareas menos denso, la cabecera de propiedades por debajo del título.
 3. ✅ 2026-10-07 **Pantalla de cuadernos** y configuración del usuario.
-4. **Guardar / Traer / Deshacer.**
+4. ✅ 2026-10-07 **Guardar / Traer / Deshacer.**
 5. **Formulario de examen** y **modo tarjeta** de flashcards.
 6. **Repaso de diseño** con los plugins de §6 (Design, ux-ui-audit, frontend-design), cambios aplicados, capturas antes y después. Nada de funcionalidad nueva hasta cerrarlo.
 7. **Terminal cuidada** (pestañas, fuente, tema) y botón Profesor. Aquí se analiza a fondo el chat como *channel* (§6, Agente): si es viable, la fase 10 se adelanta a esta.

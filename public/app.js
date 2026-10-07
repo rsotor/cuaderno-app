@@ -182,6 +182,45 @@ $('#panel').addEventListener('click', async e => {
 });
 $('#panel').addEventListener('submit', e => { if (e.target.id !== 'abrir-carpeta') return; e.preventDefault(); const v = e.target.querySelector('input').value.trim(); if (v) abrirCarpeta(v); });
 
+// ---------- guardar / traer / deshacer
+function abrirModal(id, primero) { foco = document.activeElement; $(id).hidden = false; if (primero) $(primero).focus(); }
+function cerrarModal(id) { $(id).hidden = true; if (foco) foco.focus(); }
+function mostrarResultado(titulo, r, { confirmar = null } = {}) {
+  $('#resultado-titulo').textContent = titulo; $('#resultado-texto').textContent = r.salida || (r.codigo ? 'Ha fallado sin decir por qué.' : 'Hecho.');
+  $('#resultado-profesor').hidden = !(r.codigo && cuaderno().profesor);
+  $('#resultado-confirmar').hidden = !confirmar; alConfirmar = confirmar;
+  abrirModal('#resultado', confirmar ? '#resultado-confirmar' : '#resultado-cerrar');
+}
+let alConfirmar = null;
+$('#resultado-cerrar').onclick = () => cerrarModal('#resultado');
+$('#resultado-profesor').onclick = () => { cerrarModal('#resultado'); abrirTerminal('profesor'); };
+$('#resultado-confirmar').onclick = async () => { const fn = alConfirmar; cerrarModal('#resultado'); if (fn) await fn(); };
+async function refrescarInfo() { info = await api('/api/info'); pintarEstado(); }
+async function accion(ruta, body, titulo, opciones) {
+  let r;
+  try { r = await api(ruta, body || {}); } catch (e) { r = { codigo: 1, salida: e.message }; }
+  await refrescarInfo();
+  if (rutaActual) abrirNota(rutaActual); else if (location.hash === '#/tareas') abrirTareas();
+  mostrarResultado(titulo, r, opciones);
+  return r;
+}
+$('#btn-guardar').onclick = async () => {
+  const p = await api('/api/guardar/propuesta');
+  if (p.kit !== 'kit' && !p.repo) return mostrarResultado('Guardar', { codigo: 1, salida: 'Esta carpeta no es un repositorio: no hay dónde guardar.' });
+  $('#guardar-cambios').textContent = p.cambios.length ? `${p.cambios.length} fichero${p.cambios.length === 1 ? '' : 's'} con cambios` : 'sin cambios desde el último guardado';
+  $('#guardar-mensaje').value = p.mensaje || 'Sesión de estudio';
+  abrirModal('#guardar', '#guardar-mensaje'); $('#guardar-mensaje').select();
+};
+$('#guardar-cancelar').onclick = () => cerrarModal('#guardar');
+$('#guardar-ok').onclick = async () => { const mensaje = $('#guardar-mensaje').value.trim(); if (!mensaje) return; cerrarModal('#guardar'); avisar('Guardando…'); await accion('/api/guardar', { mensaje }, 'Guardar'); };
+$('#guardar-mensaje').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') $('#guardar-ok').click(); });
+$('#btn-traer').onclick = async () => { avisar('Trayendo…'); await accion('/api/traer', {}, 'Traer'); };
+$('#btn-deshacer').onclick = async () => {
+  let r; try { r = await api('/api/deshacer', { ver: true }); } catch (e) { r = { codigo: 1, salida: e.message }; }
+  mostrarResultado('Deshacer el último guardado', r, { confirmar: r.codigo ? null : () => accion('/api/deshacer', { ver: false }, 'Deshacer') });
+};
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { for (const id of ['#guardar', '#resultado']) if (!$(id).hidden) cerrarModal(id); } });
+
 // ---------- apariencia y ajustes del usuario (iguales para todos los cuadernos)
 function aplicarApariencia(c) { const r = document.documentElement; r.dataset.tema = c.tema; r.dataset.letra = c.letra; r.dataset.fuente = c.fuente; }
 function abrirAjustes() {
@@ -204,6 +243,9 @@ function pintarEstado() {
   $('#nombre-curso').textContent = c ? c.nombre : 'Cuaderno';
   document.title = c ? `${c.nombre} · Cuaderno` : 'Cuaderno';
   $('#estado-git').textContent = c ? textoGit(c.git) : '';
+  $('#lateral').classList.toggle('sin-repo', !!c && !c.git && c.kit !== 'kit');
+  $('#btn-guardar').disabled = $('#btn-traer').disabled = $('#btn-deshacer').disabled = !!c && c.kit === 'salida-sin-motor';
+  $('#btn-guardar').title = c && c.kit === 'salida-sin-motor' ? 'Este cuaderno es una salida del kit sin motor: no se puede guardar desde aquí' : 'Guardar en el repositorio del cuaderno';
   $('#btn-profesor').hidden = !(c && c.profesor);
   $('#link-inicio').href = c && c.portada ? `#/n/${encodeURI(c.portada)}` : '#/';
 }

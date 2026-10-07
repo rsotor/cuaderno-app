@@ -32,7 +32,12 @@ class Cuaderno {
       return { nombre: typeof a.nombre === 'string' && a.nombre.trim() ? a.nombre.trim() : null, portada: typeof a.portada === 'string' ? a.portada.replace(/^\//, '') : null };
     } catch { return { nombre: null, portada: null }; }
   }
-  nombre() { return this.ajustes.nombre || path.basename(this.raiz); }
+  // El nombre: el de cuaderno.json; si no, el nombre_curso de los ajustes del kit; si no, la carpeta.
+  nombre() {
+    if (this.ajustes.nombre) return this.ajustes.nombre;
+    try { const a = JSON.parse(fs.readFileSync(path.join(this.raiz, 'config', 'ajustes.json'), 'utf8')); if (typeof a.nombre_curso === 'string' && a.nombre_curso.trim()) return a.nombre_curso.trim(); } catch { /* sin ajustes del kit */ }
+    return path.basename(this.raiz);
+  }
 
   // ---------- índice
   listar() {

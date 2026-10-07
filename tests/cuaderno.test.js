@@ -104,6 +104,14 @@ test('con CRLF: se lee igual y toda escritura conserva CRLF', con({ crlf: true }
   assert.equal(c.leer('tareas.md'), NOTAS['tareas.md'].replace(/\n/g, '\r\n').replace('- [ ] Comprar', '- [x] Comprar') + '- [ ] Otra\r\n');
 }));
 
+test('nombre: cuaderno.json, luego nombre_curso del kit, luego la carpeta', con({ kit: 'kit' }, (c, cu) => {
+  assert.equal(cu.nombre(), path.basename(c.raiz));
+  fs.writeFileSync(path.join(c.raiz, 'config', 'ajustes.json'), JSON.stringify({ nombre_curso: 'Finanzas' }));
+  assert.equal(new Cuaderno(c.raiz, c.base).nombre(), 'Finanzas');
+  fs.writeFileSync(path.join(c.raiz, 'cuaderno.json'), JSON.stringify({ nombre: 'Mi cuaderno' }));
+  assert.equal(new Cuaderno(c.raiz, c.base).nombre(), 'Mi cuaderno');
+}));
+
 test('recorrido: cuenta notas, enlaces rotos y fallos', con({}, (c, cu) => {
   const r = cu.recorrido();
   assert.equal(r.notas, 6);
