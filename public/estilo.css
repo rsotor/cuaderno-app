@@ -1,12 +1,12 @@
 /* cuaderno-app · hoja de estilos. Tema: papel, tinta y un subrayador. Los tokens van por tema; el contenido manda. */
 :root {
-  --papel: #fcfbf7; --fondo: #f6f4ee; --lateral: #efece4; --tinta: #1b1b1f; --tinta-suave: #5a5e66; --linea: #e2dfd6;
+  --papel: #fbfbfc; --fondo: #f2f3f5; --lateral: #eaecef; --tinta: #1b1b1f; --tinta-suave: #5a5e66; --linea: #dcdfe4;
   --acento: #1e5a96; --acento-suave: #e3ecfa; --sobre-acento: #ffffff; --ok: #15803d; --aviso: #7a4a00; --mal: #b91c1c;
   --terminal-fondo: #1b1d23; --marca: #fff3a8;
   --c-info: var(--acento); --c-question: #6d28d9; --c-warning: var(--aviso); --c-danger: var(--mal); --c-success: var(--ok);
   --c-quote: #4b5563; --c-example: #0e7490; --c-tip: #0f766e; --c-comment: #9a3412;
   --radio: 6px; --radio-bloque: 8px;
-  --fuente: "Avenir Next", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --fuente: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;   /* la del sistema: afinada para leer en cada plataforma */
   --serif: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --mono: "JetBrains Mono", "Fira Code", Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --sombra: 0 10px 30px rgba(20, 20, 30, .12);
@@ -31,7 +31,7 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--tinta); font: 15px/1.55 var(--fuente); }
+html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--tinta); font: 15px/1.6 var(--fuente); }
 :focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
 @media (prefers-reduced-motion: no-preference) { .bloque, .respuesta-tarjeta { transition: background-color .15s ease; } }
 .oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -40,7 +40,7 @@ html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--tin
 .icono { width: 16px; height: 16px; flex: none; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .vacio, .pista { color: var(--tinta-suave); font-size: 13px; }
 .pista { margin-right: auto; align-self: center; }
-mark { background: var(--marca); color: inherit; border-radius: 2px; }
+mark { background: var(--marca); color: var(--tinta); border-radius: 2px; }
 code, kbd { font-family: var(--mono); font-size: .88em; }
 kbd { border: 1px solid var(--linea); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--papel); }
 
@@ -76,6 +76,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 #arbol { flex: 1; overflow: auto; padding: 4px 8px 12px; font-size: 14px; }
 #arbol details { margin-left: 6px; }
 #arbol summary { cursor: pointer; padding: 4px 6px; color: var(--tinta-suave); border-radius: var(--radio); list-style: none; }
+#arbol summary .num { opacity: .7; font-variant-numeric: tabular-nums; }
 #arbol summary::before { content: "▸ "; font-size: 11px; }
 #arbol details[open] > summary::before { content: "▾ "; }
 #arbol .hoja { margin-left: 14px; display: block; }
@@ -86,14 +87,15 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 .pie-lateral #btn-ajustes { flex: 0 0 auto; padding: 6px 9px; }
 
 #centro { overflow: auto; min-height: 0; min-width: 0; padding: 0 0 40px; }
-#miga { position: sticky; top: 0; background: var(--fondo); padding: 12px 40px 8px; font-size: 13px; color: var(--tinta-suave); z-index: 2; display: flex; align-items: center; gap: 10px; }
-#btn-menu { display: none; }
-#nota, #panel { max-width: calc(70ch + 80px); margin: 0 auto; padding: 8px 40px 40px; }
+.miga-barra { position: sticky; top: 0; background: var(--fondo); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px 40px; }
+#miga { font-size: 13px; color: var(--tinta-suave); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#btn-menu { display: none; padding: 6px 8px; }
+#nota, #panel { max-width: calc(62ch + 80px); margin: 0 auto; padding: 8px 40px 40px; }   /* 62 ch ≈ 75 caracteres reales por línea */
 #nota h1, #panel h1 { font-size: 28px; line-height: 1.15; margin: 6px 0 18px; font-weight: 700; letter-spacing: -.01em; }
 #nota h2 { font-size: 21px; margin: 32px 0 10px; border-bottom: 1px solid var(--linea); padding-bottom: 4px; }
 #nota h3 { font-size: 17px; margin: 24px 0 8px; }
-#nota a { color: var(--acento); padding: 2px 0; }
-#nota a.wiki { text-decoration: none; border-bottom: 1px dotted var(--acento); padding: 2px 0; }   /* objetivo ≥ 24 px de alto sin cambiar la línea */
+#nota a { color: var(--acento); padding: 3px 0; }   /* objetivo ≥ 24 px de alto sin cambiar la línea */
+#nota a.wiki { text-decoration: none; border-bottom: 1px dotted var(--acento); }
 #nota a.wiki.roto { color: var(--mal); border-bottom-style: dashed; }
 #nota table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 14px; }
 #nota th, #nota td { border: 1px solid var(--linea); padding: 6px 10px; text-align: left; }
@@ -126,8 +128,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 .callout-warning, .callout-caution { --c: var(--c-warning); } .callout-danger, .callout-bug, .callout-error { --c: var(--c-danger); }
 .callout-quote { --c: var(--c-quote); } .callout-example { --c: var(--c-example); } .callout-tip { --c: var(--c-tip); }
 .callout-comment { --c: var(--c-comment); background: color-mix(in srgb, var(--c-comment) 6%, var(--papel)); }
-.callout-icono::before { content: "ℹ"; } .callout-success .callout-icono::before { content: "✓"; } .callout-question .callout-icono::before { content: "?"; }
-.callout-warning .callout-icono::before { content: "⚠"; } .callout-quote .callout-icono::before { content: "❝"; } .callout-example .callout-icono::before { content: "✎"; }
+.callout-icono { font-variant-emoji: text; }
+.callout-icono::before { content: "ℹ\FE0E"; } .callout-success .callout-icono::before { content: "✓"; } .callout-question .callout-icono::before { content: "?"; }
+.callout-warning .callout-icono::before { content: "⚠\FE0E"; } .callout-quote .callout-icono::before { content: "❝"; } .callout-example .callout-icono::before { content: "✎"; }
 .callout-comment .callout-icono::before { content: "✎"; } .callout-danger .callout-icono::before { content: "✕"; } .callout-tip .callout-icono::before { content: "✦"; }
 
 /* bloques editables */
@@ -160,7 +163,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 .nueva-tarea input { flex: 1; padding: 8px 12px; }
 
 /* examen como formulario */
-.examen fieldset.pregunta { border: 1px solid var(--linea); border-radius: var(--radio-bloque); background: var(--papel); padding: 10px 18px 12px; margin: 14px 0; }
+.examen fieldset.pregunta { border: 0; border-top: 1px solid var(--linea); padding: 8px 0 14px; margin: 10px 0; }
+.examen legend { padding: 0 8px 0 0; margin-left: -2px; }
 .examen legend .numero { display: inline-block; background: var(--acento-suave); color: var(--acento); border-radius: 999px; min-width: 28px; text-align: center; padding: 1px 9px; font-weight: 650; font-size: 13px; }
 .examen .enunciado > .bloque { margin: 0; padding: 0; }
 .examen .enunciado p { margin: 6px 0 10px; }
@@ -182,13 +186,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 .respuesta-tarjeta { border-top: 1px dashed var(--linea); padding-top: 12px; margin-bottom: 14px; }
 .respuesta-tarjeta .bloque { margin: 0; padding: 0; }
 .tarjeta .botones { display: flex; gap: 10px; flex-wrap: wrap; }
-.tarjeta .botones button { padding: 9px 18px; font-size: 15px; }
-.tarjeta .botones [data-tarjeta="destapar"], .tarjeta .botones [data-tarjeta="sabia"] { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); font-weight: 600; }
+.tarjeta .botones button { padding: 7px 16px; font-size: 15px; }
+.tarjeta .botones [data-tarjeta="sabia"] { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); font-weight: 600; }   /* la decisión es «la sabía / no la sabía»; Destapar es solo un paso */
 
 /* terminal */
 #terminal-panel { grid-column: 2; min-width: 0; overflow: hidden; height: 320px; background: var(--terminal-fondo); border-top: 1px solid #000; display: flex; flex-direction: column; }
-.terminal-barra { display: flex; justify-content: space-between; align-items: center; color: #9aa0a6; font-size: 12px; padding: 4px 14px; background: #00000033; }
-.terminal-barra button { background: none; border: none; color: #9aa0a6; padding: 2px 8px; min-width: 32px; min-height: 28px; }
+.terminal-barra { display: flex; justify-content: space-between; align-items: center; color: #b4b9c2; font-size: 12.5px; padding: 4px 14px; background: #0b0c10; }
+.terminal-barra button { background: none; border: none; color: #b4b9c2; padding: 2px 8px; min-width: 32px; min-height: 28px; }
 #terminal { flex: 1; padding: 10px 14px 6px; min-height: 0; }
 .xterm { height: 100%; }
 
@@ -210,12 +214,12 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 /* estrecho: la barra lateral se despliega sobre el contenido con un botón; nada se corta */
 @media (max-width: 760px) {
   #app { grid-template-columns: 1fr; }
-  #lateral { position: fixed; inset: 0 20% 0 0; z-index: 10; transform: translateX(-100%); box-shadow: var(--sombra); }
-  #lateral.abierto { transform: none; }
-  @media (prefers-reduced-motion: no-preference) { #lateral { transition: transform .2s ease; } }
+  #lateral { position: fixed; inset: 0 20% 0 0; z-index: 10; transform: translateX(-100%); visibility: hidden; box-shadow: var(--sombra); }
+  #lateral.abierto { transform: none; visibility: visible; }
+  @media (prefers-reduced-motion: no-preference) { #lateral { transition: transform .2s ease, visibility .2s; } }
   #btn-menu { display: inline-flex; }
   #nota, #panel { padding: 8px 16px 40px; }
-  #miga { padding: 10px 16px 6px; }
+  .miga-barra { padding: 8px 12px 6px; }
   .bloque { margin: 0; padding: 0 4px; }
   .bloque .acciones { position: static; justify-content: flex-end; margin-bottom: 2px; }
   #nota table { display: block; overflow-x: auto; }

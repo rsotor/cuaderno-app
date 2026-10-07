@@ -5,13 +5,14 @@
 ## 0. Estado
 
 **Ahora**
-- Fase 6 cerrada el 2026-10-07: crítica con cifras en `docs/diseno/critica-2026-10-07.md` (18 hallazgos), cambios aplicados (tokens por tema, iconos SVG, títulos en el árbol, tareas pintadas, jerarquía de acciones, estados, móvil mínimo, copia) y medidos otra vez: 0 fallos de contraste en los dos temas, foco 9,6:1 / 6,0:1. Capturas antes y después en `docs/capturas/`. 46 tests.
+- Fase 6 cerrada el 2026-10-07 tras la ronda de abogado del diablo (7 objeciones atendidas): crítica con cifras en `docs/diseno/critica-2026-10-07.md` (18 hallazgos), cambios aplicados y medidos otra vez: 0 fallos de contraste en 15 pantallas y dos temas, foco 9,6:1 / 6,0:1, sin desbordamiento a 390 px. Decisiones de Roberto: fuente del sistema, Destapar discreto, botón «Corregir». Capturas antes y después en `docs/capturas/`. 46 tests.
 - Siguiente: fase 7 (terminal cuidada, botón Profesor y análisis del chat como *channel*).
 
 **Después:** fase 8 (inbox).
 
 **Inbox**
-- Decidir el texto del botón del examen: «Validar» (plan §6) o «Corregir» (lo que hace el kit y lo que dice el resultado). Hallazgo 13 de la crítica.
+- Fase 7: la terminal en Chrome headless se cierra nada más abrirse («[terminal cerrada]»); comprobar con un navegador normal y, si pasa, por qué.
+- Para el kit: `pendientes.md` trae textos cortados («solo trae el títu»); avisar en profesor-kit.
 - Las skills de los plugins de diseño no cargan en una sesión abierta antes de sincronizarlos: se leyeron de `~/.claude/plugins/synced/` y se aplicaron a mano; para la próxima crítica, abrir sesión nueva.
 - Fase 7: analizar a fondo el chat como *channel* de Claude Code (el oficial `fakechat`: chat web en localhost conectado a la sesión local). Si es viable, la fase 10 se adelanta a la 7.
 - Fase 9: en cuanto haya una máquina Windows, probar `npm install` + `node-pty` y los ficheros CRLF.
@@ -20,7 +21,7 @@
 
 **Contexto:** las decisiones y el orden de fases están abajo; los detalles del kit (formatos, herramientas, reglas) viven en el repo del kit.
 
-**Rondas de abogado del diablo:** 2026-10-07, sobre el punto 0 y el prototipo, 7 objeciones → reorden de fases (§7), tabla caso → kit (§4b) y decisiones nuevas (§6).
+**Rondas de abogado del diablo:** 2026-10-07, sobre el punto 0 y el prototipo, 7 objeciones → reorden de fases (§7), tabla caso → kit (§4b) y decisiones nuevas (§6) · 2026-10-07, sobre la crítica de diseño, 7 objeciones → todas atendidas (ver el final de `docs/diseno/critica-2026-10-07.md`).
 
 ## 1. Qué es
 
@@ -59,7 +60,7 @@ pinta como lo que es.
 | 5 | No entiende algo, o en clase dijeron otra cosa | **Comentar un bloque**: queda anotado en la nota; el profesor lo recoge en la siguiente sesión. Un panel reúne todos los comentarios |
 | 6 | Estudia una sesión | Lee, salta a sus conceptos, abre el **ejercicio interactivo** dentro de la app, marca la sesión como **estudiada** |
 | 7 | Repasa flashcards | **Modo tarjeta**: pregunta, destapar, "la sabía / no la sabía" |
-| 8 | Hace un examen | **Formulario completo** con botón **Validar**: la app escribe las respuestas y corrige con la herramienta del kit, sin pasar por el chat. Los de respuesta libre se **entregan** y los corrige el profesor |
+| 8 | Hace un examen | **Formulario completo** con botón **Corregir**: la app escribe las respuestas y corrige con la herramienta del kit, sin pasar por el chat. Los de respuesta libre se **entregan** y los corrige el profesor |
 | 9 | Se organiza | **Tareas**: todas las casillas del curso agrupadas por nota, más su lista propia. Marcar aquí escribe en la nota |
 | 10 | Habla con el profesor | **Terminal integrada**, bonita, abierta en el cuaderno, con botón "Profesor". Más adelante, **chat** |
 | 11 | Deja una clase nueva | Ve el **inbox** y lo que aún no está preparado; "Preparar con el profesor" |
@@ -119,7 +120,7 @@ Capturas del prototipo (en `docs/capturas-prototipo/`), tal como salió, antes d
 | Plataforma | Navegador + proceso local en Node. Sin app de escritorio empaquetada |
 | Editor | Por bloques, en Markdown. Sin WYSIWYG ni vista previa partida |
 | Anotar | Comentarios anclados a un bloque, dentro de la nota |
-| Exámenes | Formulario HTML completo con Validar. El chat no genera nada |
+| Exámenes | Formulario HTML completo con un botón **Corregir** (2026-10-07: antes «Validar»; el verbo es el del kit y el del resultado). El chat no genera nada |
 | Agente | **Terminal en v1.** El chat con el profesor después, como modo opcional. El Agent SDK queda descartado (exige API key de pago, no admite la suscripción). Vía elegida (2026-10-07): la app como *channel* de Claude Code, igual que el channel oficial `fakechat` (chat web en localhost conectado a la sesión local): el chat de la app envía a la sesión que la propia app arranca en su terminal y pinta las respuestas; misma sesión, mismo contexto (AGENTS.md, skills, herramientas), suscripción sin API key. Codex, por comprobar |
 | Cuaderno con kit | Lo es si tiene `.kit/motor.json`. Con kit, todo pasa por sus herramientas. Si tiene `estudio/` y `config/` pero no `.kit/` (una salida del kit sin motor), la app lee sus formatos (tareas, exámenes…) pero no hay Profesor ni Guardar. Sin nada de eso, es una carpeta de notas: solo lectura y edición, Tareas se limita a `tareas.md`, y Guardar hace commit; el push se confirma |
 | Guardar | Un botón. En un cuaderno con kit, llama a `guardar.js "<mensaje>"` (comprueba, apunta en el diario, sube); nunca git a mano. El mensaje lo propone la app a partir de los ficheros cambiados y se puede editar. Un error o un conflicto de `--traer` no lo resuelve la app: enseña la salida y ofrece abrir la terminal con el profesor. En una carpeta sin kit que sea un repo: `git add -A`, commit y push si hay remoto, sin preguntar (como un autosave); traer es `pull --ff-only`; deshacer es `revert` del último commit, siempre enseñando antes qué volvería. Credenciales: las de git de la máquina |

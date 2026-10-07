@@ -117,6 +117,7 @@ test('títulos: el # de cada nota, sin wikilinks; las tareas llevan el Markdown 
   assert.equal(t['conceptos/interes.md'], 'Interés'); assert.equal(t['inicio.md'], 'Mi curso'); assert.equal(t['sesiones/01-01-01-sesion.md'], '1.1 La sesión');
   const item = cu.tareas().find(g => g.ruta === 'sesiones/01-01-01-sesion.md').items[1];
   assert.equal(item.texto, 'Leer interes'); assert.equal(item.html, 'Leer interes');
+  assert.equal(cu.acortarRutas('Ver conceptos/interes y sesiones/01-01-01-sesion.md: regla 50/30/20, el 04/10/2026, IVA/IRPF y https://x.com/a'), 'Ver interes y 01-01-01-sesion: regla 50/30/20, el 04/10/2026, IVA/IRPF y https://x.com/a');
 }));
 
 test('recorrido: cuenta notas, enlaces rotos y fallos', con({}, (c, cu) => {

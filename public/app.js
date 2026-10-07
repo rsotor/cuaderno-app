@@ -23,13 +23,13 @@ const icono = n => `<svg class="icono" aria-hidden="true"><use href="#i-${n}"/><
 let titulos = {};   // ruta → título (# …) de cada nota, para enseñar títulos y no nombres de fichero
 const tituloDe = p => titulos[p] || nombreNota(p);
 // Carpeta del kit «modulo-01-fundamentos-del-dinero» o «1.1-el-dinero-y-sus-funciones»: el número separado del nombre
-const nombreCarpeta = k => { const m = k.match(/^((?:modulo|m|bloque|semana|tema|unidad)-?\d+|\d+(?:\.\d+)*)-(.+)$/i); return m ? `${m[1]} · ${m[2].replace(/-/g, ' ')}` : k; };
+const nombreCarpeta = k => { const m = k.match(/^((?:modulo|m|bloque|semana|tema|unidad)-?\d+|\d+(?:\.\d+)*)-(.+)$/i); return m ? `<span class="num">${esc(m[1])}</span> ${esc(m[2].replace(/-/g, ' '))}` : esc(k); };
 
 // ---------- árbol
 function pintarArbol(lista) {
   const raiz = {};
   for (const p of lista) { let n = raiz; const partes = p.split('/'); partes.forEach((s, i) => { if (i === partes.length - 1) (n.__f ??= []).push(p); else n = (n[s] ??= {}); }); }
-  const pintar = (n, abierto) => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details${abierto ? ' open' : ''}><summary title="${esc(k)}">${esc(nombreCarpeta(k))}</summary>${pintar(n[k], false)}</details>`).join('')
+  const pintar = (n, abierto) => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details${abierto ? ' open' : ''}><summary title="${esc(k)}">${nombreCarpeta(k)}</summary>${pintar(n[k], false)}</details>`).join('')
     + (n.__f || []).map(p => `<a class="hoja" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}">${esc(tituloDe(p))}</a>`).join('');
   $('#arbol').innerHTML = lista.length ? pintar(raiz, true) : '<p class="vacio">No hay notas en esta carpeta.</p>';
   marcarActiva();
@@ -112,11 +112,11 @@ const verComoNota = ruta => `<p class="cambiar-vista"><button type="button" clas
 async function abrirExamen(ruta) {
   let ex; try { ex = await api(`/api/examen?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<p>${esc(e.message)}</p>`; return; }
   const fm = ex.frontmatter || {};
-  const estado = fm.intentos && String(fm.intentos) !== '0' ? `<p class="resumen">Intentos: ${esc(fm.intentos)}${fm.nota !== '' && fm.nota != null ? ` · última nota: <b>${esc(fm.nota)}</b>` : ''}${fm.aprobado ? ` · se aprueba con ${esc(fm.aprobado)}` : ''}</p>` : (fm.aprobado ? `<p class="resumen">Se aprueba con ${esc(fm.aprobado)}.</p>` : '');
+  const estado = fm.intentos && String(fm.intentos) !== '0' ? `<p class="resumen">Intentos: ${esc(fm.intentos)}${fm.nota !== '' && fm.nota != null ? `. Última nota: <b>${esc(fm.nota)}</b>` : ''}${fm.aprobado ? `. Se aprueba con ${esc(fm.aprobado)}` : ''}.</p>` : (fm.aprobado ? `<p class="resumen">Se aprueba con ${esc(fm.aprobado)}.</p>` : '');
   const form = ex.preguntas.map(q => `<fieldset class="pregunta" data-numero="${q.numero}"><legend><span class="numero">${q.numero}</span></legend><div class="enunciado">${q.enunciado}</div>${q.opciones.map(o => `<label class="opcion"><input type="${q.unica ? 'radio' : 'checkbox'}" name="p${q.numero}" value="${o.letra}"${o.marcada ? ' checked' : ''}><span class="letra">${o.letra})</span><span>${o.texto}</span></label>`).join('')}</fieldset>`).join('');
-  const pie = ex.validable ? '<button type="submit" id="validar">Validar</button><span class="pista">Guarda tus respuestas en la nota y las corrige con la herramienta del kit</span>'
+  const pie = ex.validable ? '<button type="submit" id="validar">Corregir</button><span class="pista">Guarda tus respuestas en la nota y las corrige con la herramienta del kit</span>'
     : `<button type="submit" id="validar" class="secundario">Guardar respuestas</button><span class="pista">${esc(ex.motivo || '')}</span>`;
-  $('#nota').innerHTML = `${verComoNota(ruta)}${ex.cabecera}${estado}<form id="examen" class="examen">${form}<footer class="examen-pie">${pie}</footer></form>${ex.resto ? `<section class="historico">${ex.resto}</section>` : ''}`;
+  $('#nota').innerHTML = `${verComoNota(ruta)}${ex.cabecera}${estado}<form id="examen" class="examen">${form}<div class="examen-pie">${pie}</div></form>${ex.resto ? `<section class="historico">${ex.resto}</section>` : ''}`;
   $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* texto */ } });
   $('#centro').scrollTop = 0;
   $('#examen').addEventListener('submit', async e => {
@@ -124,12 +124,12 @@ async function abrirExamen(ruta) {
     const respuestas = {};
     for (const f of $('#examen').querySelectorAll('fieldset')) respuestas[f.dataset.numero] = [...f.querySelectorAll('input:checked')].map(i => i.value);
     const sinContestar = Object.values(respuestas).filter(v => !v.length).length;
-    if (ex.validable && sinContestar && !confirm(`Hay ${sinContestar} pregunta${sinContestar === 1 ? '' : 's'} sin contestar. ¿Validar igualmente?`)) return;
+    if (ex.validable && sinContestar && !confirm(`Hay ${sinContestar} pregunta${sinContestar === 1 ? '' : 's'} sin contestar. ¿Corregir igualmente?`)) return;
     $('#validar').disabled = true; avisar(ex.validable ? 'Corrigiendo…' : 'Guardando…');
     let r; try { r = await api('/api/examen/validar', { ruta, respuestas }); } catch (err) { r = { codigo: 1, salida: err.message }; }
     await refrescarInfo(); refrescarContadores();
     abrirNota(ruta);
-    mostrarResultado(r.corregido ? 'Examen validado' : 'Respuestas guardadas', r);
+    mostrarResultado(r.corregido ? 'Examen corregido' : 'Respuestas guardadas', r);
   });
 }
 $('#nota').addEventListener('click', e => { const a = e.target.closest('[data-vista-nota]'); if (!a) return; e.preventDefault(); vistaNota = a.dataset.vistaNota; abrirNota(vistaNota); });
@@ -147,14 +147,14 @@ function pintarTarjeta() {
   const s = tarjetasEstado, n = s.tarjetas.length, i = s.indice, t = s.tarjetas[i];
   const sabidas = s.tarjetas.filter(x => x.sabia === true).length, falladas = s.tarjetas.filter(x => x.sabia === false).length;
   const marca = t.sabia === true ? '<span class="marca ok">✅ la sabías</span>' : t.sabia === false ? '<span class="marca mal">❌ no la sabías</span>' : '';
-  $('#nota').innerHTML = `${verComoNota(s.ruta)}<h1>${esc(s.titulo)}</h1><p class="resumen">${n} tarjetas · ${sabidas} sabidas · ${falladas} falladas</p>
+  $('#nota').innerHTML = `${verComoNota(s.ruta)}<h1>${esc(s.titulo)}</h1><p class="resumen">${n} tarjetas: ${sabidas} sabidas, ${falladas} falladas</p>
     <section class="tarjeta" aria-live="polite">
       <div class="cabecera"><span>Tarjeta ${i + 1} de ${n}</span>${marca}</div>
       <div class="pregunta-tarjeta">${t.pregunta}</div>
       ${s.destapada ? `<div class="respuesta-tarjeta">${t.respuesta}</div><div class="botones"><button type="button" data-tarjeta="sabia">✅ La sabía</button><button type="button" data-tarjeta="no-sabia" class="secundario">❌ No la sabía</button></div>`
       : '<div class="botones"><button type="button" data-tarjeta="destapar">Destapar</button></div>'}
-      <div class="pie"><button type="button" class="secundario pequeno" data-tarjeta="anterior"${i === 0 ? ' disabled' : ''}>← Anterior</button><span class="pista">${esc(t.info)}</span><button type="button" class="secundario pequeno" data-tarjeta="siguiente"${i === n - 1 ? ' disabled' : ''}>Siguiente →</button></div>
-    </section><p class="pista">Espacio destapa · 1 la sabía · 2 no la sabía · ← → cambian de tarjeta</p>`;
+      <div class="pie"><button type="button" class="secundario pequeno" data-tarjeta="anterior"${i === 0 ? ' disabled' : ''}>Anterior</button><span class="pista">${esc(t.info)}</span><button type="button" class="secundario pequeno" data-tarjeta="siguiente"${i === n - 1 ? ' disabled' : ''}>Siguiente</button></div>
+    </section><p class="pista">Teclado: espacio destapa, 1 la sabía, 2 no la sabía, flechas para cambiar de tarjeta</p>`;
   $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* texto */ } });
   const principal = $('#nota [data-tarjeta="destapar"], #nota [data-tarjeta="sabia"]'); if (principal) principal.focus();
 }
@@ -234,7 +234,7 @@ function abrirTerminal(modo) {
     fit = new FitAddon.FitAddon(); term.loadAddon(fit); term.open($('#terminal'));
     ws = new WebSocket(wsUrl(modo === 'profesor' ? '/pty?profesor=1' : '/pty'));
     ws.onmessage = e => term.write(e.data);
-    ws.onclose = () => term && term.write('\r\n\x1b[90m[terminal cerrada]\x1b[0m\r\n');
+    ws.onclose = () => term && term.write('\r\n[terminal cerrada]\r\n');
     term.onData(d => ws.readyState === 1 && ws.send(d));
     const redim = () => { fit.fit(); ws.readyState === 1 && ws.send('\u0001' + JSON.stringify({ cols: term.cols, rows: term.rows })); };
     ws.onopen = redim; new ResizeObserver(redim).observe($('#terminal'));
@@ -249,7 +249,7 @@ $('#btn-profesor').onclick = () => abrirTerminal('profesor');
 
 // ---------- cuadernos (pantalla de inicio)
 const hace = iso => { if (!iso) return 'nunca'; const d = (Date.now() - new Date(iso)) / 864e5; if (d < 1 / 24) return 'hace un momento'; if (d < 1) return `hace ${Math.round(d * 24)} h`; if (d < 30) return `hace ${Math.round(d)} día${Math.round(d) === 1 ? '' : 's'}`; return `el ${new Date(iso).toLocaleDateString('es')}`; };
-const textoGit = g => !g ? 'sin repositorio' : `guardado ${hace(g.ultimo)}${g.cambios ? ` · ${g.cambios} sin guardar` : ''}${g.sinSubir ? ` · ${g.sinSubir} sin subir` : ''}`;
+const textoGit = g => !g ? 'sin repositorio' : `guardado ${hace(g.ultimo)}${g.cambios ? `, ${g.cambios} sin guardar` : ''}${g.sinSubir ? `, ${g.sinSubir} sin subir` : ''}`;
 async function abrirCuadernos() {
   rutaActual = null; $('#nota').hidden = true; $('#panel').hidden = false;
   $('#miga').innerHTML = '<strong>Cuadernos</strong>';
@@ -319,8 +319,10 @@ function abrirAjustes() {
 }
 function cerrarAjustes() { $('#ajustes').hidden = true; if (foco) foco.focus(); }
 $('#btn-ajustes').onclick = abrirAjustes;
-$('#btn-menu').onclick = () => { const l = $('#lateral'); l.classList.toggle('abierto'); $('#btn-menu').setAttribute('aria-expanded', l.classList.contains('abierto')); };
-$('#lateral').addEventListener('click', e => { if (e.target.closest('a') && window.innerWidth <= 760) $('#lateral').classList.remove('abierto'); });
+function cajon(abrir) { const l = $('#lateral'); l.classList.toggle('abierto', abrir); $('#btn-menu').setAttribute('aria-expanded', String(abrir)); if (!abrir && window.innerWidth <= 760) $('#btn-menu').focus(); }
+$('#btn-menu').onclick = () => cajon(!$('#lateral').classList.contains('abierto'));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#lateral').classList.contains('abierto')) cajon(false); });
+$('#lateral').addEventListener('click', e => { if (e.target.closest('a') && window.innerWidth <= 760) cajon(false); });
 $('#ajustes-cerrar').onclick = cerrarAjustes;
 $('#ajustes form').addEventListener('change', async () => {
   info.configuracion = await api('/api/configuracion', { tema: $('#ajustes-tema').value, letra: $('#ajustes-letra').value, fuente: $('#ajustes-fuente').value, comando_agente: $('#ajustes-comando').value });

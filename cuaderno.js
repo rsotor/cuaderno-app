@@ -133,11 +133,17 @@ class Cuaderno {
       if (tipo === 'examen' || tipo === 'flashcards') continue;   // se contestan en su nota, no son tareas
       const ls = this.lineas(src);
       const items = [];
-      ls.forEach((l, i) => { const m = l.match(RE_CASILLA); if (!m) return; const texto = m[3].slice(2).replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, '$2').replace(/(?:[\w.-]+\/)+([\w.-]+)/g, '$1'); items.push({ linea: i, hecha: m[2] !== ' ', texto, html: this.md.renderInline(texto, {}) }); });
+      ls.forEach((l, i) => { const m = l.match(RE_CASILLA); if (!m) return; const texto = this.acortarRutas(m[3].slice(2).replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, '$2')); items.push({ linea: i, hecha: m[2] !== ' ', texto, html: this.md.renderInline(texto, {}) }); });
       if (items.length) grupos.push({ ruta: p, generado: /^> Lo genera tu profesor/m.test(ls.slice(0, 6).join('\n')), items });
     }
     grupos.sort((a, b) => (a.ruta === 'tareas.md' ? -1 : b.ruta === 'tareas.md' ? 1 : a.generado - b.generado));
     return grupos;
+  }
+  // Una ruta de nota del cuaderno dentro de un texto se deja en su nombre; cualquier otra cosa con barras
+  // («regla 50/30/20», «04/10/2026», una URL) se queda como está.
+  acortarRutas(texto) {
+    const notas = new Set(this.listar().map(p => p.replace(/\.md$/, '')));
+    return texto.replace(/[\w.-]+(?:\/[\w.-]+)+/g, t => notas.has(t.replace(/\.md$/, '')) ? t.replace(/\.md$/, '').split('/').pop() : t);
   }
   comentarios() {
     const lista = [];
