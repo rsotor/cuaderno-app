@@ -12,7 +12,7 @@
 <a class="saltar" href="#nota">Saltar al contenido</a>
 <div id="app">
   <aside id="lateral" aria-label="Cuaderno">
-    <header class="marca"><span class="logo" aria-hidden="true">▣</span><span id="nombre-curso">Cuaderno</span></header>
+    <header class="marca"><a href="#/cuadernos" title="Todos los cuadernos"><span class="logo" aria-hidden="true">▣</span><span id="nombre-curso">Cuaderno</span></a><small id="estado-git"></small></header>
     <label class="oculto" for="buscador">Buscar nota o texto</label>
     <input id="buscador" type="search" placeholder="Buscar nota o texto…  (Ctrl K)" autocomplete="off">
     <nav class="paginas" aria-label="Páginas">
@@ -24,6 +24,7 @@
     <footer class="pie-lateral">
       <button type="button" id="btn-terminal" title="Abrir la terminal (Ctrl `)">⌨ Terminal</button>
       <button type="button" id="btn-profesor" title="Abre al profesor en la terminal" hidden>🎓 Profesor</button>
+      <button type="button" id="btn-ajustes" title="Ajustes" aria-label="Ajustes">⚙</button>
     </footer>
   </aside>
   <main id="centro">
@@ -42,6 +43,18 @@
     <label class="oculto" for="editor-texto">Texto en Markdown</label>
     <textarea id="editor-texto" spellcheck="false"></textarea>
     <footer><span class="pista">Ctrl Enter guarda · Esc cancela</span><button type="button" id="editor-cancelar" class="secundario">Cancelar</button><button type="button" id="editor-guardar">Guardar</button></footer>
+  </div>
+</div>
+<div id="ajustes" class="modal" role="dialog" aria-modal="true" aria-labelledby="ajustes-titulo" hidden>
+  <div class="editor-caja estrecha">
+    <header><span id="ajustes-titulo">Ajustes</span><span class="editor-lineas">iguales para todos tus cuadernos</span></header>
+    <form class="ajustes">
+      <label>Tema <select id="ajustes-tema"><option value="auto">Como el sistema</option><option value="claro">Claro</option><option value="oscuro">Oscuro</option></select></label>
+      <label>Letra <select id="ajustes-letra"><option value="pequeña">Pequeña</option><option value="media">Media</option><option value="grande">Grande</option></select></label>
+      <label>Fuente de lectura <select id="ajustes-fuente"><option value="sistema">Del sistema</option><option value="serif">Con serifa</option></select></label>
+      <label>Comando del profesor en carpetas sin kit <input id="ajustes-comando" placeholder="claude" autocomplete="off"></label>
+    </form>
+    <footer><button type="button" id="ajustes-cerrar">Cerrar</button></footer>
   </div>
 </div>
 <script src="/assets/katex/dist/katex.min.js"></script>

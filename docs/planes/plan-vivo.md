@@ -5,10 +5,10 @@
 ## 0. Estado
 
 **Ahora**
-- Fase 2 cerrada el 2026-10-07: servidor con token, `Origin` y `Host`; escrituras que comprueban el texto original (409) y conservan CRLF; índice en memoria con `.gitignore` / `.obsidianignore`; detección del kit; botón Profesor con el comando del adaptador; 28 tests en verde; recorrido del curso de ejemplo sin enlaces rotos.
-- Siguiente: fase 3 (pantalla de cuadernos y configuración).
+- Fase 3 cerrada el 2026-10-07: pantalla de cuadernos (recientes, abrir carpeta, quitar de la lista, último guardado y cambios sin guardar por git), configuración del usuario (tema, letra, fuente, comando del profesor sin kit) en `~/.config/cuaderno/config.json`, `cuaderno.json` opcional por cuaderno (nombre, portada). 31 tests en verde.
+- Siguiente: fase 4 (Guardar / Traer / Deshacer). Necesita un curso con `.kit/` creado con el instalador del kit en una carpeta temporal.
 
-**Después:** fase 4 (Guardar / Traer / Deshacer).
+**Después:** fase 5 (formulario de examen y modo tarjeta).
 
 **Inbox**
 - Fase 6: el panel Tareas enseña el Markdown crudo de cada casilla (`**negrita**`, rutas largas) y corta a 200 caracteres; el bloque de propiedades `alias` vacío ocupa una fila.
@@ -127,15 +127,15 @@ Capturas del prototipo (en `docs/capturas-prototipo/`), tal como salió, antes d
 | Seguridad del servidor local | Escuchar en 127.0.0.1 no basta: token aleatorio por arranque exigido en la API y en la terminal, comprobación de `Origin`, los `.html` del cuaderno en iframe con `sandbox`. Antes de que el repo sea público |
 | Carpetas | Índice en memoria, actualizado por el vigilante. Se respetan `.gitignore` y `.obsidianignore`; `node_modules` nunca se recorre |
 | Botón Profesor | Lanza el comando del adaptador del kit en una terminal nueva (`pty.spawn`), no lo teclea; sin kit, el comando sale de la configuración del usuario, nunca del repo. Si el binario no existe, lo dice |
-| Varios cuadernos | Pantalla de inicio con recientes. La lista vive en la configuración del usuario, fuera de los repos |
-| Configuración | Un `cuaderno.json` por cuaderno (tema, fuente, paneles, atajos, portada). El comando del agente no va ahí |
+| Varios cuadernos | Pantalla de inicio con recientes. La lista vive en la configuración del usuario, fuera de los repos. Arrancar sin carpeta abre esa pantalla |
+| Configuración | **Del usuario, igual para todos sus cuadernos** (2026-10-07): tema, letra, fuente y el comando del profesor para carpetas sin kit, en `~/.config/cuaderno/config.json` (`%APPDATA%\cuaderno` en Windows). `cuaderno.json` en la raíz del cuaderno, opcional y versionado con él, solo con lo del cuaderno en sí: nombre para mostrar y portada |
 | Diseño | **Repaso de UX/UI con plugins cuando existan las pantallas que más lo piden** (examen, tarjetas, cuadernos): fase 6. Plugins del catálogo de Anthropic a activar en la sesión: **Design** (Anthropic; skills `design-critique`, `accessibility-review`, `ux-copy`) para la crítica pantalla a pantalla y los textos; **ux-ui-audit** (comunidad) para medir en el navegador contraste WCAG, tamaño de objetivos y foco; **frontend-design** (Anthropic) para aplicar los cambios con criterio. Entrada: las capturas de §5 y la app arrancada. Salida: lista priorizada, cambios aplicados, capturas de antes y después. Lo que ya se ve en las capturas se arregla antes, en la fase 2 |
 
 ## 7. Fases
 
 1. **Sembrar el repo:** prototipo, licencia, README, este documento como plan vivo, reglas del repo. ✅ 2026-10-07
 2. ✅ 2026-10-07 **Base segura, escrituras robustas y tests:** token + `Origin` + `sandbox`; escrituras con comprobación del texto original, línea en blanco tras cada comentario, CRLF; índice en memoria y respeto a `.gitignore` / `.obsidianignore`; detección del kit; botón Profesor con el comando del adaptador; tests `node --test` del render y de las escrituras sobre los dos cuadernos (§9: "el mismo fichero que a mano", con LF y CRLF). De diseño, solo lo que ya se ve en las capturas: foco de teclado visible, "editar / comentar" accesibles sin ratón, el panel Tareas menos denso, la cabecera de propiedades por debajo del título.
-3. **Pantalla de cuadernos** y configuración.
+3. ✅ 2026-10-07 **Pantalla de cuadernos** y configuración del usuario.
 4. **Guardar / Traer / Deshacer.**
 5. **Formulario de examen** y **modo tarjeta** de flashcards.
 6. **Repaso de diseño** con los plugins de §6 (Design, ux-ui-audit, frontend-design), cambios aplicados, capturas antes y después. Nada de funcionalidad nueva hasta cerrarlo.

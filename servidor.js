@@ -2,12 +2,16 @@
 // El servidor local: la API que usa el navegador, los ficheros estáticos, la terminal por WebSocket y la recarga en
 // vivo. Escuchar en 127.0.0.1 no basta para estar a salvo (cualquier web abierta en el navegador puede llamar a
 // localhost): cada arranque genera un token que viaja en la URL una vez, se queda en una cookie y se exige en todo.
+// Un servidor tiene como mucho un cuaderno abierto; la pantalla de cuadernos lo cambia.
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const crypto = require('node:crypto');
+const { execFileSync } = require('node:child_process');
 const { WebSocketServer } = require('ws');
-const { ErrorPeticion } = require('./cuaderno');
+const { Cuaderno, ErrorPeticion } = require('./cuaderno');
+const { detectar } = require('./kit');
+const config = require('./config');
 
 const COOKIE = 'cuaderno';
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' };
@@ -25,7 +29,49 @@ function origenPropio(req, puerto) {
   return ['127.0.0.1', 'localhost'].some(h => o === `http://${h}:${puerto}`);
 }
 
-function crearServidor({ cuaderno, kit, token = crypto.randomBytes(16).toString('hex'), pty = null }) {
+// Lo que git sabe de un cuaderno, solo lectura: cuándo se guardó por última vez y si hay cambios sin guardar.
+function estadoGit(raiz) {
+  const git = args => execFileSync('git', args, { cwd: raiz, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 4000 }).trim();
+  try {
+    if (git(['rev-parse', '--is-inside-work-tree']) !== 'true') return null;
+    const ultimo = git(['log', '-1', '--format=%cI']) || null;
+    const cambios = git(['status', '--porcelain']).split('\n').filter(Boolean).length;
+    let sinSubir = null;
+    try { sinSubir = Number(git(['rev-list', '--count', '@{upstream}..HEAD'])); } catch { /* sin remoto */ }
+    return { ultimo, cambios, sinSubir };
+  } catch { return null; }
+}
+
+function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null }) {
+  const estado = { cuaderno, kit };
+  const oyentes = new Set();
+  const avisarCambio = f => { for (const ws of oyentes) ws.send(JSON.stringify({ fichero: f })); };
+  if (cuaderno) cuaderno.vigilar(avisarCambio);
+
+  const abrir = ruta => {
+    if (typeof ruta !== 'string' || !ruta.trim()) throw new ErrorPeticion('falta la carpeta');
+    const raiz = path.resolve(ruta.trim().replace(/^~(?=$|[\\/])/, require('node:os').homedir()));
+    if (!fs.existsSync(raiz) || !fs.statSync(raiz).isDirectory()) throw new ErrorPeticion('esa carpeta no existe');
+    const k = detectar(raiz);
+    if (!fs.existsSync(k.base)) throw new ErrorPeticion('esa carpeta no tiene notas');
+    if (estado.cuaderno) estado.cuaderno.cerrar();
+    estado.kit = k; estado.cuaderno = new Cuaderno(raiz, k.base);
+    estado.cuaderno.vigilar(avisarCambio);
+    config.registrarReciente(raiz, estado.cuaderno.nombre());
+    return info();
+  };
+  const info = () => {
+    const c = config.leer();
+    const base = { configuracion: config.apariencia(c), cuaderno: null };
+    if (!estado.cuaderno) return base;
+    const { cuaderno: cu, kit: k } = estado;
+    const comando = k.tipo === 'kit' ? k.comando : (k.tipo === 'carpeta' ? c.comando_agente : null);
+    return { ...base, cuaderno: { nombre: cu.nombre(), ruta: cu.raiz, kit: k.tipo, profesor: !!comando, portada: cu.portada(), git: estadoGit(cu.raiz) } };
+  };
+  const comandoProfesor = () => { const k = estado.kit; if (!k) return null; return k.tipo === 'kit' ? k.comando : (k.tipo === 'carpeta' ? config.leer().comando_agente || null : null); };
+  const cuadernos = () => config.leer().recientes.map(r => ({ ...r, existe: fs.existsSync(r.ruta), abiertoAhora: !!estado.cuaderno && estado.cuaderno.raiz === r.ruta, git: fs.existsSync(r.ruta) ? estadoGit(r.ruta) : null }));
+  const conCuaderno = () => { if (!estado.cuaderno) throw new ErrorPeticion('no hay ningún cuaderno abierto'); return estado.cuaderno; };
+
   const servir = (res, abs) => {
     if (!fs.existsSync(abs) || fs.statSync(abs).isDirectory()) { res.writeHead(404); return res.end('no existe'); }
     res.writeHead(200, { 'content-type': TIPOS[path.extname(abs).toLowerCase()] || 'application/octet-stream' });
@@ -36,7 +82,6 @@ function crearServidor({ cuaderno, kit, token = crypto.randomBytes(16).toString(
     if (!/^application\/json/.test(req.headers['content-type'] || '')) return mal(Object.assign(new Error('el cuerpo tiene que ser JSON'), { status: 415 }));
     let d = ''; req.on('data', c => { d += c; if (d.length > 2e6) req.destroy(); }); req.on('end', () => { try { ok(d ? JSON.parse(d) : {}); } catch { mal(new ErrorPeticion('JSON inválido')); } });
   });
-  const conKit = kit.tipo === 'kit';
 
   const server = http.createServer(async (req, res) => {
     const puerto = server.address().port;
@@ -59,20 +104,25 @@ function crearServidor({ cuaderno, kit, token = crypto.randomBytes(16).toString(
       if (p === '/') return servir(res, path.join(PUBLICO, 'index.html'));
       if (p.startsWith('/public/')) return servir(res, path.join(PUBLICO, path.normalize(p.slice(8))));
       if (p.startsWith('/assets/')) return servir(res, path.join(NODE_MODULES, path.normalize(p.slice(8))));
-      if (p === '/api/info') return json(res, { nombre: path.basename(cuaderno.raiz), kit: kit.tipo, profesor: !!(conKit && kit.comando), portada: cuaderno.portada() });
-      if (p === '/api/arbol') return json(res, cuaderno.listar());
-      if (p === '/api/buscar') return json(res, cuaderno.buscar(url.searchParams.get('q') || ''));
-      if (p === '/api/nota') return json(res, cuaderno.nota(url.searchParams.get('p')));
-      if (p === '/api/tareas') return json(res, cuaderno.tareas({ soloPropias: kit.tipo === 'carpeta' }));   // una salida del kit sin motor sigue teniendo sus formatos
-      if (p === '/api/comentarios') return json(res, cuaderno.comentarios());
-      if (p === '/api/recorrido') return json(res, cuaderno.recorrido());
-      if (p.startsWith('/fichero/')) return servir(res, cuaderno.dentro(decodeURIComponent(p.slice(9))));
+      if (p === '/api/info') return json(res, info());
+      if (p === '/api/cuadernos') return json(res, cuadernos());
+      if (p === '/api/arbol') return json(res, conCuaderno().listar());
+      if (p === '/api/buscar') return json(res, conCuaderno().buscar(url.searchParams.get('q') || ''));
+      if (p === '/api/nota') return json(res, conCuaderno().nota(url.searchParams.get('p')));
+      if (p === '/api/tareas') return json(res, conCuaderno().tareas({ soloPropias: estado.kit.tipo === 'carpeta' }));   // una salida del kit sin motor sigue teniendo sus formatos
+      if (p === '/api/comentarios') return json(res, conCuaderno().comentarios());
+      if (p === '/api/recorrido') return json(res, conCuaderno().recorrido());
+      if (p.startsWith('/fichero/')) return servir(res, conCuaderno().dentro(decodeURIComponent(p.slice(9))));
       if (req.method === 'POST') {
         const b = await leerCuerpo(req);
-        if (p === '/api/bloque') { cuaderno.escribirBloque(b.ruta, b.desde, b.hasta, b.texto, b.original); return json(res, { ok: true }); }
-        if (p === '/api/casilla') { cuaderno.marcarCasilla(b.ruta, b.linea, !!b.marcada, b.original); return json(res, { ok: true }); }
-        if (p === '/api/comentario') { cuaderno.comentar(b.ruta, b.desde, b.hasta, b.texto, b.original); return json(res, { ok: true }); }
-        if (p === '/api/tarea') { cuaderno.nuevaTarea(b.texto); return json(res, { ok: true }); }
+        if (p === '/api/abrir') return json(res, abrir(b.ruta));
+        if (p === '/api/olvidar') { config.olvidarReciente(String(b.ruta || '')); return json(res, { ok: true }); }
+        if (p === '/api/configuracion') return json(res, config.apariencia(config.ajustar(b)));
+        const cu = conCuaderno();
+        if (p === '/api/bloque') { cu.escribirBloque(b.ruta, b.desde, b.hasta, b.texto, b.original); return json(res, { ok: true }); }
+        if (p === '/api/casilla') { cu.marcarCasilla(b.ruta, b.linea, !!b.marcada, b.original); return json(res, { ok: true }); }
+        if (p === '/api/comentario') { cu.comentar(b.ruta, b.desde, b.hasta, b.texto, b.original); return json(res, { ok: true }); }
+        if (p === '/api/tarea') { cu.nuevaTarea(b.texto); return json(res, { ok: true }); }
       }
       res.writeHead(404); res.end('no existe');
     } catch (e) {
@@ -82,24 +132,25 @@ function crearServidor({ cuaderno, kit, token = crypto.randomBytes(16).toString(
   });
 
   // ---------- terminal (pty) por WebSocket, abierta en la raíz del cuaderno. ?profesor=1 lanza el comando del
-  // adaptador del kit directamente (nunca se teclea a ciegas en una shell).
+  // profesor directamente (el del adaptador del kit, o el configurado por el usuario sin kit): nunca se teclea a ciegas.
   const wssPty = new WebSocketServer({ noServer: true });
   wssPty.on('connection', (ws, req) => {
     if (!pty) { ws.send('\r\n[la terminal no está disponible en este arranque]\r\n'); return ws.close(); }
+    if (!estado.cuaderno) { ws.send('\r\n[no hay ningún cuaderno abierto]\r\n'); return ws.close(); }
     const url = new URL(req.url, 'http://x');
     const profesor = url.searchParams.get('profesor') === '1';
     const shell = process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash');
+    const comando = comandoProfesor();
+    const opciones = { name: 'xterm-256color', cols: 100, rows: 28, cwd: estado.cuaderno.raiz, env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } };
     let term;
     try {
       if (profesor) {
-        if (!conKit || !kit.comando) { ws.send('\r\n[este cuaderno no tiene profesor configurado]\r\n'); return ws.close(); }
-        const [cmd, ...args] = kit.comando.split(/\s+/);
-        term = pty.spawn(cmd, args, { name: 'xterm-256color', cols: 100, rows: 28, cwd: cuaderno.raiz, env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } });
-      } else {
-        term = pty.spawn(shell, [], { name: 'xterm-256color', cols: 100, rows: 28, cwd: cuaderno.raiz, env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } });
-      }
+        if (!comando) { ws.send('\r\n[este cuaderno no tiene profesor configurado]\r\n'); return ws.close(); }
+        const [cmd, ...args] = comando.split(/\s+/);
+        term = pty.spawn(cmd, args, opciones);
+      } else term = pty.spawn(shell, [], opciones);
     } catch (e) {
-      ws.send(`\r\n[no se ha podido abrir ${profesor ? kit.comando : shell}: ${e.message}]\r\n`); return ws.close();
+      ws.send(`\r\n[no se ha podido abrir ${profesor ? comando : shell}: ${e.message}]\r\n`); return ws.close();
     }
     term.onData(d => ws.readyState === 1 && ws.send(d));
     term.onExit(() => ws.close());
@@ -108,7 +159,6 @@ function crearServidor({ cuaderno, kit, token = crypto.randomBytes(16).toString(
   });
 
   // ---------- recarga en vivo
-  const oyentes = new Set();
   const wssCambios = new WebSocketServer({ noServer: true });
   server.on('upgrade', (req, sock, head) => {
     const puerto = server.address().port;
@@ -118,12 +168,13 @@ function crearServidor({ cuaderno, kit, token = crypto.randomBytes(16).toString(
     else if (url.pathname === '/cambios') wssCambios.handleUpgrade(req, sock, head, ws => { oyentes.add(ws); ws.on('close', () => oyentes.delete(ws)); });
     else sock.destroy();
   });
-  cuaderno.vigilar(f => { for (const ws of oyentes) ws.send(JSON.stringify({ fichero: f })); });
-  server.on('close', () => cuaderno.cerrar());
+  server.on('close', () => estado.cuaderno && estado.cuaderno.cerrar());
 
   server.token = token;
+  server.estado = estado;
+  server.abrir = abrir;
   server.url = () => `http://127.0.0.1:${server.address().port}/?t=${token}`;
   return server;
 }
 
-module.exports = { crearServidor, COOKIE };
+module.exports = { crearServidor, estadoGit, COOKIE };

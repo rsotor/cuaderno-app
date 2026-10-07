@@ -9,8 +9,12 @@ Markdown en tus propios ficheros.
 
 ```
 npm install
-node server.js <carpeta-del-cuaderno>
+node server.js [carpeta-del-cuaderno]
 ```
+
+Sin carpeta, arranca en la pantalla de cuadernos: los recientes y una casilla para abrir otra carpeta. Los ajustes
+(tema, letra, fuente) son tuyos, iguales para todos tus cuadernos. Un `cuaderno.json` opcional en la raíz de un
+cuaderno le da nombre y portada (`{ "nombre": "Finanzas", "portada": "inicio.md" }`).
 
 La terminal imprime la dirección que hay que abrir (lleva un código que cambia en cada arranque: así ninguna otra
 web abierta en el navegador puede hablar con tu cuaderno). Necesita Node 24 o más reciente.

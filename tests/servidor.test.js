@@ -1,4 +1,8 @@
 'use strict';
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+process.env.CUADERNO_CONFIG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'cuaderno-config-'));
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Cuaderno } = require('../cuaderno');
@@ -52,7 +56,8 @@ test('la API: info, árbol, nota, escrituras y el 409 cuando la nota cambió', a
   const s = await arrancar({ kit: 'kit' });
   try {
     const info = await (await s.pedir('/api/info')).json();
-    assert.deepEqual(info, { nombre: require('node:path').basename(s.c.raiz), kit: 'kit', profesor: true, portada: 'inicio.md' });
+    assert.deepEqual(info.cuaderno, { nombre: path.basename(s.c.raiz), ruta: s.c.raiz, kit: 'kit', profesor: true, portada: 'inicio.md', git: null });
+    assert.equal(info.configuracion.tema, 'auto');
     assert.ok((await (await s.pedir('/api/arbol')).json()).includes('conceptos/interes.md'));
     assert.equal((await s.pedir('/api/nota?p=no/existe.md')).status, 404);
     assert.equal((await s.pedir('/api/nota?p=../../x')).status, 400);
@@ -77,7 +82,7 @@ test('sin kit: sin profesor y las tareas son solo las propias', async () => {
   const s = await arrancar();
   try {
     const info = await (await s.pedir('/api/info')).json();
-    assert.equal(info.kit, 'carpeta'); assert.equal(info.profesor, false);
+    assert.equal(info.cuaderno.kit, 'carpeta'); assert.equal(info.cuaderno.profesor, false);
     assert.deepEqual((await (await s.pedir('/api/tareas')).json()).map(g => g.ruta), ['tareas.md']);
   } finally { await s.cerrar(); }
 });
@@ -93,4 +98,31 @@ test('WebSocket: sin cookie o con Origin ajeno no hay terminal ni recarga', asyn
     assert.equal(await intentar('/cambios', { cookie: s.cookie, origin: `http://127.0.0.1:${s.puerto}` }), 'abierto');
     assert.equal(await intentar('/pty', { cookie: s.cookie, origin: `http://127.0.0.1:${s.puerto}` }), 'abierto');   // sin pty: avisa y cierra
   } finally { await s.cerrar(); }
+});
+
+test('sin cuaderno abierto: la API lo dice; abrir una carpeta cambia el cuaderno y lo apunta en recientes', async () => {
+  const otro = crearCuaderno({ kit: 'salida-sin-motor' });
+  fs.writeFileSync(path.join(otro.raiz, 'cuaderno.json'), JSON.stringify({ nombre: 'Mi otro curso', portada: 'tareas.md' }));
+  const server = crearServidor({ token: 'cd'.repeat(16) });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const puerto = server.address().port, cookie = `cuaderno=${server.token}`;
+  const pedir = (ruta, opts = {}) => fetch(`http://127.0.0.1:${puerto}${ruta}`, { ...opts, headers: { cookie, ...(opts.headers || {}) } });
+  const post = (ruta, body) => pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    assert.equal((await (await pedir('/api/info')).json()).cuaderno, null);
+    assert.equal((await pedir('/api/arbol')).status, 400);
+    assert.equal((await post('/api/abrir', { ruta: '/no/existe/seguro' })).status, 400);
+    const r = await post('/api/abrir', { ruta: otro.raiz });
+    assert.equal(r.status, 200);
+    const info = await r.json();
+    assert.equal(info.cuaderno.nombre, 'Mi otro curso'); assert.equal(info.cuaderno.kit, 'salida-sin-motor'); assert.equal(info.cuaderno.portada, 'tareas.md');
+    assert.ok((await (await pedir('/api/arbol')).json()).includes('inicio.md'));
+    const lista = await (await pedir('/api/cuadernos')).json();
+    assert.deepEqual(lista.map(c => [c.nombre, c.existe, c.abiertoAhora]), [['Mi otro curso', true, true]]);
+    // la configuración se guarda y vuelve en /api/info
+    assert.deepEqual(await (await post('/api/configuracion', { tema: 'oscuro', letra: 'grande' })).json(), { tema: 'oscuro', letra: 'grande', fuente: 'sistema', comando_agente: '' });
+    assert.equal((await (await pedir('/api/info')).json()).configuracion.tema, 'oscuro');
+    await post('/api/olvidar', { ruta: otro.raiz });
+    assert.deepEqual(await (await pedir('/api/cuadernos')).json(), []);
+  } finally { await new Promise(r => server.close(r)); otro.borrar(); fs.rmSync(process.env.CUADERNO_CONFIG_DIR, { recursive: true, force: true }); }
 });

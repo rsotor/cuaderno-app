@@ -22,7 +22,17 @@ class Cuaderno {
     this.md = crearRender(d => this.resolverWiki(d));
     this.indice = null;
     this.vigilante = null;
+    this.ajustes = this.leerAjustes();
   }
+  // cuaderno.json en la raíz del cuaderno: solo lo que es del cuaderno en sí (nombre para mostrar, portada).
+  // La apariencia (tema, letra, fuente) es del usuario, no del cuaderno.
+  leerAjustes() {
+    try {
+      const a = JSON.parse(fs.readFileSync(path.join(this.raiz, 'cuaderno.json'), 'utf8'));
+      return { nombre: typeof a.nombre === 'string' && a.nombre.trim() ? a.nombre.trim() : null, portada: typeof a.portada === 'string' ? a.portada.replace(/^\//, '') : null };
+    } catch { return { nombre: null, portada: null }; }
+  }
+  nombre() { return this.ajustes.nombre || path.basename(this.raiz); }
 
   // ---------- índice
   listar() {
@@ -56,9 +66,10 @@ class Cuaderno {
     const nombre = limpio.split('/').pop();
     return todos.find(p => p.replace(/\.md$/, '').split('/').pop() === nombre) || null;
   }
-  // La portada: inicio.md si existe; si no, la primera nota de la raíz; si no hay, null (la app enseña el árbol).
+  // La portada: la de cuaderno.json si existe; si no, inicio.md; si no, la primera nota de la raíz; si no hay, null (la app enseña el árbol).
   portada() {
     const todos = this.listar();
+    if (this.ajustes.portada && todos.includes(this.ajustes.portada)) return this.ajustes.portada;
     if (todos.includes('inicio.md')) return 'inicio.md';
     return todos.find(p => !p.includes('/') && p.endsWith('.md')) || null;
   }

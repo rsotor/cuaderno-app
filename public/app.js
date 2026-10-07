@@ -2,7 +2,8 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-let arbol = [], rutaActual = null, info = { portada: null, kit: 'carpeta', profesor: false };
+let arbol = [], rutaActual = null, info = { cuaderno: null, configuracion: {} };
+const cuaderno = () => info.cuaderno;
 
 // Toda llamada a la API: GET sin cuerpo, POST con JSON. Un 409 significa que la nota cambió debajo: se recarga.
 async function api(p, body) {
@@ -54,7 +55,7 @@ document.addEventListener('keydown', e => {
 // ---------- nota
 function sinPortada() {
   $('#miga').innerHTML = '<strong>Cuaderno</strong>';
-  $('#nota').innerHTML = `<h1>${esc(info.nombre)}</h1><p class="resumen">Esta carpeta no tiene una nota de portada. Elige una nota en el árbol de la izquierda o busca con <kbd>Ctrl K</kbd>.</p>`;
+  $('#nota').innerHTML = `<h1>${esc(cuaderno().nombre)}</h1><p class="resumen">Esta carpeta no tiene una nota de portada. Elige una nota en el árbol de la izquierda o busca con <kbd>Ctrl K</kbd>.</p>`;
 }
 async function abrirNota(ruta, lineaDestino) {
   rutaActual = ruta;
@@ -110,7 +111,7 @@ async function abrirTareas() {
   $('#miga').innerHTML = '<strong>Tareas</strong>';
   const g = await api('/api/tareas');
   const total = g.reduce((a, x) => a + x.items.length, 0), hechas = g.reduce((a, x) => a + x.items.filter(i => i.hecha).length, 0);
-  const nota = info.kit !== 'carpeta' ? 'Lo que marcas aquí se escribe en su nota. Los exámenes y las flashcards se contestan en la suya.' : 'Tu lista propia, en <code>tareas.md</code>.';
+  const nota = cuaderno().kit !== 'carpeta' ? 'Lo que marcas aquí se escribe en su nota. Los exámenes y las flashcards se contestan en la suya.' : 'Tu lista propia, en <code>tareas.md</code>.';
   $('#panel').innerHTML = `<h1>Tareas</h1><p class="resumen">${hechas} de ${total} hechas. ${nota}</p><form class="nueva-tarea" id="nueva-tarea"><label class="oculto" for="tarea-nueva">Nueva tarea</label><input id="tarea-nueva" placeholder="Nueva tarea para mí…" autocomplete="off"><button type="submit">Añadir</button></form>`
     + g.map(gr => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(gr.ruta)}">${esc(gr.ruta)}</a>${gr.generado ? '<span class="solo-lectura">la escribe el profesor al guardar</span>' : ''}</h2>`
       + gr.items.map(i => `<label class="item${i.hecha ? ' hecha' : ''}"><input type="checkbox" data-ruta="${esc(gr.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${gr.generado ? ' disabled' : ''}><span>${esc(i.texto)}</span></label>`).join('') + '</section>').join('');
@@ -125,6 +126,7 @@ async function abrirComentarios() {
     + (c.length ? c.map(x => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(x.ruta)}?l=${x.linea}">${esc(x.ruta)}</a> · ${esc(x.titulo)}</h2><p>${esc(x.texto)}</p></section>`).join('') : '<section class="grupo"><p>Todavía no hay comentarios. En cualquier nota, pasa por un párrafo (o llega a él con Tab) y pulsa <b>comentar</b>.</p></section>');
 }
 async function refrescarContadores() {
+  if (!cuaderno()) return;
   const [t, c] = await Promise.all([api('/api/tareas'), api('/api/comentarios')]);
   const pend = t.reduce((a, g) => a + g.items.filter(i => !i.hecha).length, 0);
   $('#n-tareas').textContent = pend ? `(${pend})` : ''; $('#n-comentarios').textContent = c.length ? `(${c.length})` : '';
@@ -156,24 +158,79 @@ $('#btn-terminal').onclick = () => alternarTerminal();
 $('#btn-cerrar-terminal').onclick = () => alternarTerminal();
 $('#btn-profesor').onclick = () => abrirTerminal('profesor');
 
+// ---------- cuadernos (pantalla de inicio)
+const hace = iso => { if (!iso) return 'nunca'; const d = (Date.now() - new Date(iso)) / 864e5; if (d < 1 / 24) return 'hace un momento'; if (d < 1) return `hace ${Math.round(d * 24)} h`; if (d < 30) return `hace ${Math.round(d)} día${Math.round(d) === 1 ? '' : 's'}`; return `el ${new Date(iso).toLocaleDateString('es')}`; };
+const textoGit = g => !g ? 'sin git' : `guardado ${hace(g.ultimo)}${g.cambios ? ` · ${g.cambios} sin guardar` : ''}${g.sinSubir ? ` · ${g.sinSubir} sin subir` : ''}`;
+async function abrirCuadernos() {
+  rutaActual = null; $('#nota').hidden = true; $('#panel').hidden = false;
+  $('#miga').innerHTML = '<strong>Cuadernos</strong>';
+  const lista = await api('/api/cuadernos');
+  $('#panel').innerHTML = `<h1>Cuadernos</h1><p class="resumen">Cada cuaderno es una carpeta de notas con su propio repositorio. Abre uno reciente o escribe la ruta de otra carpeta.</p>
+    <form class="nueva-tarea" id="abrir-carpeta"><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="Ruta de la carpeta del cuaderno, por ejemplo ~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button></form>`
+    + (lista.length ? lista.map(c => `<section class="grupo cuaderno${c.abiertoAhora ? ' abierto' : ''}${c.existe ? '' : ' ausente'}"><h2>${c.existe ? `<a href="#/" data-abrir="${esc(c.ruta)}">${esc(c.nombre)}</a>` : esc(c.nombre)}${c.abiertoAhora ? '<span class="solo-lectura">abierto ahora</span>' : ''}</h2><p class="ruta"><code>${esc(c.ruta)}</code></p><p class="detalle">${c.existe ? textoGit(c.git) : 'la carpeta ya no está'}</p><button type="button" class="secundario pequeno" data-olvidar="${esc(c.ruta)}">Quitar de la lista</button></section>`).join('')
+      : '<section class="grupo"><p>Todavía no has abierto ningún cuaderno.</p></section>');
+}
+async function abrirCarpeta(ruta) {
+  try { info = await api('/api/abrir', { ruta }); } catch (e) { avisar(e.message); return; }
+  await cargarCuaderno();
+  location.hash = cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/';
+  if (location.hash === '#/') enrutar();
+}
+$('#panel').addEventListener('click', async e => {
+  const a = e.target.closest('a[data-abrir]'); if (a) { e.preventDefault(); return abrirCarpeta(a.dataset.abrir); }
+  const b = e.target.closest('button[data-olvidar]'); if (b) { await api('/api/olvidar', { ruta: b.dataset.olvidar }); abrirCuadernos(); }
+});
+$('#panel').addEventListener('submit', e => { if (e.target.id !== 'abrir-carpeta') return; e.preventDefault(); const v = e.target.querySelector('input').value.trim(); if (v) abrirCarpeta(v); });
+
+// ---------- apariencia y ajustes del usuario (iguales para todos los cuadernos)
+function aplicarApariencia(c) { const r = document.documentElement; r.dataset.tema = c.tema; r.dataset.letra = c.letra; r.dataset.fuente = c.fuente; }
+function abrirAjustes() {
+  const c = info.configuracion;
+  $('#ajustes-tema').value = c.tema; $('#ajustes-letra').value = c.letra; $('#ajustes-fuente').value = c.fuente; $('#ajustes-comando').value = c.comando_agente || '';
+  foco = document.activeElement; $('#ajustes').hidden = false; $('#ajustes-tema').focus();
+}
+function cerrarAjustes() { $('#ajustes').hidden = true; if (foco) foco.focus(); }
+$('#btn-ajustes').onclick = abrirAjustes;
+$('#ajustes-cerrar').onclick = cerrarAjustes;
+$('#ajustes form').addEventListener('change', async () => {
+  info.configuracion = await api('/api/configuracion', { tema: $('#ajustes-tema').value, letra: $('#ajustes-letra').value, fuente: $('#ajustes-fuente').value, comando_agente: $('#ajustes-comando').value });
+  aplicarApariencia(info.configuracion);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ajustes').hidden) cerrarAjustes(); });
+
+function pintarEstado() {
+  const c = cuaderno();
+  $('#lateral').classList.toggle('sin-cuaderno', !c);
+  $('#nombre-curso').textContent = c ? c.nombre : 'Cuaderno';
+  document.title = c ? `${c.nombre} · Cuaderno` : 'Cuaderno';
+  $('#estado-git').textContent = c ? textoGit(c.git) : '';
+  $('#btn-profesor').hidden = !(c && c.profesor);
+  $('#link-inicio').href = c && c.portada ? `#/n/${encodeURI(c.portada)}` : '#/';
+}
+async function cargarCuaderno() {
+  pintarEstado();
+  if (!cuaderno()) { arbol = []; $('#arbol').innerHTML = ''; return; }
+  arbol = await api('/api/arbol'); pintarArbol(arbol); refrescarContadores();
+}
+
 // ---------- rutas
 function enrutar() {
   const h = location.hash;
+  if (!cuaderno() || h === '#/cuadernos') { abrirCuadernos(); marcarActiva(); return; }
   if (h === '#/tareas') abrirTareas(); else if (h === '#/comentarios') abrirComentarios();
   else if (h.startsWith('#/n/')) { const [ruta, q] = h.slice(4).split('?'); const l = q && new URLSearchParams(q).get('l'); abrirNota(decodeURI(ruta), l != null ? +l : null); }
-  else if (info.portada) location.hash = `#/n/${encodeURI(info.portada)}`;
+  else if (cuaderno().portada) location.hash = `#/n/${encodeURI(cuaderno().portada)}`;
   else { rutaActual = null; $('#panel').hidden = true; $('#nota').hidden = false; sinPortada(); }
   marcarActiva();
 }
 window.addEventListener('hashchange', enrutar);
 
 // ---------- recarga en vivo
-try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { arbol = await api('/api/arbol'); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden) abrirNota(rutaActual); else if (location.hash === '#/tareas') abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
+try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; info = await api('/api/info'); pintarEstado(); arbol = await api('/api/arbol'); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden) abrirNota(rutaActual); else if (location.hash === '#/tareas') abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
 
 (async () => {
   info = await api('/api/info');
-  $('#nombre-curso').textContent = info.nombre; document.title = `${info.nombre} · Cuaderno`;
-  $('#btn-profesor').hidden = !info.profesor;
-  $('#link-inicio').href = info.portada ? `#/n/${encodeURI(info.portada)}` : '#/';
-  arbol = await api('/api/arbol'); pintarArbol(arbol); refrescarContadores(); enrutar();
+  aplicarApariencia(info.configuracion);
+  await cargarCuaderno();
+  enrutar();
 })();
