@@ -12,7 +12,10 @@ npm install
 node server.js <carpeta-del-cuaderno>
 ```
 
-Abre `http://127.0.0.1:7331`. Necesita Node 24 o más reciente.
+La terminal imprime la dirección que hay que abrir (lleva un código que cambia en cada arranque: así ninguna otra
+web abierta en el navegador puede hablar con tu cuaderno). Necesita Node 24 o más reciente.
+
+`npm test` lanza los tests. `node pruebas/recorrido.js <carpeta>` recorre un cuaderno y lista los enlaces rotos.
 
 ## Estado
 

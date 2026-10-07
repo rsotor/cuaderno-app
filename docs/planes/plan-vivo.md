@@ -5,12 +5,14 @@
 ## 0. Estado
 
 **Ahora**
-- Fase 1 cerrada el 2026-10-07: repo sembrado, prototipo en la raíz, arranca sobre una copia del curso de ejemplo.
-- Siguiente: fase 2 (base segura, escrituras robustas, tests).
+- Fase 2 cerrada el 2026-10-07: servidor con token, `Origin` y `Host`; escrituras que comprueban el texto original (409) y conservan CRLF; índice en memoria con `.gitignore` / `.obsidianignore`; detección del kit; botón Profesor con el comando del adaptador; 28 tests en verde; recorrido del curso de ejemplo sin enlaces rotos.
+- Siguiente: fase 3 (pantalla de cuadernos y configuración).
 
-**Después:** fase 3 (pantalla de cuadernos).
+**Después:** fase 4 (Guardar / Traer / Deshacer).
 
 **Inbox**
+- Fase 6: el panel Tareas enseña el Markdown crudo de cada casilla (`**negrita**`, rutas largas) y corta a 200 caracteres; el bloque de propiedades `alias` vacío ocupa una fila.
+- Fase 6: en la sesión del 2026-10-07 se ven los conectores MCP del plugin Design pero no sus skills (`design-critique`, `accessibility-review`, `ux-copy`) ni `ux-ui-audit` ni `frontend-design`; comprobar con `/plugin` antes de empezar.
 - Fase 7: analizar a fondo el chat como *channel* de Claude Code (el oficial `fakechat`: chat web en localhost conectado a la sesión local). Si es viable, la fase 10 se adelanta a la 7.
 - Fase 9: en cuanto haya una máquina Windows, probar `npm install` + `node-pty` y los ficheros CRLF.
 - Visto con la bóveda sin kit (2026-10-07): sin `inicio.md` la app enseña un error en vez del árbol; el panel Tareas toma como tarea cualquier casilla de cualquier nota (miles en una bóveda grande): sin kit, Tareas debe limitarse a lo que configure el usuario o no mostrarse. Con `node_modules` fuera, las respuestas tardan menos de 0,2 s.
@@ -119,7 +121,7 @@ Capturas del prototipo (en `docs/capturas-prototipo/`), tal como salió, antes d
 | Anotar | Comentarios anclados a un bloque, dentro de la nota |
 | Exámenes | Formulario HTML completo con Validar. El chat no genera nada |
 | Agente | **Terminal en v1.** El chat con el profesor después, como modo opcional. El Agent SDK queda descartado (exige API key de pago, no admite la suscripción). Vía elegida (2026-10-07): la app como *channel* de Claude Code, igual que el channel oficial `fakechat` (chat web en localhost conectado a la sesión local): el chat de la app envía a la sesión que la propia app arranca en su terminal y pinta las respuestas; misma sesión, mismo contexto (AGENTS.md, skills, herramientas), suscripción sin API key. Codex, por comprobar |
-| Cuaderno con kit | Lo es si tiene `.kit/motor.json`. Con kit, todo pasa por sus herramientas. Si tiene `estudio/` y `config/` pero no `.kit/` (una salida del kit sin motor), la app avisa y no guarda. Sin nada de eso, es una carpeta de notas: solo lectura y edición, y Guardar hace commit; el push se confirma |
+| Cuaderno con kit | Lo es si tiene `.kit/motor.json`. Con kit, todo pasa por sus herramientas. Si tiene `estudio/` y `config/` pero no `.kit/` (una salida del kit sin motor), la app lee sus formatos (tareas, exámenes…) pero no hay Profesor ni Guardar. Sin nada de eso, es una carpeta de notas: solo lectura y edición, Tareas se limita a `tareas.md`, y Guardar hace commit; el push se confirma |
 | Guardar | Un botón. En un cuaderno con kit, llama a `guardar.js` (comprueba, apunta en el diario, sube); nunca git a mano. Un error o un conflicto de `--traer` no lo resuelve la app: abre la terminal y se lo pasa al profesor. En una carpeta sin kit, git normal. Credenciales: las de git de la máquina |
 | Escrituras | Toda escritura en una nota lleva el texto original del tramo; si el fichero cambió debajo, el servidor rechaza y la app avisa. Se conserva el final de línea del fichero (LF o CRLF) |
 | Seguridad del servidor local | Escuchar en 127.0.0.1 no basta: token aleatorio por arranque exigido en la API y en la terminal, comprobación de `Origin`, los `.html` del cuaderno en iframe con `sandbox`. Antes de que el repo sea público |
@@ -132,7 +134,7 @@ Capturas del prototipo (en `docs/capturas-prototipo/`), tal como salió, antes d
 ## 7. Fases
 
 1. **Sembrar el repo:** prototipo, licencia, README, este documento como plan vivo, reglas del repo. ✅ 2026-10-07
-2. **Base segura, escrituras robustas y tests:** token + `Origin` + `sandbox`; escrituras con comprobación del texto original, línea en blanco tras cada comentario, CRLF; índice en memoria y respeto a `.gitignore` / `.obsidianignore`; detección del kit; botón Profesor con el comando del adaptador; tests `node --test` del render y de las escrituras sobre los dos cuadernos (§9: "el mismo fichero que a mano", con LF y CRLF). De diseño, solo lo que ya se ve en las capturas: foco de teclado visible, "editar / comentar" accesibles sin ratón, el panel Tareas menos denso, la cabecera de propiedades por debajo del título.
+2. ✅ 2026-10-07 **Base segura, escrituras robustas y tests:** token + `Origin` + `sandbox`; escrituras con comprobación del texto original, línea en blanco tras cada comentario, CRLF; índice en memoria y respeto a `.gitignore` / `.obsidianignore`; detección del kit; botón Profesor con el comando del adaptador; tests `node --test` del render y de las escrituras sobre los dos cuadernos (§9: "el mismo fichero que a mano", con LF y CRLF). De diseño, solo lo que ya se ve en las capturas: foco de teclado visible, "editar / comentar" accesibles sin ratón, el panel Tareas menos denso, la cabecera de propiedades por debajo del título.
 3. **Pantalla de cuadernos** y configuración.
 4. **Guardar / Traer / Deshacer.**
 5. **Formulario de examen** y **modo tarjeta** de flashcards.

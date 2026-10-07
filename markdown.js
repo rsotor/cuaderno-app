@@ -128,6 +128,7 @@ function crearRender(resolverWiki) {
 
 // Frontmatter YAML sencillo (clave: valor, listas [a, b]). Devuelve { datos, lineas } (líneas que ocupa, 0 si no hay).
 function leerFrontmatter(src) {
+  src = src.replace(/\r\n/g, '\n');   // en Windows el fichero viene con CRLF; las líneas se cuentan igual
   if (!src.startsWith('---\n')) return { datos: null, lineas: 0 };
   const fin = src.indexOf('\n---', 4);
   if (fin < 0) return { datos: null, lineas: 0 };
