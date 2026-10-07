@@ -1,0 +1,20 @@
+{
+  "name": "cuaderno-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Un cuaderno de estudio en el navegador: lee y edita las notas Markdown de un curso montado con profesor-kit, y habla con el profesor sin salir de la ventana.",
+  "license": "MIT",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"tests/*.test.js\""
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "katex": "^0.19.0",
+    "markdown-it": "^15.0.2",
+    "node-pty": "^1.1.0",
+    "ws": "^8.22.0"
+  }
+}

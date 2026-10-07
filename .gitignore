@@ -1,2 +1,20 @@
+# Dependencias
+node_modules/
+
+# Secretos: nunca entran en el repo (los nombres, sin valores, van en .env.example)
+.env
+.env.*
+*.pem
+*.key
+
 # Descargas y archivos sueltos: se versiona lo extraído, no el zip
 *.zip
+
+# Copias temporales de cuadernos para probar (nunca los cuadernos reales ni sus rutas)
+cuadernos-prueba/
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.tmp
+*~
