@@ -148,7 +148,7 @@ function pintarTarjeta() {
   const sabidas = s.tarjetas.filter(x => x.sabia === true).length, falladas = s.tarjetas.filter(x => x.sabia === false).length;
   const marca = t.sabia === true ? '<span class="marca ok">✅ la sabías</span>' : t.sabia === false ? '<span class="marca mal">❌ no la sabías</span>' : '';
   $('#nota').innerHTML = `${verComoNota(s.ruta)}<h1>${esc(s.titulo)}</h1><p class="resumen">${n} tarjetas: ${sabidas} sabidas, ${falladas} falladas</p>
-    <section class="tarjeta" aria-live="polite">
+    <section class="tarjeta" aria-live="polite" tabindex="-1">
       <div class="cabecera"><span>Tarjeta ${i + 1} de ${n}</span>${marca}</div>
       <div class="pregunta-tarjeta">${t.pregunta}</div>
       ${s.destapada ? `<div class="respuesta-tarjeta">${t.respuesta}</div><div class="botones"><button type="button" data-tarjeta="sabia">✅ La sabía</button><button type="button" data-tarjeta="no-sabia" class="secundario">❌ No la sabía</button></div>`
@@ -156,7 +156,7 @@ function pintarTarjeta() {
       <div class="pie"><button type="button" class="secundario pequeno" data-tarjeta="anterior"${i === 0 ? ' disabled' : ''}>Anterior</button><span class="pista">${esc(t.info)}</span><button type="button" class="secundario pequeno" data-tarjeta="siguiente"${i === n - 1 ? ' disabled' : ''}>Siguiente</button></div>
     </section><p class="pista">Teclado: espacio destapa, 1 la sabía, 2 no la sabía, flechas para cambiar de tarjeta</p>`;
   $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* texto */ } });
-  const principal = $('#nota [data-tarjeta="destapar"], #nota [data-tarjeta="sabia"]'); if (principal) principal.focus();
+  $('#nota .tarjeta').focus();   // el foco va a la tarjeta, no a un botón: las teclas siguen funcionando y nada lleva anillo
 }
 async function accionTarjeta(que) {
   const s = tarjetasEstado; if (!s) return;

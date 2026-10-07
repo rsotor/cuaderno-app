@@ -179,6 +179,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 
 /* flashcards en modo tarjeta */
 .tarjeta { background: var(--papel); border: 1px solid var(--linea); border-radius: 10px; padding: 16px 22px 14px; margin: 16px 0; box-shadow: var(--sombra); }
+.tarjeta:focus { outline: none; }
 .tarjeta .cabecera, .tarjeta .pie { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: var(--tinta-suave); }
 .tarjeta .pie { margin-top: 14px; }
 .tarjeta .marca.ok { color: var(--ok); } .tarjeta .marca.mal { color: var(--mal); }
@@ -186,7 +187,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 .respuesta-tarjeta { border-top: 1px dashed var(--linea); padding-top: 12px; margin-bottom: 14px; }
 .respuesta-tarjeta .bloque { margin: 0; padding: 0; }
 .tarjeta .botones { display: flex; gap: 10px; flex-wrap: wrap; }
-.tarjeta .botones button { padding: 7px 16px; font-size: 15px; }
+.tarjeta .botones button { padding: 2px 10px; font-size: 13px; min-height: 26px; }   /* mismo tamaño que Anterior / Siguiente; solo cambia el color */
 .tarjeta .botones [data-tarjeta="sabia"] { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); font-weight: 600; }   /* la decisión es «la sabía / no la sabía»; Destapar es solo un paso */
 
 /* terminal */
