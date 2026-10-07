@@ -13,9 +13,10 @@
 **Después:** fase 8 (inbox).
 
 **Inbox**
+- Diseño (nota de Roberto, 2026-10-07): revisar los espacios entre titulares en la vista de concepto (captura `despues/02-concepto.png`): hay demasiado aire entre un `h2` y el siguiente bloque.
+- Visor de PDF y de ficheros de texto (JSON, txt): hoy el índice solo lista `.md` y `.html`. El navegador pinta PDF en un iframe sin librería; JSON y txt, como texto preformateado. Solo lectura. Decidir en qué fase entra (encaja en la 8, inbox, donde llegan los PDF de clase).
 - Fase 7: la terminal en Chrome headless se cierra nada más abrirse («[terminal cerrada]»); comprobar con un navegador normal y, si pasa, por qué.
 - Para el kit: `pendientes.md` trae textos cortados («solo trae el títu»); avisar en profesor-kit.
-- Las skills de los plugins de diseño no cargan en una sesión abierta antes de sincronizarlos: se leyeron de `~/.claude/plugins/synced/` y se aplicaron a mano; para la próxima crítica, abrir sesión nueva.
 - Fase 7: analizar a fondo el chat como *channel* de Claude Code (el oficial `fakechat`: chat web en localhost conectado a la sesión local). Si es viable, la fase 10 se adelanta a la 7.
 - Fase 9: en cuanto haya una máquina Windows, probar `npm install` + `node-pty` y los ficheros CRLF.
 - Visto con la bóveda sin kit (2026-10-07): sin `inicio.md` la app enseña un error en vez del árbol; el panel Tareas toma como tarea cualquier casilla de cualquier nota (miles en una bóveda grande): sin kit, Tareas debe limitarse a lo que configure el usuario o no mostrarse. Con `node_modules` fuera, las respuestas tardan menos de 0,2 s.
