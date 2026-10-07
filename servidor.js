@@ -13,6 +13,9 @@ const { Cuaderno, ErrorPeticion } = require('./cuaderno');
 const { detectar } = require('./kit');
 const config = require('./config');
 const acciones = require('./guardar');
+const formulario = require('./formulario');
+const { leerTarjetas } = require('./tarjetas');
+const { leerFrontmatter } = require('./markdown');
 
 const COOKIE = 'cuaderno';
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' };
@@ -116,6 +119,22 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
       if (p === '/api/tareas') return json(res, conCuaderno().tareas({ soloPropias: estado.kit.tipo === 'carpeta' }));   // una salida del kit sin motor sigue teniendo sus formatos
       if (p === '/api/comentarios') return json(res, conCuaderno().comentarios());
       if (p === '/api/recorrido') return json(res, conCuaderno().recorrido());
+      if (p === '/api/examen') {
+        const cu = conCuaderno(), rel = url.searchParams.get('p'), texto = cu.leer(rel);
+        const { datos } = leerFrontmatter(texto);
+        const ex = formulario.leerExamen(texto.split(/\r?\n/).slice(leerFrontmatter(texto).lineas).join('\n'));
+        const desplaza = leerFrontmatter(texto).lineas;
+        const v = formulario.validable(cu.raiz, estado.kit, path.relative(cu.raiz, cu.dentro(rel)), datos);
+        return json(res, { ruta: rel, frontmatter: datos, validable: v.ok, motivo: v.motivo, cabecera: cu.md.render(ex.cabecera, {}),
+          preguntas: ex.preguntas.map(q => ({ numero: q.numero, unica: q.unica, enunciado: cu.md.render(q.enunciado.replace(/^(\d+\.\s|\*\*\d+\.\*\*)\s*/, ''), {}), opciones: q.opciones.map(o => ({ letra: o.letra, marcada: o.marcada, linea: o.linea + desplaza, texto: cu.md.renderInline(o.texto, {}) })) })),
+          resto: ex.resto ? cu.md.render(ex.resto, {}) : '' });
+      }
+      if (p === '/api/flashcards') {
+        const cu = conCuaderno(), rel = url.searchParams.get('p'), texto = cu.leer(rel);
+        const t = leerTarjetas(texto);
+        const titulo = (texto.match(/^#\s+(.+)$/m) || [])[1] || rel;
+        return json(res, { ruta: rel, titulo, tarjetas: t.map(x => ({ ...x, pregunta: cu.md.renderInline(x.pregunta, {}), respuesta: cu.md.render(x.respuesta, {}) })) });
+      }
       if (p === '/api/guardar/propuesta') { const raiz = conCuaderno().raiz; return json(res, { mensaje: acciones.proponerMensaje(raiz), cambios: acciones.cambios(raiz), repo: acciones.esRepo(raiz), kit: estado.kit.tipo }); }
       if (p.startsWith('/fichero/')) return servir(res, conCuaderno().dentro(decodeURIComponent(p.slice(9))));
       if (req.method === 'POST') {
@@ -127,6 +146,19 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
         if (p === '/api/traer') return json(res, accion((raiz, k) => acciones.traer(raiz, k)));
         if (p === '/api/deshacer') return json(res, accion((raiz, k) => acciones.deshacer(raiz, k, { ver: b.ver !== false })));
         const cu = conCuaderno();
+        if (p === '/api/examen/validar') {
+          const abs = cu.dentro(b.ruta), texto = fs.readFileSync(abs, 'utf8');
+          const { lineas } = leerFrontmatter(texto);
+          // marcar() trabaja sobre el cuerpo (sin frontmatter) para que las líneas coincidan con las del formulario
+          const partes = texto.split(/(\r?\n)/);   // conserva los finales de línea
+          const cabeza = partes.slice(0, lineas * 2).join(''), cuerpo = partes.slice(lineas * 2).join('');
+          fs.writeFileSync(abs, cabeza + formulario.marcar(cuerpo, b.respuestas || {})); cu.invalidar();
+          const v = formulario.validable(cu.raiz, estado.kit, path.relative(cu.raiz, abs), leerFrontmatter(texto).datos);
+          if (!v.ok) return json(res, { codigo: 0, corregido: false, salida: `Respuestas guardadas en la nota. ${v.motivo}` });
+          const r = accion(raiz => formulario.corregir(raiz, path.relative(raiz, abs)));
+          cu.invalidar();
+          return json(res, { ...r, corregido: r.codigo === 0 });
+        }
         if (p === '/api/bloque') { cu.escribirBloque(b.ruta, b.desde, b.hasta, b.texto, b.original); return json(res, { ok: true }); }
         if (p === '/api/casilla') { cu.marcarCasilla(b.ruta, b.linea, !!b.marcada, b.original); return json(res, { ok: true }); }
         if (p === '/api/comentario') { cu.comentar(b.ruta, b.desde, b.hasta, b.texto, b.original); return json(res, { ok: true }); }

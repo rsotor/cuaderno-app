@@ -126,3 +126,44 @@ test('sin cuaderno abierto: la API lo dice; abrir una carpeta cambia el cuaderno
     assert.deepEqual(await (await pedir('/api/cuadernos')).json(), []);
   } finally { await new Promise(r => server.close(r)); otro.borrar(); fs.rmSync(process.env.CUADERNO_CONFIG_DIR, { recursive: true, force: true }); }
 });
+
+test('examen: formulario, validar sin motor guarda las marcas; con kit lanza examen.js --corregir', async () => {
+  const s = await arrancar({ kit: 'salida-sin-motor' });
+  try {
+    const post = (ruta, body) => s.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const ex = await (await s.pedir('/api/examen?p=examenes/01-examen.md')).json();
+    assert.equal(ex.validable, false); assert.match(ex.motivo, /no trae el motor/);
+    assert.equal(ex.preguntas.length, 2); assert.equal(ex.preguntas[0].unica, true); assert.match(ex.preguntas[0].enunciado, /Tienes 100 €/); assert.doesNotMatch(ex.preguntas[0].enunciado, /\*\*1\.\*\*/);
+    assert.deepEqual(ex.preguntas[1].opciones.map(o => o.linea), [22, 23, 24]);   // líneas del fichero, con el frontmatter
+    const r = await (await post('/api/examen/validar', { ruta: 'examenes/01-examen.md', respuestas: { 1: ['b'], 2: ['a', 'b'] } })).json();
+    assert.equal(r.corregido, false); assert.match(r.salida, /Respuestas guardadas/);
+    const texto = s.c.leer('examenes/01-examen.md');
+    assert.match(texto, /^---\ntipo: examen\n/); assert.match(texto, /- \[x\] b\) Baja/); assert.match(texto, /- \[x\] b\) Unidad de cuenta\n- \[ \] c\)/);
+    assert.equal((await (await s.pedir('/api/examen?p=examenes/01-examen.md')).json()).preguntas[0].opciones[1].marcada, true);
+  } finally { await s.cerrar(); }
+  const k = await arrancar({ kit: 'kit' });
+  try {
+    const falsa = `const a = process.argv.slice(2); if (a[0] === '--revision') { process.stdout.write('Revisión resuelta'); process.exit(0); } process.stdout.write('examen.js ' + JSON.stringify(a)); process.exit(0);`;
+    fs.mkdirSync(path.join(k.c.raiz, '.kit', 'herramientas'), { recursive: true });
+    fs.writeFileSync(path.join(k.c.raiz, '.kit', 'herramientas', 'examen.js'), falsa);
+    const ex = await (await k.pedir('/api/examen?p=examenes/01-examen.md')).json();
+    assert.equal(ex.validable, true);
+    const post = (ruta, body) => k.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await (await post('/api/examen/validar', { ruta: 'examenes/01-examen.md', respuestas: { 1: ['a'] } })).json();
+    assert.deepEqual(r, { codigo: 0, corregido: true, salida: 'examen.js ["--corregir","estudio/examenes/01-examen.md"]' });
+    assert.match(k.c.leer('examenes/01-examen.md'), /- \[x\] a\) Sube/);
+  } finally { await k.cerrar(); }
+});
+
+test('flashcards: las tarjetas con sus líneas, y marcar una casilla pasa por /api/casilla', async () => {
+  const s = await arrancar();
+  try {
+    const t = await (await s.pedir('/api/flashcards?p=flashcards/01-tarjetas.md')).json();
+    assert.equal(t.titulo, 'Flashcards · 01-01-01-sesion'); assert.equal(t.tarjetas.length, 2);
+    assert.match(t.tarjetas[0].pregunta, /interés/); assert.match(t.tarjetas[0].respuesta, /<p>El precio del dinero\.<\/p>/);
+    assert.deepEqual([t.tarjetas[0].lineaSabia, t.tarjetas[0].lineaNoSabia], [10, 11]);
+    const post = (ruta, body) => s.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal((await post('/api/casilla', { ruta: 'flashcards/01-tarjetas.md', linea: 11, marcada: true, original: '- [ ] ❌ no la sabía' })).status, 200);
+    assert.equal((await (await s.pedir('/api/flashcards?p=flashcards/01-tarjetas.md')).json()).tarjetas[0].sabia, false);
+  } finally { await s.cerrar(); }
+});

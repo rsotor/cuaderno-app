@@ -5,10 +5,10 @@
 ## 0. Estado
 
 **Ahora**
-- Fase 4 cerrada el 2026-10-07: Guardar (mensaje propuesto por la app), Traer y Deshacer (primero enseña, luego confirma). Con kit, `guardar.js` / `deshacer.js`; sin kit, commit y push si hay remoto; salida sin motor, desactivado. Probado con un curso montado con el motor del kit en el scratchpad (`preparar-curso.js --subir no`). 38 tests.
-- Siguiente: fase 5 (formulario de examen y modo tarjeta de flashcards).
+- Fase 5 cerrada el 2026-10-07: examen tipo test como formulario con Validar (marca las casillas y lanza `examen.js --corregir`; solo con motor y revisión resuelta, si no guarda las respuestas y lo dice) y flashcards en modo tarjeta (destapar, la sabía / no la sabía, teclado). Probado con el examen real del curso con kit: intento corregido, nota en el frontmatter, sesiones marcadas. 45 tests.
+- Siguiente: fase 6 (repaso de diseño con plugins). Antes, comprobar con `/plugin` que Design, ux-ui-audit y frontend-design están activos.
 
-**Después:** fase 6 (repaso de diseño con plugins).
+**Después:** fase 7 (terminal cuidada y análisis del chat como *channel*).
 
 **Inbox**
 - Fase 6: los botones del pie lateral (Terminal, Profesor, ⚙) se parten en dos líneas con el panel estrecho.
@@ -80,9 +80,9 @@ primero se añade al kit (y funciona sin la app) o el caso espera.
 | 4 Editar bloque | escritura directa en la nota, comprobando que el texto original sigue ahí | de la app |
 | 5 Comentar | callout `> [!comment]` en la nota | **TBD:** confirmar con el kit que el profesor lo recoge (hoy ninguna herramienta lo lee) |
 | 6 Sesión estudiada | casilla `estudiada` del frontmatter de la sesión (la marca el alumno o `examen.js` al aprobar) | listo; exige escribir YAML sin romperlo |
-| 7 Flashcards | casillas `✅ la sabía / ❌ no la sabía` del fichero; `guardar.js` las lee para el repaso | listo |
-| 8 Examen tipo test | casillas del examen + `examen.js --corregir <examen.md>` (clave en `config/claves/`); solo si `examen.js --revision` dice resuelta | listo |
-| 8 Examen de respuesta libre | **TBD:** no hay herramienta de "entregar"; hoy lo corrige el profesor en el chat y lo registra con `--registrar` | falta en el kit |
+| 7 Flashcards | casillas `✅ la sabía / ❌ no la sabía` del fichero (la app marca una y desmarca la otra); `guardar.js` las lee para el repaso | hecho (fase 5) |
+| 8 Examen tipo test | casillas del examen + `examen.js --corregir <examen.md>` (clave en `config/claves/`); solo si `examen.js --revision` dice resuelta. La app lee las preguntas con las mismas reglas que `examen.js` (número `**1.**`, opción `- [ ] a)`), "(elige una)" → una sola respuesta | hecho (fase 5) |
+| 8 Examen de respuesta libre | Fuera de v1 hasta que el kit lo resuelva: [profesor-kit#46](https://github.com/rsotor/profesor-kit/issues/46) ("/examen: desarrollo, problemas y supuestos prácticos"). Hoy lo corrige el profesor en el chat y lo registra con `--registrar` | espera al kit |
 | 9 Tareas | casillas `- [ ]` de cualquier nota + `tareas.md` | **TBD:** `tareas.md` hoy lo crea la app; decidir si es del kit |
 | 10 Terminal / Profesor | comando del adaptador del kit (`.kit/adaptadores/<id>.json` → `comando`) | listo |
 | 11 Inbox | `estudio/inbox/`, `estudio/pendientes.md`; preparar → `preparar.js` | **TBD:** cómo se lanza desde la app |
@@ -138,7 +138,7 @@ Capturas del prototipo (en `docs/capturas-prototipo/`), tal como salió, antes d
 2. ✅ 2026-10-07 **Base segura, escrituras robustas y tests:** token + `Origin` + `sandbox`; escrituras con comprobación del texto original, línea en blanco tras cada comentario, CRLF; índice en memoria y respeto a `.gitignore` / `.obsidianignore`; detección del kit; botón Profesor con el comando del adaptador; tests `node --test` del render y de las escrituras sobre los dos cuadernos (§9: "el mismo fichero que a mano", con LF y CRLF). De diseño, solo lo que ya se ve en las capturas: foco de teclado visible, "editar / comentar" accesibles sin ratón, el panel Tareas menos denso, la cabecera de propiedades por debajo del título.
 3. ✅ 2026-10-07 **Pantalla de cuadernos** y configuración del usuario.
 4. ✅ 2026-10-07 **Guardar / Traer / Deshacer.**
-5. **Formulario de examen** y **modo tarjeta** de flashcards.
+5. ✅ 2026-10-07 **Formulario de examen** (tipo test) y **modo tarjeta** de flashcards. La respuesta libre espera a profesor-kit#46.
 6. **Repaso de diseño** con los plugins de §6 (Design, ux-ui-audit, frontend-design), cambios aplicados, capturas antes y después. Nada de funcionalidad nueva hasta cerrarlo.
 7. **Terminal cuidada** (pestañas, fuente, tema) y botón Profesor. Aquí se analiza a fondo el chat como *channel* (§6, Agente): si es viable, la fase 10 se adelanta a esta.
 8. **Inbox** y preparación de clases nuevas.

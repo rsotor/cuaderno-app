@@ -114,7 +114,7 @@ test('nombre: cuaderno.json, luego nombre_curso del kit, luego la carpeta', con(
 
 test('recorrido: cuenta notas, enlaces rotos y fallos', con({}, (c, cu) => {
   const r = cu.recorrido();
-  assert.equal(r.notas, 6);
+  assert.equal(r.notas, 7);
   assert.deepEqual(r.rotos, [{ ruta: 'conceptos/interes.md', destino: 'no-existe' }]);
   assert.deepEqual(r.fallos, []);
 }));

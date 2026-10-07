@@ -58,11 +58,15 @@ function sinPortada() {
   $('#nota').innerHTML = `<h1>${esc(cuaderno().nombre)}</h1><p class="resumen">Esta carpeta no tiene una nota de portada. Elige una nota en el árbol de la izquierda o busca con <kbd>Ctrl K</kbd>.</p>`;
 }
 async function abrirNota(ruta, lineaDestino) {
+  if (rutaActual !== ruta) { vistaNota = null; }
   rutaActual = ruta;
   $('#panel').hidden = true; $('#nota').hidden = false;
   let n;
   try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(s)}</strong>`).join('');
+  const tipo = n.frontmatter && n.frontmatter.tipo;
+  if (vistaNota !== ruta && tipo === 'examen') return abrirExamen(ruta);
+  if (vistaNota !== ruta && tipo === 'flashcards') return abrirTarjetas(ruta);
   if (n.esHtml) { $('#nota').innerHTML = `<iframe class="ejercicio" sandbox="allow-scripts allow-forms allow-modals" src="/fichero/${encodeURI(ruta)}" title="${esc(nombreNota(ruta))}"></iframe>`; return; }
   // Las propiedades van debajo del título, no encima: el título es lo primero que se lee.
   const props = n.frontmatter ? `<dl class="propiedades">${Object.entries(n.frontmatter).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${Array.isArray(v) ? v.map(x => `<span class="etiqueta">${esc(x)}</span>`).join('') : esc(v)}</dd>`).join('')}</dl>` : '';
@@ -96,6 +100,86 @@ $('#nota').addEventListener('click', async e => {
   if (btn.dataset.accion === 'comentar') abrirEditor('Comentar este bloque', '', 'se guarda en la nota, debajo del bloque', async texto => { if (!texto.trim()) return; await api('/api/comentario', { ruta: rutaActual, desde, hasta, texto, original }); avisar('Comentario guardado'); abrirNota(rutaActual); refrescarContadores(); });
 });
 $('#nota').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('callout-titulo')) e.target.click(); });
+
+// ---------- examen como formulario
+let vistaNota = null;   // ruta que el usuario quiere ver como nota normal aunque sea examen o flashcards
+const verComoNota = ruta => `<p class="cambiar-vista"><a href="#/n/${encodeURI(ruta)}" data-vista-nota="${esc(ruta)}">Ver como nota</a></p>`;
+async function abrirExamen(ruta) {
+  let ex; try { ex = await api(`/api/examen?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<p>${esc(e.message)}</p>`; return; }
+  const fm = ex.frontmatter || {};
+  const estado = fm.intentos && String(fm.intentos) !== '0' ? `<p class="resumen">Intentos: ${esc(fm.intentos)}${fm.nota !== '' && fm.nota != null ? ` · última nota: <b>${esc(fm.nota)}</b>` : ''}${fm.aprobado ? ` · se aprueba con ${esc(fm.aprobado)}` : ''}</p>` : (fm.aprobado ? `<p class="resumen">Se aprueba con ${esc(fm.aprobado)}.</p>` : '');
+  const form = ex.preguntas.map(q => `<fieldset class="pregunta" data-numero="${q.numero}"><legend><span class="numero">${q.numero}</span></legend><div class="enunciado">${q.enunciado}</div>${q.opciones.map(o => `<label class="opcion"><input type="${q.unica ? 'radio' : 'checkbox'}" name="p${q.numero}" value="${o.letra}"${o.marcada ? ' checked' : ''}><span class="letra">${o.letra})</span><span>${o.texto}</span></label>`).join('')}</fieldset>`).join('');
+  const pie = ex.validable ? '<button type="submit" id="validar">Validar</button><span class="pista">La app guarda tus respuestas en la nota y las corrige con la herramienta del kit.</span>'
+    : `<button type="submit" id="validar" class="secundario">Guardar respuestas</button><span class="pista">${esc(ex.motivo || '')}</span>`;
+  $('#nota').innerHTML = `${verComoNota(ruta)}${ex.cabecera}${estado}<form id="examen" class="examen">${form}<footer class="examen-pie">${pie}</footer></form>${ex.resto ? `<section class="historico">${ex.resto}</section>` : ''}`;
+  $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* texto */ } });
+  $('#centro').scrollTop = 0;
+  $('#examen').addEventListener('submit', async e => {
+    e.preventDefault();
+    const respuestas = {};
+    for (const f of $('#examen').querySelectorAll('fieldset')) respuestas[f.dataset.numero] = [...f.querySelectorAll('input:checked')].map(i => i.value);
+    const sinContestar = Object.values(respuestas).filter(v => !v.length).length;
+    if (ex.validable && sinContestar && !confirm(`Hay ${sinContestar} pregunta${sinContestar === 1 ? '' : 's'} sin contestar. ¿Validar igualmente?`)) return;
+    $('#validar').disabled = true; avisar(ex.validable ? 'Corrigiendo…' : 'Guardando…');
+    let r; try { r = await api('/api/examen/validar', { ruta, respuestas }); } catch (err) { r = { codigo: 1, salida: err.message }; }
+    await refrescarInfo(); refrescarContadores();
+    abrirNota(ruta);
+    mostrarResultado(r.corregido ? 'Examen corregido' : 'Examen', r);
+  });
+}
+$('#nota').addEventListener('click', e => { const a = e.target.closest('a[data-vista-nota]'); if (!a) return; e.preventDefault(); vistaNota = a.dataset.vistaNota; abrirNota(vistaNota); });
+
+// ---------- flashcards en modo tarjeta
+let tarjetasEstado = null;
+async function abrirTarjetas(ruta) {
+  let t; try { t = await api(`/api/flashcards?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<p>${esc(e.message)}</p>`; return; }
+  if (!t.tarjetas.length) { vistaNota = ruta; return abrirNota(ruta); }
+  const previo = tarjetasEstado && tarjetasEstado.ruta === ruta ? tarjetasEstado.indice : 0;
+  tarjetasEstado = { ruta, indice: Math.min(previo, t.tarjetas.length - 1), destapada: false, tarjetas: t.tarjetas, titulo: t.titulo };
+  pintarTarjeta();
+}
+function pintarTarjeta() {
+  const s = tarjetasEstado, n = s.tarjetas.length, i = s.indice, t = s.tarjetas[i];
+  const sabidas = s.tarjetas.filter(x => x.sabia === true).length, falladas = s.tarjetas.filter(x => x.sabia === false).length;
+  const marca = t.sabia === true ? '<span class="marca ok">✅ la sabías</span>' : t.sabia === false ? '<span class="marca mal">❌ no la sabías</span>' : '';
+  $('#nota').innerHTML = `${verComoNota(s.ruta)}<h1>${esc(s.titulo)}</h1><p class="resumen">${n} tarjetas · ${sabidas} sabidas · ${falladas} falladas</p>
+    <section class="tarjeta" aria-live="polite">
+      <header><span>Tarjeta ${i + 1} de ${n}</span>${marca}</header>
+      <div class="pregunta-tarjeta">${t.pregunta}</div>
+      ${s.destapada ? `<div class="respuesta-tarjeta">${t.respuesta}</div><div class="botones"><button type="button" data-tarjeta="sabia">✅ La sabía</button><button type="button" data-tarjeta="no-sabia" class="secundario">❌ No la sabía</button></div>`
+      : '<div class="botones"><button type="button" data-tarjeta="destapar">Destapar</button></div>'}
+      <footer><button type="button" class="secundario pequeno" data-tarjeta="anterior"${i === 0 ? ' disabled' : ''}>← Anterior</button><span class="pista">${esc(t.info)}</span><button type="button" class="secundario pequeno" data-tarjeta="siguiente"${i === n - 1 ? ' disabled' : ''}>Siguiente →</button></footer>
+    </section><p class="pista">Espacio destapa · 1 la sabía · 2 no la sabía · ← → cambian de tarjeta</p>`;
+  $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* texto */ } });
+  const principal = $('#nota [data-tarjeta="destapar"], #nota [data-tarjeta="sabia"]'); if (principal) principal.focus();
+}
+async function accionTarjeta(que) {
+  const s = tarjetasEstado; if (!s) return;
+  const t = s.tarjetas[s.indice];
+  if (que === 'destapar') { s.destapada = true; return pintarTarjeta(); }
+  if (que === 'anterior' && s.indice > 0) { s.indice--; s.destapada = false; return pintarTarjeta(); }
+  if (que === 'siguiente' && s.indice < s.tarjetas.length - 1) { s.indice++; s.destapada = false; return pintarTarjeta(); }
+  if (que === 'sabia' || que === 'no-sabia') {
+    if (!s.destapada) return;
+    const sabia = que === 'sabia';
+    const lineas = lineasDe(await textoFichero(s.ruta));
+    try {
+      await api('/api/casilla', { ruta: s.ruta, linea: sabia ? t.lineaSabia : t.lineaNoSabia, marcada: true, original: lineas[sabia ? t.lineaSabia : t.lineaNoSabia] });
+      await api('/api/casilla', { ruta: s.ruta, linea: sabia ? t.lineaNoSabia : t.lineaSabia, marcada: false, original: lineas[sabia ? t.lineaNoSabia : t.lineaSabia] });
+    } catch (e) { if (e.status !== 409) avisar(e.message); return; }
+    t.sabia = sabia;
+    if (s.indice < s.tarjetas.length - 1) { s.indice++; s.destapada = false; } 
+    pintarTarjeta();
+    if (s.indice === s.tarjetas.length - 1 && t === s.tarjetas[s.indice]) avisar('Última tarjeta. Guarda cuando acabes.');
+  }
+}
+$('#nota').addEventListener('click', e => { const b = e.target.closest('button[data-tarjeta]'); if (b) accionTarjeta(b.dataset.tarjeta); });
+document.addEventListener('keydown', e => {
+  if (!tarjetasEstado || rutaActual !== tarjetasEstado.ruta || !$('#editor').hidden || !$('#resultado').hidden) return;
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+  const m = { ' ': 'destapar', '1': 'sabia', '2': 'no-sabia', 'ArrowLeft': 'anterior', 'ArrowRight': 'siguiente' }[e.key];
+  if (m) { e.preventDefault(); accionTarjeta(m); }
+});
 
 // ---------- editor modal
 let alGuardar = null, foco = null;
@@ -268,7 +352,7 @@ function enrutar() {
 window.addEventListener('hashchange', enrutar);
 
 // ---------- recarga en vivo
-try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; info = await api('/api/info'); pintarEstado(); arbol = await api('/api/arbol'); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden) abrirNota(rutaActual); else if (location.hash === '#/tareas') abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
+try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; info = await api('/api/info'); pintarEstado(); arbol = await api('/api/arbol'); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (location.hash === '#/tareas') abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
 
 (async () => {
   info = await api('/api/info');

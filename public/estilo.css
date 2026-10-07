@@ -160,3 +160,31 @@ mark { background: #fff2a8; color: inherit; border-radius: 2px; }
 .nueva-tarea { display: flex; gap: 8px; margin: 0 0 14px; }
 .nueva-tarea input { flex: 1; padding: 8px 12px; border: 1px solid var(--linea); border-radius: 8px; background: var(--papel); color: var(--tinta); font: inherit; }
 .nota-pie { font-size: 13px; color: var(--tinta-suave); }
+
+/* examen como formulario */
+.cambiar-vista { text-align: right; font-size: 13px; margin: 0 0 -8px; }
+.cambiar-vista a { color: var(--tinta-suave); }
+.examen fieldset.pregunta { border: 1px solid var(--linea); border-radius: var(--radio); background: var(--papel); padding: 10px 18px 12px; margin: 14px 0; }
+.examen legend .numero { display: inline-block; background: var(--acento); color: #fff; border-radius: 999px; min-width: 26px; text-align: center; padding: 1px 8px; font-weight: 600; font-size: 13px; }
+.examen .enunciado > .bloque { margin: 0; padding: 0; }
+.examen .enunciado p { margin: 6px 0 10px; }
+.examen .opcion { display: flex; gap: 10px; align-items: baseline; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+.examen .opcion:hover, .examen .opcion:focus-within { background: var(--acento-suave); }
+.examen .opcion input { accent-color: var(--acento); width: 16px; height: 16px; flex: none; transform: translateY(2px); }
+.examen .letra { color: var(--tinta-suave); min-width: 1.6em; }
+.examen-pie { display: flex; gap: 12px; align-items: center; margin: 18px 0 8px; flex-wrap: wrap; }
+#validar { background: var(--acento); color: #fff; border-color: var(--acento); padding: 8px 18px; }
+#validar.secundario { background: var(--papel); color: var(--tinta); border-color: var(--linea); }
+.historico { margin-top: 32px; padding-top: 12px; border-top: 1px solid var(--linea); }
+
+/* flashcards en modo tarjeta */
+.tarjeta { background: var(--papel); border: 1px solid var(--linea); border-radius: 14px; padding: 16px 22px 14px; margin: 16px 0; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
+.tarjeta header, .tarjeta footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: var(--tinta-suave); }
+.tarjeta footer { margin-top: 14px; }
+.tarjeta .marca.ok { color: var(--ok); } .tarjeta .marca.mal { color: var(--mal); }
+.pregunta-tarjeta { font-size: 1.2em; font-weight: 600; line-height: 1.45; margin: 14px 0 18px; }
+.respuesta-tarjeta { border-top: 1px dashed var(--linea); padding-top: 12px; margin-bottom: 14px; }
+.respuesta-tarjeta .bloque { margin: 0; padding: 0; }
+.tarjeta .botones { display: flex; gap: 10px; flex-wrap: wrap; }
+.tarjeta .botones button { padding: 9px 18px; font-size: 15px; }
+.tarjeta .botones [data-tarjeta="destapar"], .tarjeta .botones [data-tarjeta="sabia"] { background: var(--acento); color: #fff; border-color: var(--acento); }
