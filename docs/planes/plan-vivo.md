@@ -5,15 +5,14 @@
 ## 0. Estado
 
 **Ahora**
-- Fase 5 cerrada el 2026-10-07: examen tipo test como formulario con Validar (marca las casillas y lanza `examen.js --corregir`; solo con motor y revisión resuelta, si no guarda las respuestas y lo dice) y flashcards en modo tarjeta (destapar, la sabía / no la sabía, teclado). Probado con el examen real del curso con kit: intento corregido, nota en el frontmatter, sesiones marcadas. 45 tests.
-- Siguiente: fase 6 (repaso de diseño con plugins). Antes, comprobar con `/plugin` que Design, ux-ui-audit y frontend-design están activos.
+- Fase 6 cerrada el 2026-10-07: crítica con cifras en `docs/diseno/critica-2026-10-07.md` (18 hallazgos), cambios aplicados (tokens por tema, iconos SVG, títulos en el árbol, tareas pintadas, jerarquía de acciones, estados, móvil mínimo, copia) y medidos otra vez: 0 fallos de contraste en los dos temas, foco 9,6:1 / 6,0:1. Capturas antes y después en `docs/capturas/`. 46 tests.
+- Siguiente: fase 7 (terminal cuidada, botón Profesor y análisis del chat como *channel*).
 
-**Después:** fase 7 (terminal cuidada y análisis del chat como *channel*).
+**Después:** fase 8 (inbox).
 
 **Inbox**
-- Fase 6: los botones del pie lateral (Terminal, Profesor, ⚙) se parten en dos líneas con el panel estrecho.
-- Fase 6: el panel Tareas enseña el Markdown crudo de cada casilla (`**negrita**`, rutas largas) y corta a 200 caracteres; el bloque de propiedades `alias` vacío ocupa una fila.
-- Fase 6: en la sesión del 2026-10-07 se ven los conectores MCP del plugin Design pero no sus skills (`design-critique`, `accessibility-review`, `ux-copy`) ni `ux-ui-audit` ni `frontend-design`; comprobar con `/plugin` antes de empezar.
+- Decidir el texto del botón del examen: «Validar» (plan §6) o «Corregir» (lo que hace el kit y lo que dice el resultado). Hallazgo 13 de la crítica.
+- Las skills de los plugins de diseño no cargan en una sesión abierta antes de sincronizarlos: se leyeron de `~/.claude/plugins/synced/` y se aplicaron a mano; para la próxima crítica, abrir sesión nueva.
 - Fase 7: analizar a fondo el chat como *channel* de Claude Code (el oficial `fakechat`: chat web en localhost conectado a la sesión local). Si es viable, la fase 10 se adelanta a la 7.
 - Fase 9: en cuanto haya una máquina Windows, probar `npm install` + `node-pty` y los ficheros CRLF.
 - Visto con la bóveda sin kit (2026-10-07): sin `inicio.md` la app enseña un error en vez del árbol; el panel Tareas toma como tarea cualquier casilla de cualquier nota (miles en una bóveda grande): sin kit, Tareas debe limitarse a lo que configure el usuario o no mostrarse. Con `node_modules` fuera, las respuestas tardan menos de 0,2 s.
@@ -139,7 +138,7 @@ Capturas del prototipo (en `docs/capturas-prototipo/`), tal como salió, antes d
 3. ✅ 2026-10-07 **Pantalla de cuadernos** y configuración del usuario.
 4. ✅ 2026-10-07 **Guardar / Traer / Deshacer.**
 5. ✅ 2026-10-07 **Formulario de examen** (tipo test) y **modo tarjeta** de flashcards. La respuesta libre espera a profesor-kit#46.
-6. **Repaso de diseño** con los plugins de §6 (Design, ux-ui-audit, frontend-design), cambios aplicados, capturas antes y después. Nada de funcionalidad nueva hasta cerrarlo.
+6. ✅ 2026-10-07 **Repaso de diseño** con los plugins de §6 (Design, ux-ui-audit, frontend-design), cambios aplicados, capturas antes y después: `docs/diseno/critica-2026-10-07.md`.
 7. **Terminal cuidada** (pestañas, fuente, tema) y botón Profesor. Aquí se analiza a fondo el chat como *channel* (§6, Agente): si es viable, la fase 10 se adelanta a esta.
 8. **Inbox** y preparación de clases nuevas.
 9. **`npx cuaderno <carpeta>`**, prueba en Mac y Windows, prueba real automatizada.

@@ -106,6 +106,7 @@ function crearRender(resolverWiki) {
 
   // --- Bloques editables: cada bloque de nivel 0 se envuelve con sus líneas de origen.
   md.core.ruler.push('bloques', (state) => {
+    if (state.inlineMode) return;   // renderInline: sin envoltorios de bloque
     const ts = state.tokens, salida = [];
     for (let i = 0; i < ts.length; i++) {
       const t = ts[i];

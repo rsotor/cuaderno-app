@@ -19,13 +19,18 @@ const textoFichero = ruta => fetch(`/fichero/${encodeURI(ruta)}`).then(r => r.te
 const lineasDe = texto => texto.split(/\r?\n/);
 function avisar(msg) { const d = document.createElement('div'); d.className = 'aviso-flotante'; d.setAttribute('role', 'status'); d.textContent = msg; document.body.append(d); setTimeout(() => d.remove(), 2200); }
 const nombreNota = p => p.split('/').pop().replace(/\.md$/, '');
+const icono = n => `<svg class="icono" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+let titulos = {};   // ruta → título (# …) de cada nota, para enseñar títulos y no nombres de fichero
+const tituloDe = p => titulos[p] || nombreNota(p);
+// Carpeta del kit «modulo-01-fundamentos-del-dinero» o «1.1-el-dinero-y-sus-funciones»: el número separado del nombre
+const nombreCarpeta = k => { const m = k.match(/^((?:modulo|m|bloque|semana|tema|unidad)-?\d+|\d+(?:\.\d+)*)-(.+)$/i); return m ? `${m[1]} · ${m[2].replace(/-/g, ' ')}` : k; };
 
 // ---------- árbol
 function pintarArbol(lista) {
   const raiz = {};
   for (const p of lista) { let n = raiz; const partes = p.split('/'); partes.forEach((s, i) => { if (i === partes.length - 1) (n.__f ??= []).push(p); else n = (n[s] ??= {}); }); }
-  const pintar = (n, abierto) => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details${abierto ? ' open' : ''}><summary>${esc(k)}</summary>${pintar(n[k], false)}</details>`).join('')
-    + (n.__f || []).map(p => `<a class="hoja" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}">${esc(nombreNota(p))}</a>`).join('');
+  const pintar = (n, abierto) => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details${abierto ? ' open' : ''}><summary title="${esc(k)}">${esc(nombreCarpeta(k))}</summary>${pintar(n[k], false)}</details>`).join('')
+    + (n.__f || []).map(p => `<a class="hoja" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}">${esc(tituloDe(p))}</a>`).join('');
   $('#arbol').innerHTML = lista.length ? pintar(raiz, true) : '<p class="vacio">No hay notas en esta carpeta.</p>';
   marcarActiva();
 }
@@ -43,8 +48,8 @@ async function buscar(q) {
   const re = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig');
   const marcar = s => esc(s).replace(re, m => `<mark>${m}</mark>`);
   $('#arbol').innerHTML = `<div class="resultado" role="status"><small>${r.ficheros.length} notas · ${r.lineas.length} líneas</small></div>`
-    + r.ficheros.map(p => `<a class="resultado" href="#/n/${encodeURI(p)}">${marcar(nombreNota(p))}<small>${esc(p)}</small></a>`).join('')
-    + r.lineas.map(l => `<a class="resultado" href="#/n/${encodeURI(l.ruta)}?l=${l.linea}">${esc(nombreNota(l.ruta))}<small>${marcar(l.texto)}</small></a>`).join('');
+    + r.ficheros.map(p => `<a class="resultado" href="#/n/${encodeURI(p)}">${marcar(tituloDe(p))}<small>${esc(p)}</small></a>`).join('')
+    + r.lineas.map(l => `<a class="resultado" href="#/n/${encodeURI(l.ruta)}?l=${l.linea}">${esc(tituloDe(l.ruta))}<small>${marcar(l.texto)}</small></a>`).join('');
 }
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#buscador').focus(); $('#buscador').select(); }
@@ -69,8 +74,8 @@ async function abrirNota(ruta, lineaDestino) {
   if (vistaNota !== ruta && tipo === 'flashcards') return abrirTarjetas(ruta);
   if (n.esHtml) { $('#nota').innerHTML = `<iframe class="ejercicio" sandbox="allow-scripts allow-forms allow-modals" src="/fichero/${encodeURI(ruta)}" title="${esc(nombreNota(ruta))}"></iframe>`; return; }
   // Las propiedades van debajo del título, no encima: el título es lo primero que se lee.
-  const props = n.frontmatter ? `<dl class="propiedades">${Object.entries(n.frontmatter).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${Array.isArray(v) ? v.map(x => `<span class="etiqueta">${esc(x)}</span>`).join('') : esc(v)}</dd>`).join('')}</dl>` : '';
-  const back = n.backlinks.length ? `<nav class="backlinks" aria-label="Notas que enlazan aquí">Enlazan aquí: ${n.backlinks.map(b => `<a class="wiki" href="#/n/${encodeURI(b)}">${esc(nombreNota(b))}</a>`).join('')}</nav>` : '';
+  const props = n.frontmatter ? `<dl class="propiedades">${Object.entries(n.frontmatter).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${Array.isArray(v) ? v.map(x => `<span class="etiqueta">${esc(x)}</span>`).join('') : esc(v)}</dd>`).join('')}</dl>` : '';
+  const back = n.backlinks.length ? `<nav class="backlinks" aria-label="Notas que enlazan aquí">Enlazan aquí: ${n.backlinks.map(b => `<a class="wiki" href="#/n/${encodeURI(b)}" title="${esc(b)}">${esc(tituloDe(b))}</a>`).join('')}</nav>` : '';
   $('#nota').innerHTML = n.html + back;
   const h1 = $('#nota .bloque > h1');
   if (props) (h1 ? h1.closest('.bloque') : $('#nota')).insertAdjacentHTML(h1 ? 'afterend' : 'afterbegin', props);
@@ -79,7 +84,7 @@ async function abrirNota(ruta, lineaDestino) {
   $('#nota').querySelectorAll('.bloque').forEach(b => {
     b.tabIndex = 0;
     const acc = document.createElement('div'); acc.className = 'acciones';
-    acc.innerHTML = '<button type="button" data-accion="editar" aria-label="Editar este bloque">✎ editar</button><button type="button" data-accion="comentar" aria-label="Comentar este bloque">💬 comentar</button>';
+    acc.innerHTML = `<button type="button" data-accion="editar" aria-label="Editar este bloque">${icono('lapiz')}editar</button><button type="button" data-accion="comentar" aria-label="Comentar este bloque">${icono('comentar')}comentar</button>`;
     b.prepend(acc);
   });
   $('#centro').scrollTop = 0;
@@ -103,13 +108,13 @@ $('#nota').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.
 
 // ---------- examen como formulario
 let vistaNota = null;   // ruta que el usuario quiere ver como nota normal aunque sea examen o flashcards
-const verComoNota = ruta => `<p class="cambiar-vista"><a href="#/n/${encodeURI(ruta)}" data-vista-nota="${esc(ruta)}">Ver como nota</a></p>`;
+const verComoNota = ruta => `<p class="cambiar-vista"><button type="button" class="secundario pequeno" data-vista-nota="${esc(ruta)}">Ver como nota</button></p>`;
 async function abrirExamen(ruta) {
   let ex; try { ex = await api(`/api/examen?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<p>${esc(e.message)}</p>`; return; }
   const fm = ex.frontmatter || {};
   const estado = fm.intentos && String(fm.intentos) !== '0' ? `<p class="resumen">Intentos: ${esc(fm.intentos)}${fm.nota !== '' && fm.nota != null ? ` · última nota: <b>${esc(fm.nota)}</b>` : ''}${fm.aprobado ? ` · se aprueba con ${esc(fm.aprobado)}` : ''}</p>` : (fm.aprobado ? `<p class="resumen">Se aprueba con ${esc(fm.aprobado)}.</p>` : '');
   const form = ex.preguntas.map(q => `<fieldset class="pregunta" data-numero="${q.numero}"><legend><span class="numero">${q.numero}</span></legend><div class="enunciado">${q.enunciado}</div>${q.opciones.map(o => `<label class="opcion"><input type="${q.unica ? 'radio' : 'checkbox'}" name="p${q.numero}" value="${o.letra}"${o.marcada ? ' checked' : ''}><span class="letra">${o.letra})</span><span>${o.texto}</span></label>`).join('')}</fieldset>`).join('');
-  const pie = ex.validable ? '<button type="submit" id="validar">Validar</button><span class="pista">La app guarda tus respuestas en la nota y las corrige con la herramienta del kit.</span>'
+  const pie = ex.validable ? '<button type="submit" id="validar">Validar</button><span class="pista">Guarda tus respuestas en la nota y las corrige con la herramienta del kit</span>'
     : `<button type="submit" id="validar" class="secundario">Guardar respuestas</button><span class="pista">${esc(ex.motivo || '')}</span>`;
   $('#nota').innerHTML = `${verComoNota(ruta)}${ex.cabecera}${estado}<form id="examen" class="examen">${form}<footer class="examen-pie">${pie}</footer></form>${ex.resto ? `<section class="historico">${ex.resto}</section>` : ''}`;
   $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* texto */ } });
@@ -124,10 +129,10 @@ async function abrirExamen(ruta) {
     let r; try { r = await api('/api/examen/validar', { ruta, respuestas }); } catch (err) { r = { codigo: 1, salida: err.message }; }
     await refrescarInfo(); refrescarContadores();
     abrirNota(ruta);
-    mostrarResultado(r.corregido ? 'Examen corregido' : 'Examen', r);
+    mostrarResultado(r.corregido ? 'Examen validado' : 'Respuestas guardadas', r);
   });
 }
-$('#nota').addEventListener('click', e => { const a = e.target.closest('a[data-vista-nota]'); if (!a) return; e.preventDefault(); vistaNota = a.dataset.vistaNota; abrirNota(vistaNota); });
+$('#nota').addEventListener('click', e => { const a = e.target.closest('[data-vista-nota]'); if (!a) return; e.preventDefault(); vistaNota = a.dataset.vistaNota; abrirNota(vistaNota); });
 
 // ---------- flashcards en modo tarjeta
 let tarjetasEstado = null;
@@ -144,11 +149,11 @@ function pintarTarjeta() {
   const marca = t.sabia === true ? '<span class="marca ok">✅ la sabías</span>' : t.sabia === false ? '<span class="marca mal">❌ no la sabías</span>' : '';
   $('#nota').innerHTML = `${verComoNota(s.ruta)}<h1>${esc(s.titulo)}</h1><p class="resumen">${n} tarjetas · ${sabidas} sabidas · ${falladas} falladas</p>
     <section class="tarjeta" aria-live="polite">
-      <header><span>Tarjeta ${i + 1} de ${n}</span>${marca}</header>
+      <div class="cabecera"><span>Tarjeta ${i + 1} de ${n}</span>${marca}</div>
       <div class="pregunta-tarjeta">${t.pregunta}</div>
       ${s.destapada ? `<div class="respuesta-tarjeta">${t.respuesta}</div><div class="botones"><button type="button" data-tarjeta="sabia">✅ La sabía</button><button type="button" data-tarjeta="no-sabia" class="secundario">❌ No la sabía</button></div>`
       : '<div class="botones"><button type="button" data-tarjeta="destapar">Destapar</button></div>'}
-      <footer><button type="button" class="secundario pequeno" data-tarjeta="anterior"${i === 0 ? ' disabled' : ''}>← Anterior</button><span class="pista">${esc(t.info)}</span><button type="button" class="secundario pequeno" data-tarjeta="siguiente"${i === n - 1 ? ' disabled' : ''}>Siguiente →</button></footer>
+      <div class="pie"><button type="button" class="secundario pequeno" data-tarjeta="anterior"${i === 0 ? ' disabled' : ''}>← Anterior</button><span class="pista">${esc(t.info)}</span><button type="button" class="secundario pequeno" data-tarjeta="siguiente"${i === n - 1 ? ' disabled' : ''}>Siguiente →</button></div>
     </section><p class="pista">Espacio destapa · 1 la sabía · 2 no la sabía · ← → cambian de tarjeta</p>`;
   $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* texto */ } });
   const principal = $('#nota [data-tarjeta="destapar"], #nota [data-tarjeta="sabia"]'); if (principal) principal.focus();
@@ -197,8 +202,8 @@ async function abrirTareas() {
   const total = g.reduce((a, x) => a + x.items.length, 0), hechas = g.reduce((a, x) => a + x.items.filter(i => i.hecha).length, 0);
   const nota = cuaderno().kit !== 'carpeta' ? 'Lo que marcas aquí se escribe en su nota. Los exámenes y las flashcards se contestan en la suya.' : 'Tu lista propia, en <code>tareas.md</code>.';
   $('#panel').innerHTML = `<h1>Tareas</h1><p class="resumen">${hechas} de ${total} hechas. ${nota}</p><form class="nueva-tarea" id="nueva-tarea"><label class="oculto" for="tarea-nueva">Nueva tarea</label><input id="tarea-nueva" placeholder="Nueva tarea para mí…" autocomplete="off"><button type="submit">Añadir</button></form>`
-    + g.map(gr => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(gr.ruta)}">${esc(gr.ruta)}</a>${gr.generado ? '<span class="solo-lectura">la escribe el profesor al guardar</span>' : ''}</h2>`
-      + gr.items.map(i => `<label class="item${i.hecha ? ' hecha' : ''}"><input type="checkbox" data-ruta="${esc(gr.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${gr.generado ? ' disabled' : ''}><span>${esc(i.texto)}</span></label>`).join('') + '</section>').join('');
+    + g.map(gr => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(gr.ruta)}" title="${esc(gr.ruta)}">${esc(tituloDe(gr.ruta))}</a>${gr.generado ? '<span class="solo-lectura">la escribe el profesor al guardar</span>' : ''}</h2>`
+      + gr.items.map(i => `<label class="item${i.hecha ? ' hecha' : ''}"><input type="checkbox" data-ruta="${esc(gr.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${gr.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('') + '</section>').join('');
 }
 $('#panel').addEventListener('submit', async e => { if (e.target.id !== 'nueva-tarea') return; e.preventDefault(); const i = e.target.querySelector('input'); if (!i.value.trim()) return; await api('/api/tarea', { texto: i.value }); avisar('Tarea añadida'); abrirTareas(); refrescarContadores(); });
 $('#panel').addEventListener('change', async e => { const t = e.target; if (t.type !== 'checkbox') return; const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { avisar(err.message); abrirTareas(); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); refrescarContadores(); } });
@@ -207,7 +212,7 @@ async function abrirComentarios() {
   $('#miga').innerHTML = '<strong>Comentarios</strong>';
   const c = await api('/api/comentarios');
   $('#panel').innerHTML = `<h1>Comentarios</h1><p class="resumen">Lo que has anotado en las notas. Tu profesor los ve en la siguiente sesión y los convierte en dudas o aportaciones.</p>`
-    + (c.length ? c.map(x => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(x.ruta)}?l=${x.linea}">${esc(x.ruta)}</a> · ${esc(x.titulo)}</h2><p>${esc(x.texto)}</p></section>`).join('') : '<section class="grupo"><p>Todavía no hay comentarios. En cualquier nota, pasa por un párrafo (o llega a él con Tab) y pulsa <b>comentar</b>.</p></section>');
+    + (c.length ? c.map(x => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(x.ruta)}?l=${x.linea}" title="${esc(x.ruta)}">${esc(tituloDe(x.ruta))}</a> <span class="editor-lineas">${esc(x.titulo)}</span></h2><p>${esc(x.texto)}</p></section>`).join('') : '<section class="grupo"><p>Todavía no hay comentarios. En cualquier nota, pasa por un párrafo (o llega a él con Tab) y pulsa <b>comentar</b>.</p></section>');
 }
 async function refrescarContadores() {
   if (!cuaderno()) return;
@@ -244,14 +249,14 @@ $('#btn-profesor').onclick = () => abrirTerminal('profesor');
 
 // ---------- cuadernos (pantalla de inicio)
 const hace = iso => { if (!iso) return 'nunca'; const d = (Date.now() - new Date(iso)) / 864e5; if (d < 1 / 24) return 'hace un momento'; if (d < 1) return `hace ${Math.round(d * 24)} h`; if (d < 30) return `hace ${Math.round(d)} día${Math.round(d) === 1 ? '' : 's'}`; return `el ${new Date(iso).toLocaleDateString('es')}`; };
-const textoGit = g => !g ? 'sin git' : `guardado ${hace(g.ultimo)}${g.cambios ? ` · ${g.cambios} sin guardar` : ''}${g.sinSubir ? ` · ${g.sinSubir} sin subir` : ''}`;
+const textoGit = g => !g ? 'sin repositorio' : `guardado ${hace(g.ultimo)}${g.cambios ? ` · ${g.cambios} sin guardar` : ''}${g.sinSubir ? ` · ${g.sinSubir} sin subir` : ''}`;
 async function abrirCuadernos() {
   rutaActual = null; $('#nota').hidden = true; $('#panel').hidden = false;
   $('#miga').innerHTML = '<strong>Cuadernos</strong>';
   const lista = await api('/api/cuadernos');
   $('#panel').innerHTML = `<h1>Cuadernos</h1><p class="resumen">Cada cuaderno es una carpeta de notas con su propio repositorio. Abre uno reciente o escribe la ruta de otra carpeta.</p>
     <form class="nueva-tarea" id="abrir-carpeta"><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="Ruta de la carpeta del cuaderno, por ejemplo ~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button></form>`
-    + (lista.length ? lista.map(c => `<section class="grupo cuaderno${c.abiertoAhora ? ' abierto' : ''}${c.existe ? '' : ' ausente'}"><h2>${c.existe ? `<a href="#/" data-abrir="${esc(c.ruta)}">${esc(c.nombre)}</a>` : esc(c.nombre)}${c.abiertoAhora ? '<span class="solo-lectura">abierto ahora</span>' : ''}</h2><p class="ruta"><code>${esc(c.ruta)}</code></p><p class="detalle">${c.existe ? textoGit(c.git) : 'la carpeta ya no está'}</p><button type="button" class="secundario pequeno" data-olvidar="${esc(c.ruta)}">Quitar de la lista</button></section>`).join('')
+    + (lista.length ? lista.map(c => `<section class="grupo cuaderno${c.abiertoAhora ? ' abierto' : ''}${c.existe ? '' : ' ausente'}"><h2>${c.existe ? `<a href="#/" data-abrir="${esc(c.ruta)}">${esc(c.nombre)}</a>` : esc(c.nombre)}${c.abiertoAhora ? '<span class="solo-lectura">abierto ahora</span>' : ''}</h2><p class="ruta"><code>${esc(c.ruta)}</code></p><p class="detalle">${!c.existe ? 'La carpeta ya no está' : c.git ? textoGit(c.git) : 'No es un repositorio: desde aquí no se puede guardar'}</p><button type="button" class="secundario pequeno" data-olvidar="${esc(c.ruta)}">Quitar de la lista</button></section>`).join('')
       : '<section class="grupo"><p>Todavía no has abierto ningún cuaderno.</p></section>');
 }
 async function abrirCarpeta(ruta) {
@@ -314,6 +319,8 @@ function abrirAjustes() {
 }
 function cerrarAjustes() { $('#ajustes').hidden = true; if (foco) foco.focus(); }
 $('#btn-ajustes').onclick = abrirAjustes;
+$('#btn-menu').onclick = () => { const l = $('#lateral'); l.classList.toggle('abierto'); $('#btn-menu').setAttribute('aria-expanded', l.classList.contains('abierto')); };
+$('#lateral').addEventListener('click', e => { if (e.target.closest('a') && window.innerWidth <= 760) $('#lateral').classList.remove('abierto'); });
 $('#ajustes-cerrar').onclick = cerrarAjustes;
 $('#ajustes form').addEventListener('change', async () => {
   info.configuracion = await api('/api/configuracion', { tema: $('#ajustes-tema').value, letra: $('#ajustes-letra').value, fuente: $('#ajustes-fuente').value, comando_agente: $('#ajustes-comando').value });
@@ -336,7 +343,7 @@ function pintarEstado() {
 async function cargarCuaderno() {
   pintarEstado();
   if (!cuaderno()) { arbol = []; $('#arbol').innerHTML = ''; return; }
-  arbol = await api('/api/arbol'); pintarArbol(arbol); refrescarContadores();
+  [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); pintarArbol(arbol); refrescarContadores();
 }
 
 // ---------- rutas
@@ -352,7 +359,7 @@ function enrutar() {
 window.addEventListener('hashchange', enrutar);
 
 // ---------- recarga en vivo
-try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; info = await api('/api/info'); pintarEstado(); arbol = await api('/api/arbol'); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (location.hash === '#/tareas') abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
+try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; info = await api('/api/info'); pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (location.hash === '#/tareas') abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
 
 (async () => {
   info = await api('/api/info');

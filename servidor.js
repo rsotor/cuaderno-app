@@ -114,6 +114,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
       if (p === '/api/info') return json(res, info());
       if (p === '/api/cuadernos') return json(res, cuadernos());
       if (p === '/api/arbol') return json(res, conCuaderno().listar());
+      if (p === '/api/titulos') return json(res, conCuaderno().titulos());
       if (p === '/api/buscar') return json(res, conCuaderno().buscar(url.searchParams.get('q') || ''));
       if (p === '/api/nota') return json(res, conCuaderno().nota(url.searchParams.get('p')));
       if (p === '/api/tareas') return json(res, conCuaderno().tareas({ soloPropias: estado.kit.tipo === 'carpeta' }));   // una salida del kit sin motor sigue teniendo sus formatos

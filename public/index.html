@@ -9,27 +9,42 @@
 <link rel="stylesheet" href="/public/estilo.css">
 </head>
 <body>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="i-casa" viewBox="0 0 24 24"><path d="M3 11 12 3l9 8M5 10v10h5v-6h4v6h5V10"/></symbol>
+  <symbol id="i-casillas" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></symbol>
+  <symbol id="i-bocadillo" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><path d="m4 17 6-5-6-5M12 19h8"/></symbol>
+  <symbol id="i-birrete" viewBox="0 0 24 24"><path d="M2 10l10-5 10 5-10 5zM6 12v5c0 1.5 3 3 6 3s6-1.5 6-3v-5M22 10v6"/></symbol>
+  <symbol id="i-engranaje" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-guardar" viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5zM8 3v6h7V3M8 21v-7h8v7"/></symbol>
+  <symbol id="i-traer" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 17v3h16v-3"/></symbol>
+  <symbol id="i-deshacer" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+  <symbol id="i-lapiz" viewBox="0 0 24 24"><path d="m4 20 4-1L19 8l-3-3L5 16zM14 7l3 3"/></symbol>
+  <symbol id="i-comentar" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4zM12 8v5M9.5 10.5h5"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-cuaderno" viewBox="0 0 24 24"><path d="M6 3h12v18H6zM6 7h12M9 3v18"/></symbol>
+</svg>
 <a class="saltar" href="#nota">Saltar al contenido</a>
 <div id="app">
   <aside id="lateral" aria-label="Cuaderno">
-    <header class="marca"><a href="#/cuadernos" title="Todos los cuadernos"><span class="logo" aria-hidden="true">▣</span><span id="nombre-curso">Cuaderno</span></a><small id="estado-git"></small>
-      <div class="guardar-barra"><button type="button" id="btn-guardar" title="Guardar en el repositorio del cuaderno">💾 Guardar</button><button type="button" id="btn-traer" class="secundario" title="Traer lo que cambió en otro sitio">⇣ Traer</button><button type="button" id="btn-deshacer" class="secundario" title="Deshacer el último guardado">↶ Deshacer</button></div></header>
+    <header class="marca"><a href="#/cuadernos" title="Todos los cuadernos"><svg class="icono" aria-hidden="true"><use href="#i-cuaderno"/></svg><span id="nombre-curso">Cuaderno</span></a><small id="estado-git"></small>
+      <div class="guardar-barra"><button type="button" id="btn-guardar" class="primario" title="Guardar en el repositorio del cuaderno"><svg class="icono" aria-hidden="true"><use href="#i-guardar"/></svg>Guardar</button><button type="button" id="btn-traer" class="secundario" title="Traer lo que cambió en otro sitio" aria-label="Traer"><svg class="icono" aria-hidden="true"><use href="#i-traer"/></svg></button><button type="button" id="btn-deshacer" class="secundario" title="Deshacer el último guardado" aria-label="Deshacer"><svg class="icono" aria-hidden="true"><use href="#i-deshacer"/></svg></button></div></header>
     <label class="oculto" for="buscador">Buscar nota o texto</label>
     <input id="buscador" type="search" placeholder="Buscar nota o texto…  (Ctrl K)" autocomplete="off">
     <nav class="paginas" aria-label="Páginas">
-      <a id="link-inicio" href="#/" data-pagina="inicio">🏠 Inicio</a>
-      <a href="#/tareas" data-pagina="tareas">☑ Tareas <span class="contador" id="n-tareas"></span></a>
-      <a href="#/comentarios" data-pagina="comentarios">💬 Comentarios <span class="contador" id="n-comentarios"></span></a>
+      <a id="link-inicio" href="#/" data-pagina="inicio"><svg class="icono" aria-hidden="true"><use href="#i-casa"/></svg>Inicio</a>
+      <a href="#/tareas" data-pagina="tareas"><svg class="icono" aria-hidden="true"><use href="#i-casillas"/></svg>Tareas <span class="contador" id="n-tareas"></span></a>
+      <a href="#/comentarios" data-pagina="comentarios"><svg class="icono" aria-hidden="true"><use href="#i-bocadillo"/></svg>Comentarios <span class="contador" id="n-comentarios"></span></a>
     </nav>
     <nav id="arbol" aria-label="Notas"></nav>
     <footer class="pie-lateral">
-      <button type="button" id="btn-terminal" title="Abrir la terminal (Ctrl `)">⌨ Terminal</button>
-      <button type="button" id="btn-profesor" title="Abre al profesor en la terminal" hidden>🎓 Profesor</button>
-      <button type="button" id="btn-ajustes" title="Ajustes" aria-label="Ajustes">⚙</button>
+      <button type="button" id="btn-terminal" title="Abrir la terminal (Ctrl `)"><svg class="icono" aria-hidden="true"><use href="#i-terminal"/></svg>Terminal</button>
+      <button type="button" id="btn-profesor" title="Abre al profesor en la terminal" hidden><svg class="icono" aria-hidden="true"><use href="#i-birrete"/></svg>Profesor</button>
+      <button type="button" id="btn-ajustes" title="Ajustes" aria-label="Ajustes"><svg class="icono" aria-hidden="true"><use href="#i-engranaje"/></svg></button>
     </footer>
   </aside>
   <main id="centro">
-    <div id="miga" aria-label="Ruta de la nota"></div>
+    <div class="miga-barra"><button type="button" id="btn-menu" class="secundario" aria-label="Abrir el menú" aria-controls="lateral"><svg class="icono" aria-hidden="true"><use href="#i-menu"/></svg></button><div id="miga" aria-label="Ruta de la nota"></div></div>
     <article id="nota" tabindex="-1"></article>
     <section id="panel" hidden></section>
   </main>
@@ -40,37 +55,37 @@
 </div>
 <div id="editor" role="dialog" aria-modal="true" aria-labelledby="editor-titulo" hidden>
   <div class="editor-caja">
-    <header><span id="editor-titulo">Editar bloque</span><span class="editor-lineas" id="editor-lineas"></span></header>
+    <div class="cabecera"><span id="editor-titulo">Editar bloque</span><span class="editor-lineas" id="editor-lineas"></span></div>
     <label class="oculto" for="editor-texto">Texto en Markdown</label>
     <textarea id="editor-texto" spellcheck="false"></textarea>
-    <footer><span class="pista">Ctrl Enter guarda · Esc cancela</span><button type="button" id="editor-cancelar" class="secundario">Cancelar</button><button type="button" id="editor-guardar">Guardar</button></footer>
+    <div class="pie"><span class="pista">Ctrl Enter guarda · Esc cancela</span><button type="button" id="editor-cancelar" class="secundario">Cancelar</button><button type="button" id="editor-guardar">Guardar</button></div>
   </div>
 </div>
 <div id="guardar" class="modal" role="dialog" aria-modal="true" aria-labelledby="guardar-titulo" hidden>
   <div class="editor-caja estrecha">
-    <header><span id="guardar-titulo">Guardar</span><span class="editor-lineas" id="guardar-cambios"></span></header>
+    <div class="cabecera"><span id="guardar-titulo">Guardar</span><span class="editor-lineas" id="guardar-cambios"></span></div>
     <label class="oculto" for="guardar-mensaje">Mensaje del guardado</label>
     <textarea id="guardar-mensaje" rows="2" spellcheck="true"></textarea>
-    <footer><span class="pista">Ctrl Enter guarda · Esc cancela</span><button type="button" id="guardar-cancelar" class="secundario">Cancelar</button><button type="button" id="guardar-ok">Guardar</button></footer>
+    <div class="pie"><span class="pista">Ctrl Enter guarda · Esc cancela</span><button type="button" id="guardar-cancelar" class="secundario">Cancelar</button><button type="button" id="guardar-ok">Guardar</button></div>
   </div>
 </div>
 <div id="resultado" class="modal" role="dialog" aria-modal="true" aria-labelledby="resultado-titulo" hidden>
   <div class="editor-caja estrecha">
-    <header><span id="resultado-titulo">Resultado</span></header>
+    <div class="cabecera"><span id="resultado-titulo">Resultado</span></div>
     <pre id="resultado-texto" class="resultado-texto"></pre>
-    <footer><button type="button" id="resultado-profesor" class="secundario" hidden>Abrir con el profesor</button><button type="button" id="resultado-confirmar" hidden>Deshacer</button><button type="button" id="resultado-cerrar">Cerrar</button></footer>
+    <div class="pie"><button type="button" id="resultado-profesor" class="secundario" hidden>Abrir con el profesor</button><button type="button" id="resultado-confirmar" class="primario" hidden>Deshacer</button><button type="button" id="resultado-cerrar">Cerrar</button></div>
   </div>
 </div>
 <div id="ajustes" class="modal" role="dialog" aria-modal="true" aria-labelledby="ajustes-titulo" hidden>
   <div class="editor-caja estrecha">
-    <header><span id="ajustes-titulo">Ajustes</span><span class="editor-lineas">iguales para todos tus cuadernos</span></header>
+    <div class="cabecera"><span id="ajustes-titulo">Ajustes</span><span class="editor-lineas">iguales para todos tus cuadernos</span></div>
     <form class="ajustes">
       <label>Tema <select id="ajustes-tema"><option value="auto">Como el sistema</option><option value="claro">Claro</option><option value="oscuro">Oscuro</option></select></label>
       <label>Letra <select id="ajustes-letra"><option value="pequeña">Pequeña</option><option value="media">Media</option><option value="grande">Grande</option></select></label>
       <label>Fuente de lectura <select id="ajustes-fuente"><option value="sistema">Del sistema</option><option value="serif">Con serifa</option></select></label>
       <label>Comando del profesor en carpetas sin kit <input id="ajustes-comando" placeholder="claude" autocomplete="off"></label>
     </form>
-    <footer><button type="button" id="ajustes-cerrar">Cerrar</button></footer>
+    <div class="pie"><button type="button" id="ajustes-cerrar">Cerrar</button></div>
   </div>
 </div>
 <script src="/assets/katex/dist/katex.min.js"></script>

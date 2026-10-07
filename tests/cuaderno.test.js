@@ -112,6 +112,13 @@ test('nombre: cuaderno.json, luego nombre_curso del kit, luego la carpeta', con(
   assert.equal(new Cuaderno(c.raiz, c.base).nombre(), 'Mi cuaderno');
 }));
 
+test('títulos: el # de cada nota, sin wikilinks; las tareas llevan el Markdown en línea pintado', con({}, (c, cu) => {
+  const t = cu.titulos();
+  assert.equal(t['conceptos/interes.md'], 'Interés'); assert.equal(t['inicio.md'], 'Mi curso'); assert.equal(t['sesiones/01-01-01-sesion.md'], '1.1 La sesión');
+  const item = cu.tareas().find(g => g.ruta === 'sesiones/01-01-01-sesion.md').items[1];
+  assert.equal(item.texto, 'Leer interes'); assert.equal(item.html, 'Leer interes');
+}));
+
 test('recorrido: cuenta notas, enlaces rotos y fallos', con({}, (c, cu) => {
   const r = cu.recorrido();
   assert.equal(r.notas, 7);

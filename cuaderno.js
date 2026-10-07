@@ -44,7 +44,18 @@ class Cuaderno {
     if (!this.indice) this.indice = this.recorrer(this.base, []);
     return this.indice;
   }
-  invalidar() { this.indice = null; }
+  invalidar() { this.indice = null; this.cacheTitulos = null; }
+  // El título (# …) de cada nota, para que la app enseñe títulos y no nombres de fichero.
+  titulos() {
+    if (this.cacheTitulos) return this.cacheTitulos;
+    const t = {};
+    for (const p of this.listar()) {
+      if (!p.endsWith('.md')) continue;
+      const m = this.leer(p).replace(/\r\n/g, '\n').match(/^#\s+(.+?)\s*#*\s*$/m);
+      if (m) t[p] = m[1].replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, '$2').trim();
+    }
+    return (this.cacheTitulos = t);
+  }
   recorrer(dir, acc) {
     let entradas;
     try { entradas = fs.readdirSync(dir, { withFileTypes: true }); } catch { return acc; }
@@ -122,7 +133,7 @@ class Cuaderno {
       if (tipo === 'examen' || tipo === 'flashcards') continue;   // se contestan en su nota, no son tareas
       const ls = this.lineas(src);
       const items = [];
-      ls.forEach((l, i) => { const m = l.match(RE_CASILLA); if (m) items.push({ linea: i, hecha: m[2] !== ' ', texto: m[3].slice(2).replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, '$2').slice(0, 200) }); });
+      ls.forEach((l, i) => { const m = l.match(RE_CASILLA); if (!m) return; const texto = m[3].slice(2).replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, '$2').replace(/(?:[\w.-]+\/)+([\w.-]+)/g, '$1'); items.push({ linea: i, hecha: m[2] !== ' ', texto, html: this.md.renderInline(texto, {}) }); });
       if (items.length) grupos.push({ ruta: p, generado: /^> Lo genera tu profesor/m.test(ls.slice(0, 6).join('\n')), items });
     }
     grupos.sort((a, b) => (a.ruta === 'tareas.md' ? -1 : b.ruta === 'tareas.md' ? 1 : a.generado - b.generado));
