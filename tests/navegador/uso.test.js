@@ -120,7 +120,9 @@ test('árbol: las carpetas salen plegadas salvo la de la nota abierta, y la que 
   await e.ir('#/n/conceptos/capital.md');
   const abierta = nombre => e.pagina.locator('#arbol details', { has: e.pagina.locator('summary', { hasText: nombre }) }).first().evaluate(d => d.open);
   // El árbol se pinta después de la nota: se espera a que marque la nota abierta (en Windows tarda más que en un Mac).
-  await visible(e.pagina.locator('#arbol a.hoja.activa', { hasText: 'Capital' }), 'árbol', 'la nota abierta marcada en el árbol');
+  // Dos esperas separadas (en Windows falló una vez sin decir cuál): primero que el árbol marque la nota, después que
+  // abra su carpeta. El árbol se repinta tras la nota y en Windows llega más tarde.
+  await hasta(() => e.pagina.locator('#arbol a.hoja.activa[data-ruta="conceptos/capital.md"]').count(), 'árbol', 'la nota abierta no sale marcada en el árbol');
   await hasta(() => abierta('conceptos'), 'árbol', 'la carpeta de la nota abierta sale plegada');
   assert.equal(await abierta('sesiones'), false, 'árbol: una carpeta sin la nota abierta sale desplegada');
   await e.pagina.locator('#arbol summary', { hasText: 'sesiones' }).click();
