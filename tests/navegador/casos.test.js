@@ -23,6 +23,10 @@ test.before(async () => {
   git(remoto, 'init', '-q', '--bare', '-b', 'main');
   git(e.c.raiz, 'init', '-q', '-b', 'main'); git(e.c.raiz, 'config', 'user.email', 't@t'); git(e.c.raiz, 'config', 'user.name', 'Prueba'); git(e.c.raiz, 'add', '-A'); git(e.c.raiz, 'commit', '-q', '-m', 'base');
   git(e.c.raiz, 'remote', 'add', 'origin', remoto); git(e.c.raiz, 'push', '-q', '-u', 'origin', 'main');
+  // El vigilante de ficheros avisa con retraso (hasta 1 s en macOS) de lo que acaba de escribir git: se espera a que
+  // pase, o la recarga en vivo repinta la nota justo cuando el primer recorrido pulsa un botón (como en uso.test.js).
+  await e.ir('#/n/conceptos/capital.md');
+  await e.pagina.waitForTimeout(1500);
 });
 test.after(async () => { if (e) await e.cerrar(); if (remoto) fs.rmSync(remoto, { recursive: true, force: true }); });
 
