@@ -4,8 +4,11 @@
 hable con el profesor desde la app, con lo que da y lo que no da cada una, sus riesgos y una estimación de
 esfuerzo. Termina con una recomendación. La decisión es de Roberto; hasta entonces no se toca la terminal (fase 9).
 
-Todo lo que sigue sale de la documentación oficial leída hoy (enlaces al final), no de memoria. Lo que no está
-documentado se marca como **por comprobar**.
+Aclaración de Roberto (2026-10-08): el objetivo es **un chat conectado al profesor dentro de la app**, no
+necesariamente una interfaz nuestra; un Discord o parecido también sirve. Eso abre las vías de §2.
+
+Todo lo que sigue sale de la documentación y el código oficiales leídos hoy (enlaces al final), no de memoria.
+Lo que no está documentado se marca como **por comprobar**.
 
 ## 0. Lo que manda
 
@@ -18,7 +21,7 @@ documentado se marca como **por comprobar**.
 
 Hoy la app lanza el comando del adaptador del kit (`claude`) en una pty y lo pinta con xterm. Eso es la vía A.
 
-## 1. Las vías
+## 1. Vías con interfaz nuestra
 
 ### A. Terminal sola (lo que hay)
 
@@ -26,29 +29,28 @@ La sesión interactiva de Claude Code dentro de la app, cuidada: pestañas, fuen
 Profesor. Sin chat propio.
 
 - **Da:** todo lo que hace Claude Code, tal cual, con la suscripción. Cero protocolo que pueda cambiar.
-- **No da:** una conversación con el aspecto de la app. El alumno ve una terminal.
-- **Riesgos:** `node-pty` en Windows (fase 11); el bug de la terminal que se cierra en Chrome headless (Inbox).
+- **No da:** una conversación con el aspecto de un chat. El alumno ve una terminal.
+- **Riesgos:** `node-pty` en Windows (fase 11); el bug de la terminal que se cierra en Chrome headless (Inbox). Si
+  `ANTHROPIC_API_KEY` está en el entorno, Claude Code la usa y factura por API: la app debe quitarla del entorno
+  del proceso hijo.
 - **Esfuerzo:** pequeño. Una o dos sesiones. Hay que hacerlo en cualquier caso: es la base y el plan B de todo lo demás.
 
-### B. La app como *channel* de Claude Code (un `fakechat` propio)
+### B. Un *channel* propio (un `fakechat` nuestro)
 
 Un channel es un servidor MCP que Claude Code arranca como subproceso (stdio) y que **empuja mensajes dentro de la
 sesión ya abierta**. El servidor declara la capability experimental `claude/channel`, emite notificaciones
 `notifications/claude/channel` con `content` y `meta`, y expone una herramienta `reply` con la que Claude contesta.
 El mensaje llega al modelo como un evento `<channel source="…">`, y la terminal lo enseña como una línea
-`← cuaderno: …`. `fakechat`, el ejemplo oficial, es exactamente esto con una UI web en `localhost:8787`: adjuntos
-(hasta 50 MB, en `~/.claude/channels/fakechat/inbox/`), edición de mensajes (`edit_message`), un solo chat, sin
-historial. El requisito es `@modelcontextprotocol/sdk`; vale Node, no hace falta Bun.
+`← cuaderno: …`. El requisito es `@modelcontextprotocol/sdk`; vale Node, no hace falta Bun.
 
 Cómo encajaría: la app arranca el adaptador del kit con dos flags más, `--mcp-config '<json en línea>'` y el
-flag de channel; el servidor MCP es un fichero nuestro que habla con el servidor de la app por localhost (token
-incluido); el panel de chat envía por ahí y pinta lo que `reply` traiga. El cuaderno no cambia: nada de `.mcp.json`
-en su repo.
+flag de channel; el servidor MCP es un fichero nuestro que habla con el servidor de la app por localhost (con el
+token de la app y comprobación de `Origin`); el panel de chat envía por ahí y pinta lo que `reply` traiga. El
+cuaderno no cambia: nada de `.mcp.json` en su repo.
 
-- **Da:** la **misma sesión que la terminal**, con AGENTS.md, skills y herramientas del kit. El alumno escribe en
-  el chat o en la terminal y es la misma conversación. Si Claude pide permiso para una herramienta, un channel con
-  la capability `claude/channel/permission` recibe el aviso y puede aprobar o denegar desde el chat (*permission
-  relay*). La suscripción Pro o Max basta y no hay comprobación de organización.
+- **Da:** la **misma sesión que la terminal**, con AGENTS.md, skills y herramientas del kit. Si Claude pide permiso
+  para una herramienta, un channel con la capability `claude/channel/permission` recibe el aviso y puede aprobar o
+  denegar desde el chat (*permission relay*). Interfaz nuestra al 100 %: render, tema, historial, varios chats.
 - **No da:** streaming. El channel solo recibe lo que Claude decide enviar con `reply`, no la respuesta entera ni
   lo que escribe en la terminal. Claude Code no acusa recibo de las notificaciones: si la sesión está ocupada, los
   mensajes se encolan y llegan juntos en el turno siguiente, y no hay forma documentada de saber si está ocupada.
@@ -58,109 +60,167 @@ en su repo.
   - **Research preview.** Los flags no salen en `--help`; la sintaxis y el contrato "pueden cambiar".
   - **Lista blanca.** `--channels` solo acepta plugins del *marketplace* oficial de Anthropic. Un channel propio
     tiene que arrancarse con `--dangerously-load-development-channels server:<nombre>`, que **abre un diálogo de
-    aviso a pantalla completa en cada arranque** ("I am using this for local development"). Solo funciona en
-    sesión interactiva, que es la nuestra. Para librarse del aviso hay que estar en la lista oficial, y eso pasa por
-    un contacto de Anthropic. Esta es la pega de verdad: cada vez que el alumno pulse Profesor verá ese aviso.
+    aviso a pantalla completa en cada arranque** ("I am using this for local development"). Para librarse del
+    aviso hay que estar en la lista oficial, y eso pasa por un contacto de Anthropic.
   - Team y Enterprise exigen que un administrador active `channelsEnabled`.
   - Dos dependencias nuevas (`@modelcontextprotocol/sdk`, y `zod` si se hace el relay de permisos).
   - **Por comprobar:** si `--mcp-config` en línea evita el diálogo de consentimiento de "nuevo servidor MCP en este
     proyecto", y si el adaptador del kit admite flags añadidos sin tocar el kit.
-- **Esfuerzo:** medio. Una sesión de prueba de concepto (servidor MCP en Node, los dos flags, un panel mínimo,
-  medir el aviso y los permisos); dos más para el panel con render Markdown nuestro, adjuntos y el relay de
-  permisos; una de tests de navegador. Tres o cuatro en total.
+- **Esfuerzo:** medio. Tres o cuatro sesiones (prueba de concepto, panel, relay de permisos, tests).
 
 ### C. Chat propio sobre `claude -p` (modo programático, `stream-json`)
 
 La app arranca `claude -p --output-format stream-json --input-format stream-json --verbose
---include-partial-messages` en la carpeta del cuaderno y mantiene la conversación por stdin y stdout, o un proceso
-por turno con `--resume <id>`. Sin `--bare`, porque el modo *bare* no usa la sesión de la suscripción y no carga
-el AGENTS.md ni las skills.
+--include-partial-messages` en la carpeta del cuaderno y mantiene la conversación por stdin y stdout. Sin `--bare`,
+porque el modo *bare* no usa la sesión de la suscripción y no carga el AGENTS.md ni las skills.
 
-- **Da:** control total de la experiencia: tokens en vivo, nuestro render, las herramientas pintadas como queramos,
-  reanudar la sesión al reabrir la app.
-- **No da:** la misma sesión que la terminal. Serían dos sesiones (dos contextos) o el chat sustituye a la terminal.
-  Reanudar el mismo `session-id` desde dos procesos no está bloqueado: la documentación avisa de que los mensajes
-  "se entrelazan en un único transcript".
-  Los permisos los tenemos que resolver nosotros (`--permission-prompt-tool` con un servidor MCP propio, o un
-  `--permission-mode` fijo). Las herramientas que necesitan terminal (preguntas de opción múltiple, aprobación del
-  modo plan) se desactivan en `-p`.
-- **Riesgos:**
-  - **Política de Anthropic.** La documentación del Agent SDK dice, literal: *"Unless previously approved,
-    Anthropic does not allow third party developers to offer claude.ai login or rate limits for their products"*.
-    Una app pública que envuelve el CLI con la cuenta del alumno para dar su propio chat está en esa zona. La vía
-    B no tiene este problema: el alumno ejecuta Claude Code y nuestra app es un channel, que es el patrón que la
-    propia documentación propone. Mientras esa nota siga así, C queda fuera para un repo público.
-  - Es la vía con más superficie que construir y mantener: parser del stream, permisos, errores, reanudación. El
-    esquema de la herramienta de `--permission-prompt-tool` no está documentado en las páginas del CLI.
-  - Si `ANTHROPIC_API_KEY` está en el entorno, `-p` la usa siempre y factura por API: la app tendría que quitarla
-    del entorno del proceso hijo. Esto vale también para la terminal de la vía A.
+- **Da:** control total: tokens en vivo, nuestro render, reanudar la sesión al reabrir la app.
+- **No da:** la misma sesión que la terminal. Reanudar el mismo `session-id` desde dos procesos no está
+  bloqueado: la documentación avisa de que los mensajes "se entrelazan en un único transcript". Los permisos los
+  tenemos que resolver nosotros (`--permission-prompt-tool`, cuyo esquema no está documentado, o un
+  `--permission-mode` fijo).
+- **Riesgos:** **la política de Anthropic.** La documentación del Agent SDK dice, literal: *"Unless previously
+  approved, Anthropic does not allow third party developers to offer claude.ai login or rate limits for their
+  products"*. Una app pública que envuelve el CLI con la cuenta del alumno para dar su propio chat está en esa zona.
+  Los channels no tienen este problema: el alumno ejecuta Claude Code y nuestra app es un channel, que es el patrón
+  que la propia documentación propone. Mientras esa nota siga así, C queda fuera para un repo público.
 - **Esfuerzo:** grande. Cuatro a seis sesiones.
 
 ### D. Agent SDK
 
 Confirmado hoy: exige API key y la misma nota de política de la vía C. Sigue descartado.
 
-**Remote Control**, de paso: permite manejar la sesión local desde claude.ai o la app de Claude, con suscripción,
-pero la interfaz es la de Anthropic, no la nuestra. No es embebible; no es una vía para la app.
+### E. Codex (OpenAI): `codex app-server` y `codex exec --json`
 
-### E. Codex (OpenAI): `codex app-server`
+Equivalentes a la vía C para Codex: JSON-RPC por stdio, experimental y "no soportado para producción"; `exec --json`
+es más sencillo pero su documentación de autenticación dice de la cuenta de ChatGPT: "Do not use this workflow for
+public or open-source repositories". No hay equivalente de los channels. Solo tiene sentido si el kit tiene
+adaptador de Codex. Queda en la fase 12 como "por comprobar".
 
-Equivalente a la vía C para Codex: JSON-RPC 2.0 por stdio, métodos `thread/start`, `turn/start`, `turn/interrupt`,
-aprobaciones como peticiones del servidor (`item/permissions/requestApproval`), inicio de sesión con la cuenta de
-ChatGPT gestionado por el propio Codex (`account/login/start`), o un patrón de token compartido en que la app
-obtiene el OAuth de ChatGPT del usuario. La documentación lo marca como experimental y "no soportado para
-producción"; los esquemas se generan por versión (`codex generate-ts`). Existe también `codex exec --json` (JSONL
-por stdout, reanudable), más sencillo, pero su documentación de autenticación recomienda API key para automatizar y
-dice de la cuenta de ChatGPT: "Do not use this workflow for public or open-source repositories". No hay
-equivalente de los channels. Solo tiene sentido si el kit tiene adaptador de Codex, y después de decidir la vía con Claude.
-Esfuerzo grande. Queda en la fase 12 como "por comprobar".
+## 2. Vías con un chat que ya existe
 
-## 2. Comparación
+Todas usan los **plugins oficiales de channels**, que están en la lista blanca: se arrancan con `--channels
+plugin:<nombre>@claude-plugins-official` y **no muestran el aviso de desarrollo**. Comparten tres requisitos: el
+alumno instala el plugin una vez desde Claude Code (`/plugin install …`), tiene **Bun** instalado (los plugins
+oficiales son scripts Bun; no hay versión Node) y la app añade el flag al comando del adaptador. La app puede
+detectar las dos cosas y guiar al alumno. Todas llegan a la misma sesión que la terminal, y la terminal enseña el
+mensaje entrante y la llamada a `reply`.
 
-| | A Terminal | B Channel | C `claude -p` | D Agent SDK | E Codex app-server |
-|---|---|---|---|---|---|
-| Misma sesión que la terminal | es la terminal | **sí** | no | no | no |
-| Suscripción sin API key | sí | sí | sí, pero política en contra para terceros | **no** | sí (ChatGPT), por comprobar |
-| Permitido para un producto de terceros | sí | **sí** (patrón oficial) | zona gris | no | por comprobar |
-| Control de la experiencia | bajo | medio (sin streaming) | **total** | total | total |
-| Estado | estable | research preview, aviso en cada arranque | estable | estable | experimental |
-| Dependencias nuevas | 0 | 1-2 | 0 | 1 | 0-1 |
-| Esfuerzo (sesiones) | 1-2 | 3-4 | 4-6 | — | 4-6 |
-| Riesgo principal | Windows | el aviso y el cambio de contrato | la política de Anthropic | API key | protocolo experimental |
+### F. `fakechat` oficial, embebido en la app
 
-## 3. Recomendación
+El servidor de `fakechat` (`server.ts`, Bun) sirve una página de chat en `http://127.0.0.1:8787` (`FAKECHAT_PORT`
+para cambiarlo), con WebSocket en `/ws`, subida de ficheros en `POST /upload` y descarga en `/files/`. Leído el
+código: **no manda `X-Frame-Options` ni `Content-Security-Policy`**, así que la app puede pintarlo en un `iframe`
+dentro de su propia ventana, al lado de la terminal o en su lugar. Herramientas: `reply` (texto, `reply_to`, hasta
+50 MB de ficheros) y `edit_message`. La notificación lleva `chat_id: 'web'`, `message_id`, `user: 'web'`, `ts` y
+`file_path` si hay adjunto.
+
+- **Da:** un chat dentro de la app, con la misma sesión que la terminal, **sin escribir ningún puente** y sin el
+  aviso de desarrollo. Esfuerzo nuestro: detectar Bun y el plugin, añadir el flag, un panel con el `iframe`, y el
+  tema (el `iframe` no hereda nuestro CSS; `fakechat` trae estilo propio, "tipo iMessage").
+- **No da:** historial (cada recarga empieza un chat vacío; el servidor no guarda ni reenvía mensajes), varios
+  chats, búsqueda, ni tema nuestro. Sin streaming, como todo channel. La propia documentación lo llama "herramienta
+  de desarrollo, no un puente de mensajería real".
+- **Riesgos:**
+  - **Seguridad.** El servidor **no comprueba `Origin` ni tiene token**: cualquier página web abierta en el
+    navegador del alumno podría conectar a `ws://127.0.0.1:8787/ws` y meter texto en la sesión del profesor. Es la
+    misma debilidad para cualquiera que use `fakechat`, pero nuestra app, que sí exige token y `Origin`, estaría
+    embebiendo algo que no lo hace. Hay que decirlo al alumno o pedir a Anthropic que lo cierre.
+  - Es una demo: puede cambiar o desaparecer con cualquier versión del plugin. Puerto fijo, un solo servidor por
+    máquina (dos cuadernos abiertos a la vez chocarían salvo `FAKECHAT_PORT` distinto por cuaderno, cosa que la
+    app puede fijar en el entorno del adaptador).
+  - Bun es una dependencia del sistema fuera de Node; la app solo puede comprobar que está.
+- **Esfuerzo:** pequeño. Una sesión, más la prueba real con Bun y el plugin en el ordenador de Roberto (aquí no
+  se puede automatizar sin Bun).
+
+### G. Telegram, Discord o iMessage oficiales
+
+El alumno habla con el profesor desde su móvil o desde la app de Discord o Telegram; la sesión sigue en la app.
+Telegram: crear un bot con BotFather, `/telegram:configure <token>`, emparejar con un código, `allowlist`. Discord:
+bot en el Developer Portal con *Message Content Intent*, invitarlo a un servidor compartido, mismo emparejamiento;
+trae hilos, reacciones, indicador de "escribiendo", historial (`fetch_messages`, hasta 100) y adjuntos (10 × 25 MB).
+iMessage: solo macOS, sin bot ni token; lee la base de Mensajes (Acceso total al disco) y basta escribirse a uno
+mismo.
+
+- **Da:** un chat de verdad, con historial, notificaciones y móvil, sin escribir nada. Permiten el relay de
+  permisos desde el chat (Telegram y Discord lo gatean con la allowlist).
+- **No da:** chat **dentro de la app**: Discord y Telegram web no se dejan embeber en un `iframe`; la app solo puede
+  abrirlos en otra pestaña. Todo el texto del alumno y del profesor pasa por los servidores de Discord, Telegram o
+  Apple, que son terceros ajenos a Anthropic: para notas de estudio puede dar igual, pero hay que decirlo.
+- **Riesgos:** la configuración del bot es un trámite real para un alumno (Developer Portal, intents, permisos,
+  emparejamiento); iMessage pide permisos de sistema delicados. Un bot mal configurado (sin allowlist) deja que
+  desconocidos hablen con la sesión.
+- **Esfuerzo:** muy pequeño para nosotros: ajuste del usuario con los plugins a cargar, el flag, y una página de
+  ayuda con los pasos. Media sesión. Es un complemento de F o B, no una alternativa al chat en la app.
+
+### H. Remote Control (claude.ai y la app de Claude)
+
+`claude --remote-control` deja manejar la sesión local desde claude.ai o la app móvil de Claude, con suscripción
+Pro, Max, Team o Enterprise, sin bot, sin Bun y sin API key. La interfaz es la de Anthropic y no se embebe. Cumple
+"cualquier chat" y es lo que menos pide al alumno; no cumple "dentro de la app". **Por comprobar:** la elegibilidad
+(`claude doctor` la informa) y si el flag convive con `--channels`.
+
+### Lo que no sirve
+
+Un cliente de chat genérico para LLM (Open WebUI, LibreChat y parecidos) conectado a la API de Anthropic: exige
+API key y, sobre todo, habla con un modelo sin el AGENTS.md ni las herramientas del kit. No es el profesor.
+
+## 3. Comparación
+
+| | A Terminal | B Channel propio | C `claude -p` | F `fakechat` embebido | G Telegram/Discord/iMessage | H Remote Control |
+|---|---|---|---|---|---|---|
+| Misma sesión que la terminal | es la terminal | sí | no | **sí** | sí | sí |
+| Chat dentro de la app | no | **sí** | sí | **sí** (iframe) | no (otra pestaña o móvil) | no |
+| Suscripción, permitido para terceros | sí | sí | zona gris | sí | sí | sí |
+| Aviso de desarrollo al arrancar | no | **sí, siempre** | no | no | no | no |
+| Interfaz nuestra | no | **total** | total | no (la de la demo) | no | no |
+| Historial y varios chats | la terminal | sí | sí | **no** | sí | sí |
+| Pide al alumno | nada | nada | nada | Bun + plugin | Bun + plugin + bot | elegibilidad |
+| Seguridad del puente | token y Origin de la app | token y Origin | n/a | **sin Origin ni token** | allowlist del bot | la de Anthropic |
+| Dependencias nuevas del repo | 0 | 1-2 | 0 | 0 | 0 | 0 |
+| Esfuerzo (sesiones) | 1-2 | 3-4 | 4-6 | **1** | 0,5 | 0,5 |
+| Riesgo principal | Windows | aviso y contrato | política | demo sin blindar | trámite del bot, terceros | no embebible |
+
+## 4. Recomendación
 
 1. **La fase 9 (terminal cuidada) se hace sí o sí.** Es la única vía estable hoy y el plan B de las demás.
-2. **El chat va por la vía B, el channel**, y es la única que cumple las cuatro condiciones de §0 a la vez. Su coste
-   es el aviso a pantalla completa en cada arranque mientras no estemos en la lista oficial, y la falta de streaming.
-   Antes de comprometer la fase 12 propongo **una sesión de prueba de concepto** que responda a lo que está por
-   comprobar: el aviso, el consentimiento MCP, la aprobación de `reply`, qué pasa si la sesión está ocupada y si el
-   adaptador del kit tolera los flags. Con eso en la mano se decide si la fase 12 se adelanta a la 9 (como dice el
-   plan) o se queda detrás.
-3. **La vía C queda descartada para este repo mientras la nota de política no cambie.** Si Roberto quiere un chat
-   solo para uso propio, es técnicamente la mejor; pero no es lo que dice el principio 5.
-4. **Codex se revisa cuando el kit tenga adaptador** y la vía con Claude esté cerrada.
+2. **Primer chat en la app: F, `fakechat` embebido.** Una sesión, cero código de puente, sin aviso de desarrollo, y
+   la misma sesión que la terminal. Se acepta a cambio: sin historial entre recargas, interfaz ajena y la falta de
+   `Origin` en el servidor de la demo, que se le comunica al alumno en la ayuda y se reporta a Anthropic. Es la forma
+   más barata de **saber si un chat así se usa de verdad** antes de invertir en uno propio.
+3. **Complemento G, opcional y por ajuste del usuario:** quien quiera hablar con el profesor desde el móvil añade
+   Telegram, Discord o iMessage a la lista de channels; la app solo pone el flag y la página de ayuda.
+4. **B, el channel propio, solo si F se queda corto** (historial, varios chats, tema, seguridad) y después de intentar
+   la lista oficial con Anthropic, porque el aviso en cada arranque es un coste serio para un alumno. Mientras, se
+   hace la prueba de concepto de una sesión para despejar lo que está por comprobar.
+5. **C queda descartada para este repo mientras la nota de política no cambie.** D sigue descartada; Codex se revisa
+   cuando el kit tenga adaptador; H se anota como alternativa para quien no quiera instalar Bun.
 
-## 4. Tiempos
+Si Roberto confirma, la fase 12 del plan pasa a ser "chat por channel oficial (`fakechat` embebido, con Telegram,
+Discord o iMessage opcionales)" y el channel propio queda como fase posterior condicionada.
+
+## 5. Tiempos
 
 | Paso | Sesiones | Depende de |
 |---|---|---|
-| Prueba de concepto del channel (vía B) | 1 | nada |
-| Fase 9 · terminal cuidada | 1-2 | nada |
-| Fase 12 · chat por channel, completo con tests | 2-3 | la prueba de concepto |
-| Relay de permisos en el chat | dentro de la 12 | la prueba de concepto |
-| Codex | 4-6 | adaptador en el kit |
+| Fase 9 · terminal cuidada (A) | 1-2 | nada |
+| Fase 12 · `fakechat` embebido (F): detección de Bun y plugin, flag, panel, ayuda | 1 | prueba manual con Bun en el ordenador de Roberto |
+| Channels de móvil opcionales (G): ajuste, flag, ayuda | 0,5 | F |
+| Prueba de concepto del channel propio (B) | 1 | nada; solo si se decide ir a por B |
+| Channel propio completo con relay de permisos y tests (B) | 2-3 | la prueba de concepto y, a ser posible, la lista oficial |
+| Codex (E) | 4-6 | adaptador en el kit |
 
 ## Fuentes
 
 - Channels: https://code.claude.com/docs/en/channels
 - Referencia para construir un channel: https://code.claude.com/docs/en/channels-reference
-- `fakechat` (ejemplo oficial): https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/fakechat
+- `fakechat` (código y README): https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/fakechat
+- Discord, Telegram e iMessage oficiales: https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins
 - Modo programático (`claude -p`, `stream-json`): https://code.claude.com/docs/en/headless
 - Referencia de flags del CLI: https://code.claude.com/docs/en/cli-reference
-- Agent SDK (nota sobre login de claude.ai y licencia): https://code.claude.com/docs/en/agent-sdk/overview
 - Sesiones (entrelazado al reanudar desde dos sitios): https://code.claude.com/docs/en/sessions
 - Autenticación del CLI (precedencia de `ANTHROPIC_API_KEY`): https://code.claude.com/docs/en/authentication
 - Remote Control: https://code.claude.com/docs/en/remote-control
+- Agent SDK (nota sobre login de claude.ai y licencia): https://code.claude.com/docs/en/agent-sdk/overview
 - Codex app-server: https://learn.chatgpt.com/docs/app-server · https://openai.com/index/unlocking-the-codex-harness
 - Codex, modo no interactivo y autenticación: https://learn.chatgpt.com/docs/non-interactive-mode · https://learn.chatgpt.com/docs/auth

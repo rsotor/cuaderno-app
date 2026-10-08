@@ -9,7 +9,7 @@
 **Ahora**
 - Fase 6 cerrada el 2026-10-07 tras la ronda de abogado del diablo (7 objeciones atendidas): crítica con cifras en `docs/diseno/critica-2026-10-07.md` (18 hallazgos), cambios aplicados y medidos otra vez: 0 fallos de contraste en 15 pantallas y dos temas, foco 9,6:1 / 6,0:1, sin desbordamiento a 390 px. Decisiones de Roberto: fuente del sistema, Destapar discreto, botón «Corregir». Capturas antes y después en `docs/capturas/`. 46 tests.
 - Validación de Roberto (2026-10-08) sobre tres cosas: no hay tests de navegador (solo la sonda de macOS); no hay comando rápido para crear tareas (solo Ctrl K para buscar); las tareas no se pueden relacionar con notas ni filtrar. Decisiones en §6 (Tests de navegador, Tareas rápidas) y dos fases nuevas en §7.
-- En marcha: **fase 7** (tareas rápidas y primeros tests de navegador) y, en paralelo, el análisis de la **fase 8** (el chat con el profesor: vías, alcances y tiempos) en `docs/planes/chat-alcances.md`. Roberto decide la vía antes de tocar la terminal (fase 9).
+- En marcha: **fase 7** (tareas rápidas y primeros tests de navegador) y, en paralelo, el análisis de la **fase 8** (el chat con el profesor: vías, alcances y tiempos, incluidos los chats ya existentes como `fakechat`, Telegram o Discord) en `docs/planes/chat-alcances.md`. Roberto decide la vía antes de tocar la terminal (fase 9).
 
 **Después:** fase 9 (terminal cuidada, con la vía del chat ya decidida), fase 10 (inbox).
 
