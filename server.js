@@ -10,7 +10,8 @@ const puerto = Number(process.argv[3] || (/^\d+$/.test(process.argv[2] || '') ? 
 let pty = null;
 try { pty = require('node-pty'); } catch { console.error('node-pty no está disponible: la app arranca sin terminal.'); }
 
-const server = crearServidor({ pty });
+// CUADERNO_TOKEN (solo si lo fija quien arranca): el código de la URL no cambia en cada reinicio; para desarrollar.
+const server = crearServidor({ pty, ...(process.env.CUADERNO_TOKEN ? { token: process.env.CUADERNO_TOKEN } : {}) });
 if (carpeta) {
   try { server.abrir(carpeta); } catch (e) { console.error(`No se puede abrir ${carpeta}: ${e.message}`); process.exit(2); }
 }

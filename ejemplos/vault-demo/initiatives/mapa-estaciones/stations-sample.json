@@ -1,0 +1,34 @@
+{
+  "city": "rodando-demo",
+  "generatedAt": "2026-10-08T08:00:00Z",
+  "stations": [
+    {
+      "id": "st-042",
+      "name": "Plaza Mayor",
+      "lat": 40.4169,
+      "lng": -3.7035,
+      "bikes": 7,
+      "docks": 12,
+      "reserved": 1
+    },
+    {
+      "id": "st-117",
+      "name": "Estación Norte",
+      "lat": 40.4258,
+      "lng": -3.6911,
+      "bikes": 0,
+      "docks": 20,
+      "reserved": 0,
+      "outOfService": true
+    },
+    {
+      "id": "st-203",
+      "name": "Parque del Río",
+      "lat": 40.4051,
+      "lng": -3.7192,
+      "bikes": 15,
+      "docks": 16,
+      "reserved": 3
+    }
+  ]
+}
