@@ -27,11 +27,15 @@ const tituloDe = p => titulos[p] || nombreNota(p);
 const nombreCarpeta = k => { const m = k.match(/^((?:modulo|m|bloque|semana|tema|unidad)-?\d+|\d+(?:\.\d+)*)-(.+)$/i); return m ? `<span class="num">${esc(m[1])}</span> ${esc(m[2].replace(/-/g, ' '))}` : esc(k); };
 
 // ---------- árbol
+const carpetasAbiertas = new Set();
+$('#arbol').addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.carpeta != null) { if (d.open) carpetasAbiertas.add(d.dataset.carpeta); else carpetasAbiertas.delete(d.dataset.carpeta); } }, true);
 function pintarArbol(lista) {
   lista = lista.filter(p => p !== 'tareas.md');   // tareas.md se ve en el panel Tareas, no dos veces
   const raiz = {};
   for (const p of lista) { let n = raiz; const partes = p.split('/'); partes.forEach((s, i) => { if (i === partes.length - 1) (n.__f ??= []).push(p); else n = (n[s] ??= {}); }); }
-  const pintar = (n, abierto, prefijo = '') => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details${abierto ? ' open' : ''}><summary title="${esc(k)}"><span class="nombre">${nombreCarpeta(k)}</span>${botonesFila(prefijo + k, k)}</summary>${pintar(n[k], false, `${prefijo}${k}/`)}</details>`).join('')
+  // Plegadas por defecto (Roberto, 2026-10-09); abiertas las que abrió la persona (no se le cierran al repintar, en la
+  // recarga en vivo) y las que llevan a la nota abierta (marcarActiva).
+  const pintar = (n, abierto, prefijo = '') => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details data-carpeta="${esc(prefijo + k)}"${carpetasAbiertas.has(prefijo + k) ? ' open' : ''}><summary title="${esc(k)}"><span class="nombre">${nombreCarpeta(k)}</span>${botonesFila(prefijo + k, k)}</summary>${pintar(n[k], false, `${prefijo}${k}/`)}</details>`).join('')
     + (n.__f || []).map(p => { const t = tituloDe(p), repetido = (n.__f || []).some(q => q !== p && tituloDe(q) === t); return `<div class="fila"><a class="hoja${p.endsWith('.md') ? '' : ' fichero'}" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}"><span class="nombre">${esc(t)}</span>${repetido ? `<small>${esc(p.split('/').pop())}</small>` : ''}</a>${botonesFila(p, t, true)}</div>`; }).join('');
   $('#arbol').innerHTML = lista.length ? pintar(raiz, true) : '<p class="vacio">No hay notas en esta carpeta.</p>';
   pintarCarpetas(lista);

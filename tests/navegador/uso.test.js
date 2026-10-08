@@ -60,12 +60,12 @@ test('árbol: las carpetas se pliegan y despliegan, y una nota dentro cambia de 
   const carpeta = await visible(e.pagina.locator('#arbol summary', { hasText: 'conceptos' }), 'árbol', 'la carpeta «conceptos»');
   // La marca de carpeta es un chevron de 14 px que gira al abrir: así se distingue de una página y se ve el estado.
   const marca = () => carpeta.evaluate(el => { const c = getComputedStyle(el, '::before'); return { ancho: c.width, giro: c.transform }; });
-  const abierta = await marca();
+  const abierta = await marca();   // plegada: el chevron sin girar
   assert.equal(abierta.ancho, '14px', `árbol: el chevron de la carpeta mide ${abierta.ancho}, no 14px`);
-  await carpeta.click();   // abierta por defecto: el primer clic la pliega
-  await hasta(async () => (await marca()).giro !== abierta.giro, 'árbol', 'el chevron no gira al plegar la carpeta');
-  await oculto(e.pagina.locator('#arbol a.hoja', { hasText: 'Capital' }), 'árbol', 'la nota «Capital» con la carpeta plegada');
+  // Plegada por defecto (Roberto, 2026-10-09): la nota de dentro no se ve hasta abrirla.
+  await oculto(e.pagina.locator('#arbol a.hoja', { hasText: 'Capital' }), 'árbol', 'la nota «Capital» con la carpeta plegada por defecto');
   await carpeta.click();
+  await hasta(async () => (await marca()).giro !== abierta.giro, 'árbol', 'el chevron no gira al abrir la carpeta');
   const nota = await visible(e.pagina.locator('#arbol a.hoja', { hasText: 'Capital' }), 'árbol', 'la nota «Capital» dentro de la carpeta abierta');
   await nota.click();
   await hashCumple(e.pagina, /^#\/n\/conceptos\/capital\.md$/, 'árbol');
@@ -114,4 +114,15 @@ test('otra pestaña abre otro cuaderno: esta se entera, lo dice y pasa al nuevo 
     await abrir(e.c.raiz);
     await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(path.basename(e.c.raiz)), 'pestaña vieja', 'de vuelta al cuaderno de las pruebas');
   } finally { otro.borrar(); }
+});
+
+test('árbol: las carpetas salen plegadas salvo la de la nota abierta, y la que abres sigue abierta tras una recarga en vivo', async () => {
+  await e.ir('#/n/conceptos/capital.md');
+  const abierta = nombre => e.pagina.locator('#arbol details', { has: e.pagina.locator('summary', { hasText: nombre }) }).first().evaluate(d => d.open);
+  assert.equal(await abierta('conceptos'), true, 'árbol: la carpeta de la nota abierta sale plegada');
+  assert.equal(await abierta('sesiones'), false, 'árbol: una carpeta sin la nota abierta sale desplegada');
+  await e.pagina.locator('#arbol summary', { hasText: 'sesiones' }).click();
+  fs.appendFileSync(path.join(e.c.base, 'tareas.md'), '- [ ] Una más\n');
+  await e.pagina.waitForTimeout(1500);
+  assert.equal(await abierta('sesiones'), true, 'árbol: la recarga en vivo ha plegado la carpeta que abrió la persona');
 });
