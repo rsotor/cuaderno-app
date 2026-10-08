@@ -184,11 +184,11 @@ Capturas del prototipo (en `docs/capturas-prototipo/`), tal como salió, antes d
 5. ✅ 2026-10-07 **Formulario de examen** (tipo test) y **modo tarjeta** de flashcards. La respuesta libre espera a profesor-kit#46.
 6. ✅ 2026-10-07 **Repaso de diseño** con los plugins de §6 (Design, ux-ui-audit, frontend-design), cambios aplicados, capturas antes y después: `docs/diseno/critica-2026-10-07.md`.
 7. ✅ 2026-10-08 **Tareas rápidas y primeros tests de navegador:** `+` en el buscador, enlaces y etiquetas en las tareas, filtros en el panel; Playwright con `node --test` en `tests/navegador/` con 12 recorridos (portada, buscar, editar, tareas, examen, tarjetas, 390 px) (§6).
-8. **Análisis del chat con el profesor:** las vías posibles (channel de Claude Code, terminal sola, otras), con alcance, riesgos y tiempo de cada una, en `docs/planes/chat-alcances.md`. Termina con una decisión de Roberto sobre la vía; hasta entonces no se toca la terminal.
-9. **Terminal cuidada** (pestañas, fuente, tema) y botón Profesor, con la vía del chat ya decidida. Si el channel es viable, la fase 12 se adelanta a esta.
-10. **Ver cualquier fichero del cuaderno** (recortada el 2026-10-08: el inbox es una carpeta más y preparar se hace con el profesor): PDF, JSON, CSV, TXT y HTML en el árbol y bien pintados; «Mostrar en el Finder». Hecha el 2026-10-08.
+8. ✅ 2026-10-08 **Análisis del chat con el profesor:** las vías posibles (channel de Claude Code, terminal sola, otras), con alcance, riesgos y tiempo de cada una, en `docs/planes/chat-alcances.md`. Termina con una decisión de Roberto sobre la vía; hasta entonces no se toca la terminal.
+9. ✅ 2026-10-08 **Terminal dentro de la app**, en un cajón a la derecha o abajo, con asa y varias sesiones (Terminal; el profesor desde «Abrir con el profesor»). El chat será otra pestaña del cajón.
+10. ✅ 2026-10-08 **Ver cualquier fichero del cuaderno** (recortada el 2026-10-08: el inbox es una carpeta más y preparar se hace con el profesor): PDF, JSON, CSV, TXT y HTML en el árbol y bien pintados; «Mostrar en el Finder». Hecha el 2026-10-08.
 11. **Arranque sin terminal:** `npx cuaderno <carpeta>`; la app arranca al iniciar sesión en el ordenador (agente de `launchd` en Mac, tarea programada en Windows) y abre el navegador sola; un icono en el escritorio lee la dirección actual de la configuración del usuario y la abre, arrancando la app si no está. Pensado para quien no debe saber nada de terminales (decisión de Roberto, 2026-10-08). Prueba en Mac y Windows (los ficheros CRLF; la terminal del sistema con una ventana de verdad) y los recorridos de navegador sobre el curso de prueba con kit.
-12. **Chat con el profesor** como *channel* de Claude Code (§6, Agente).
+12. **Chat propio dentro de la app** (cajón, pestaña Chat): Claude y Codex por sus CLIs directos, imágenes, página abierta, permisos del kit. Diseñado en `docs/planes/chat-diseno.md`; falta la ronda completa, las pruebas previas a–d y el plan por tareas.
 
 Cada fase termina usable y guardada.
 
