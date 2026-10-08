@@ -355,6 +355,37 @@ function aplicarCajon() {
 function abrirCajon() { $('#cajon').hidden = false; aplicarCajon(); }
 function cerrarCajon() { $('#cajon').hidden = true; aplicarCajon(); $('#btn-terminal').focus(); }
 window.addEventListener('resize', aplicarCajon);
+// El asa: arrastrar cambia el tamaño en vivo (acotado), soltar lo guarda; las flechas lo mueven de 16 en 16; doble clic
+// vuelve al de siempre. El valor se guarda redondeado: la validación del servidor solo admite enteros.
+const ponerTamanoCajon = (pos, v) => $('#app').style.setProperty(pos === 'derecha' ? '--panel-ancho' : '--panel-alto', `${v}px`);
+async function guardarTamanoCajon(pos, v) {
+  v = acotarCajon(v, pos); ponerTamanoCajon(pos, v);
+  info.configuracion = await api('/api/configuracion', pos === 'derecha' ? { panel_ancho: v } : { panel_alto: v });
+  aplicarCajon();
+}
+{
+  const asa = $('.cajon-asa'); let origen = null;
+  asa.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    const pos = posicionCajon();
+    origen = { x: e.clientX, y: e.clientY, pos, tam: tamanoCajon(pos), ultimo: tamanoCajon(pos) };
+    asa.setPointerCapture(e.pointerId); asa.classList.add('arrastrando'); document.body.classList.add('redimensionando'); document.body.dataset.panel = pos;
+    e.preventDefault();
+  });
+  asa.addEventListener('pointermove', e => {
+    if (!origen) return;
+    origen.ultimo = acotarCajon(origen.pos === 'derecha' ? origen.tam + origen.x - e.clientX : origen.tam + origen.y - e.clientY, origen.pos);
+    ponerTamanoCajon(origen.pos, origen.ultimo);
+  });
+  const soltar = () => { if (!origen) return; const { pos, ultimo } = origen; origen = null; asa.classList.remove('arrastrando'); document.body.classList.remove('redimensionando'); guardarTamanoCajon(pos, ultimo); };
+  asa.addEventListener('pointerup', soltar); asa.addEventListener('pointercancel', soltar);
+  asa.addEventListener('dblclick', () => guardarTamanoCajon(posicionCajon(), CAJON_DEFECTO[posicionCajon()]));
+  asa.addEventListener('keydown', e => {
+    const pos = posicionCajon(), paso = { ArrowLeft: 16, ArrowRight: -16, ArrowUp: 16, ArrowDown: -16 }[e.key];
+    if (!paso || (pos === 'derecha') !== (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return;
+    e.preventDefault(); guardarTamanoCajon(pos, tamanoCajon(pos) + paso);
+  });
+}
 
 // ---------- terminal
 let term, fit, ws, modoTerminal = null;

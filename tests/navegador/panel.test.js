@@ -62,3 +62,39 @@ test('si no cabe (390 px, o 900 px con el panel a la derecha), el cajón ocupa t
   }
   await e.pagina.setViewportSize({ width: 1280, height: 800 });
 });
+
+// Lo que dice el servidor que hay guardado, para comprobar que soltar el asa lo guardó.
+const anchoGuardado = () => e.pagina.evaluate(() => fetch('/api/info').then(r => r.json()).then(i => i.configuracion.panel_ancho));
+const arrastrarAsa = async dx => {
+  const a = await e.pagina.locator('.cajon-asa').boundingBox();
+  const x = a.x + a.width / 2, y = a.y + a.height / 2;
+  await e.pagina.mouse.move(x, y); await e.pagina.mouse.down(); await e.pagina.mouse.move(x + dx, y, { steps: 6 }); await e.pagina.mouse.up();
+};
+
+test('el asa: arrastrar cambia el ancho y lo guarda; no pasa del sitio de la nota; doble clic vuelve a 420', async () => {
+  await e.ir('#/');
+  await abrirPanel();
+  await arrastrarAsa(-60);
+  await hasta(async () => (await anchoGuardado()) === 480, 'panel', `soltar el asa no guarda 480 px (hay ${await anchoGuardado()})`);
+  assert.equal(Math.round((await caja('#cajon')).width), 480, 'panel: tras arrastrar 60 px el cajón no mide 480');
+  await cerrarPanel(); await e.pagina.reload(); await e.pagina.locator('#miga strong').waitFor(); await abrirPanel();
+  assert.equal(Math.round((await caja('#cajon')).width), 480, 'panel: tras recargar no vuelve a medir 480');
+  // Hasta el borde izquierdo: la nota conserva 480 px, el cajón se queda en 1280 - 280 - 480 = 520.
+  await arrastrarAsa(-800);
+  await hasta(async () => (await anchoGuardado()) === 520, 'panel', `arrastrar hasta el borde no se queda en 520 px (hay ${await anchoGuardado()})`);
+  assert.ok((await caja('#centro')).width >= 480, 'panel: la columna de la nota ha bajado de 480 px');
+  await e.pagina.dblclick('.cajon-asa');
+  await hasta(async () => (await anchoGuardado()) === 420, 'panel', `doble clic en el asa no vuelve a 420 (hay ${await anchoGuardado()})`);
+  assert.equal(Math.round((await caja('#cajon')).width), 420, 'panel: tras el doble clic el cajón no mide 420');
+  await cerrarPanel();
+});
+
+test('un ancho guardado que no cabe (3000 px) se acota al abrir, no se aplica tal cual', async () => {
+  await e.pagina.evaluate(() => fetch('/api/configuracion', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ panel_ancho: 3000 }) }));
+  await e.ir('#/');
+  await abrirPanel();
+  assert.equal(Math.round((await caja('#cajon')).width), 520, `panel: con 3000 px guardados el cajón mide ${(await caja('#cajon')).width}; debería acotarse a 520`);
+  await e.pagina.dblclick('.cajon-asa');
+  await hasta(async () => (await anchoGuardado()) === 420, 'panel', 'el doble clic no deja el ancho en 420');
+  await cerrarPanel();
+});

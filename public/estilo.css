@@ -223,6 +223,19 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 #app[data-panel="derecha"] #cajon { grid-column: 3; grid-row: 1 / 3; border-left: 1px solid #000; }
 #app[data-panel="abajo"] #cajon { grid-column: 2; grid-row: 2; border-top: 1px solid #000; }
 #app.cajon-capa #cajon { position: fixed; inset: 0; z-index: 10; border: none; }
+/* el asa: 6 px visibles en el borde interior, 12 px de zona activa; el acento al pasar, arrastrar o enfocar */
+#cajon { position: relative; }
+.cajon-asa { position: absolute; z-index: 1; background: var(--linea); touch-action: none; }
+.cajon-asa::before { content: ''; position: absolute; inset: 0; }
+#app[data-panel="derecha"] .cajon-asa { left: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; }
+#app[data-panel="derecha"] .cajon-asa::before { left: -3px; right: -3px; }
+#app[data-panel="abajo"] .cajon-asa { top: 0; left: 0; right: 0; height: 6px; cursor: row-resize; }
+#app[data-panel="abajo"] .cajon-asa::before { top: -3px; bottom: -3px; }
+.cajon-asa:hover, .cajon-asa.arrastrando, .cajon-asa:focus-visible { background: var(--acento); outline: none; }
+#app.cajon-capa .cajon-asa { display: none; }
+body.redimensionando { user-select: none; }
+body.redimensionando[data-panel="derecha"] { cursor: col-resize; }
+body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 .cajon-barra { display: flex; justify-content: space-between; align-items: center; color: #b4b9c2; font-size: 12.5px; padding: 4px 14px; background: #0b0c10; }
 .cajon-barra button { background: none; border: none; color: #b4b9c2; padding: 2px 8px; min-width: 32px; min-height: 28px; }
 #terminal { flex: 1; padding: 10px 14px 6px; min-height: 0; }
