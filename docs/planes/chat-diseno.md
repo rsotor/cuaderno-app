@@ -117,11 +117,17 @@ ACP solo compensa con muchos agentes; aquí son dos, y sus diferencias (página 
 - **Página abierta:** no vale `--append-system-prompt` (Claude lo graba en la primera petición y lo reutiliza al
   reanudar). Va como una primera línea en cada mensaje del alumno: `Página abierta: <ruta relativa>` (y nada si no hay
   nota abierta). Igual para los dos proveedores, así el asistente puede leer el fichero con sus herramientas.
-- **Permisos:** crear carpetas y ficheros **dentro del cuaderno** no pregunta: Claude con `--permission-mode acceptEdits`
-  (documentado); Codex, en principio con `sandbox: workspaceWrite` y una `approvalPolicy` que pregunte solo fuera del
-  sandbox (**por comprobar**: el informe no leyó la lista de valores, y el ejemplo oficial usa `never`, que denegaría
-  sin avisar; lo fija la prueba previa (c)). Lo demás llega al chat como una tarjeta con «Permitir», «Permitir en esta sesión»
-  y «Denegar»: Claude por el hook `PermissionRequest` de tipo `http` apuntando a `/api/chat/permiso` (inyectado con
+- **Permisos: los del kit, no los de la app** (Roberto, 2026-10-08; principio 2). El kit ya define qué puede hacer el
+  profesor sin preguntar y lo aplica con `permisos.js --aplicar` («aceptar una vez»): para Claude,
+  `.claude/settings.local.json` con las herramientas del kit y git de solo lectura; para Codex, `.codex/config.toml`
+  (la raíz del curso en `writable_roots`, sin red) y `.codex/rules/profesor-kit.rules`. La app **no impone modo de
+  permisos**: lanza el CLI en la raíz del curso, en su modo normal, y el CLI carga esa configuración solo (Claude en
+  `-p` sin `--bare` lee `project` y `local`; Codex lee el `.codex/` del curso si la carpeta es de confianza; **por
+  comprobar** en la prueba (c) que `app-server` lo respeta sin pasar `sandbox` ni `approvalPolicy` en `thread/start`).
+  Si el curso no tiene los permisos aplicados, el chat lo dice y ofrece aplicarlos **con la herramienta del kit**
+  (`node .kit/herramientas/permisos.js --aplicar`, enseñando su salida), nunca escribiendo la app esos ficheros. En
+  un cuaderno sin kit no hay lista: todo pregunta. Lo que la configuración del kit no resuelve llega al chat como una
+  tarjeta con «Permitir», «Permitir en esta sesión» y «Denegar»: Claude por el hook `PermissionRequest` de tipo `http` apuntando a `/api/chat/permiso` (inyectado con
   `--settings` en línea; el servidor retiene la respuesta hasta que el alumno decide, con el tope de 600 s del hook).
   **Excepción a la regla del token:** ese POST lo hace el proceso `claude`, sin cookie ni `Origin`, así que la ruta no
   usa el token de la app sino un **secreto propio por sesión de chat**, generado al arrancar el hijo, que viaja en la
@@ -142,10 +148,12 @@ ACP solo compensa con muchos agentes; aquí son dos, y sus diferencias (página 
   cuaderno sin diálogo de confianza. La app avisa la primera vez que se abre un cuaderno nuevo con el chat o la terminal.
 - **Versiones mínimas:** `claude --version` (2.1.277 para `AGENTS.md`, 2.1.259 para `--permission-prompts`) y la de
   `codex`; si no llegan, el chat lo dice y no arranca.
-- **Para el kit (principio 3, primero el kit):** (1) Codex lee `.agents/skills`, no `.claude/skills`: el kit debería
-  publicar las dos (enlace simbólico); (2) comprobado en la raíz de profesor-kit: hay `CLAUDE.md` con `@AGENTS.md`, así que Claude lo lee, y
-  `.claude/skills` solo trae las de base-kit (la lógica del profesor está en `.kit/`), con lo que el punto (1) pesa
-  menos de lo que parecía. (1) va como issue a profesor-kit cuando Roberto confirme.
+- **Para el kit (principio 3, primero el kit), comprobado en profesor-kit el 2026-10-08:** el kit ya tiene
+  adaptador de Codex (`.kit/adaptadores/codex.json`: skills en `.agents/skills`, permisos en `.codex/`, probado en
+  Windows con Codex 0.159.3 «con limitaciones»: sin prueba real completa y sin selector de opciones) y de Claude
+  (`claude-code.json`). La raíz lleva `CLAUDE.md` con `@AGENTS.md`. No hace falta pedirle nada al kit para la v1.
+  Lo que sí: `segundo_plano` de cada adaptador trae los argumentos para trabajar sin conversación; el chat **no** los
+  usa (es conversación), pero es la referencia de cómo llama el kit a cada CLI.
 - **Pruebas previas (primera tarea del plan, desechables):** (a) `claude -p` por stdin con un mensaje con imagen y
   `--include-partial-messages`, sobre una copia de `ejemplos/curso-demo`; (b) el hook `PermissionRequest` http dispara en
   `-p` y espera la respuesta; (c) `codex app-server`: `initialize`, `thread/start`, un turno con `localImage`, la lista real de valores de
@@ -156,8 +164,12 @@ ACP solo compensa con muchos agentes; aquí son dos, y sus diferencias (página 
 
 ## 4. Ajustes de conexión
 
-- **Proveedor:** un selector en Ajustes, «Asistente: Claude | Codex», global para toda la app (decisión de Roberto).
-  Cambiarlo cierra la sesión de chat abierta y arranca con el otro; los historiales se guardan por proveedor.
+- **Proveedor: en un curso con kit lo dice el curso**, no la app: `config/ajustes.json` → `llm` →
+  `.kit/adaptadores/<llm>.json` (`comando`, skills, permisos), que es lo que `kit.js` ya resuelve hoy para el botón
+  Profesor; las skills están instaladas y los permisos aplicados para ese asistente, cambiarlo desde la app rompería
+  las dos cosas. El selector de Ajustes «Asistente: Claude | Codex» vale para los **cuadernos sin kit** (y como valor
+  por defecto). Señalado a Roberto: matiza su «el mismo proveedor para todas las conversaciones». Cambiar el selector
+  cierra la sesión abierta y arranca con el otro; los historiales se guardan por proveedor.
 - **Estado de conexión, al abrir Ajustes y al abrir el chat:** Claude, `claude auth status` (código 0 y `authMethod`);
   Codex, **una sola vía**, decidida en la prueba previa (d): `codex login status` si existe y responde en frío, si no,
   `account/read` de un `app-server` efímero. Las dos comprobaciones con tope de 5 s y, si el hijo no responde, un error
