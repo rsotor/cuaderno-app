@@ -16,6 +16,8 @@ test('portada: se ve el título de inicio.md, el nombre del cuaderno y el árbol
   const nombre = path.basename(e.c.raiz);
   await hasta(async () => (await e.pagina.title()) === `${nombre} · Cuaderno`, 'portada', `el título de la ventana no es «${nombre} · Cuaderno»`);
   await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(nombre), 'portada', 'el nombre del cuaderno en la barra lateral');
+  // Las carpetas salen plegadas (2026-10-09): se abre «conceptos» para ver la nota de dentro.
+  await (await visible(e.pagina.locator('#arbol summary', { hasText: 'conceptos' }), 'portada', 'la carpeta «conceptos» en el árbol')).click();
   await visible(e.pagina.locator('#arbol a.hoja', { hasText: 'Interés' }), 'portada', 'la nota «Interés» en el árbol (con su título, no el nombre de fichero)');
   await visible(e.pagina.locator('#link-inicio.activa'), 'portada', 'el enlace Inicio marcado como activo');
 });
@@ -67,7 +69,7 @@ test('buscar con teclado: por título («módulo» abre el examen), flecha abajo
   await hashCumple(e.pagina, /^#\/n\/examenes\/01-examen\.md/, 'buscador');
   await e.pagina.keyboard.press('Control+k'); await e.pagina.keyboard.press('Escape');
   await visible(e.pagina.locator('.paginas'), 'buscador', 'Inicio/Tareas/Comentarios al vaciar con Escape');
-  await visible(e.pagina.locator('#arbol a.hoja', { hasText: 'Interés' }), 'buscador', 'el árbol de vuelta al vaciar');
+  await visible(e.pagina.locator('#arbol summary', { hasText: 'conceptos' }), 'buscador', 'el árbol de vuelta al vaciar');
   void nota;
 });
 
