@@ -52,7 +52,8 @@ test('abrir: lanza el proceso con la carpeta como cwd y devuelve el nombre; en m
   const [, , script] = llamadas[1].args;
   assert.match(script, /claude\.command$/);
   assert.match(fs.readFileSync(script, 'utf8'), /exec 'claude' '--model' 'sonnet'/);
-  assert.ok(fs.statSync(script).mode & 0o100, 'el .command no es ejecutable');
+  // El bit de ejecución solo existe donde hay permisos POSIX (el .command es de macOS; en Windows el modo no lo guarda).
+  if (process.platform !== 'win32') assert.ok(fs.statSync(script).mode & 0o100, 'el .command no es ejecutable');
   fs.rmSync(require('node:path').dirname(script), { recursive: true, force: true });
 });
 
