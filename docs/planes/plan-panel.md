@@ -1,6 +1,6 @@
 # Plan · fase 9: el panel (terminal movible, ajustable y con varias sesiones)
 
-**2026-10-08 · estado: superado el mismo día.** T1 a T4 se hicieron y luego se retiraron: Roberto decidió usar la terminal del sistema (ver §0 del plan vivo). Se conserva para recuperar el cajón cuando llegue el chat. Sale del §2 de `chat-diseno.md` (diseño del panel, ronda corta aplicada) y de la
+**2026-10-08 · estado: T1 a T4 hechos; T5 (letra y tema propios de la terminal) retirado por decisión de Roberto.** Hubo un rodeo por la terminal del sistema (`40ec87e`), deshecho el mismo día: ver §0 del plan vivo. Sale del §2 de `chat-diseno.md` (diseño del panel, ronda corta aplicada) y de la
 decisión de Roberto de hoy: el chat propio dentro de la app sigue siendo la meta, pero ahora toca el panel de la terminal.
 
 ## Objetivo
