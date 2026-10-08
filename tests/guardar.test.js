@@ -75,8 +75,15 @@ test('sin kit: deshacer enseña primero y revierte después; con cambios sin gua
 });
 
 test('salida del kit sin motor: nada se puede hacer, y se dice', () => {
+  // El único test del curso del kit sin motor (plan del cuaderno de ejemplo, T5): nunca git directo sobre un curso del
+  // kit, porque se saltaría lo que comprueba su guardar.js (remoto privado, no el repo del kit, secretos).
   const d = repo();
+  fs.appendFileSync(path.join(d, 'inicio.md'), 'Un cambio sin guardar\n');
+  const commits = () => git(d, 'rev-list', '--count', 'HEAD');
+  const antes = commits();
   for (const r of [guardar(d, SIN_MOTOR, 'x'), traer(d, SIN_MOTOR), deshacer(d, SIN_MOTOR)]) { assert.equal(r.codigo, 1); assert.match(r.salida, /sin motor/); }
+  assert.equal(commits(), antes, 'sin motor se ha hecho un commit o se ha revertido algo');
+  assert.match(fs.readFileSync(path.join(d, 'inicio.md'), 'utf8'), /Un cambio sin guardar/, 'sin motor se ha tocado el cambio sin guardar');
   fs.rmSync(d, { recursive: true, force: true });
 });
 

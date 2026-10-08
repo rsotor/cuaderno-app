@@ -33,7 +33,7 @@ test('el histórico queda fuera del formulario', () => {
   assert.match(ex.resto, /^## Histórico de intentos/);
 });
 
-test('sin motor no se puede validar, y se dice por qué', () => {
-  assert.equal(validable('/x', { tipo: 'carpeta' }, 'e.md', {}).ok, false);
-  assert.match(validable('/x', { tipo: 'salida-sin-motor' }, 'e.md', {}).motivo, /no trae el motor/);
+test('sin kit no se puede corregir, y se dice por qué (el curso sin motor lo prueba guardar.test.js)', () => {
+  const v = validable('/x', { tipo: 'carpeta' }, 'e.md', {});
+  assert.equal(v.ok, false); assert.match(v.motivo, /Sin kit no hay quien corrija/);
 });

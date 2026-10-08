@@ -107,7 +107,7 @@ test('WebSocket: sin cookie o con Origin ajeno no hay terminal ni recarga', asyn
 });
 
 test('sin cuaderno abierto: la API lo dice; abrir una carpeta cambia el cuaderno y lo apunta en recientes', async () => {
-  const otro = crearCuaderno({ kit: 'sin-motor' });
+  const otro = crearCuaderno({ kit: false });
   fs.writeFileSync(path.join(otro.raiz, 'cuaderno.json'), JSON.stringify({ nombre: 'Mi otro curso', portada: 'tareas.md' }));
   const server = crearServidor({ token: 'cd'.repeat(16) });
   await new Promise(r => server.listen(0, '127.0.0.1', r));
@@ -121,7 +121,7 @@ test('sin cuaderno abierto: la API lo dice; abrir una carpeta cambia el cuaderno
     const r = await post('/api/abrir', { ruta: otro.raiz });
     assert.equal(r.status, 200);
     const info = await r.json();
-    assert.equal(info.cuaderno.nombre, 'Mi otro curso'); assert.equal(info.cuaderno.kit, 'salida-sin-motor'); assert.equal(info.cuaderno.portada, 'tareas.md');
+    assert.equal(info.cuaderno.nombre, 'Mi otro curso'); assert.equal(info.cuaderno.kit, 'carpeta'); assert.equal(info.cuaderno.portada, 'tareas.md');
     assert.ok((await (await pedir('/api/arbol')).json()).includes('inicio.md'));
     const lista = await (await pedir('/api/cuadernos')).json();
     assert.deepEqual(lista.map(c => [c.nombre, c.existe, c.abiertoAhora]), [['Mi otro curso', true, true]]);
@@ -136,12 +136,12 @@ test('sin cuaderno abierto: la API lo dice; abrir una carpeta cambia el cuaderno
   } finally { await new Promise(r => server.close(r)); otro.borrar(); fs.rmSync(process.env.CUADERNO_CONFIG_DIR, { recursive: true, force: true }); }
 });
 
-test('examen: formulario, validar sin motor guarda las marcas; con kit lanza examen.js --corregir', async () => {
-  const s = await arrancar({ kit: 'sin-motor' });
+test('examen: formulario, validar sin kit guarda las marcas; con kit lanza examen.js --corregir', async () => {
+  const s = await arrancar({ kit: false });
   try {
     const post = (ruta, body) => s.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     const ex = await (await s.pedir('/api/examen?p=examenes/01-examen.md')).json();
-    assert.equal(ex.validable, false); assert.match(ex.motivo, /no trae el motor/);
+    assert.equal(ex.validable, false); assert.match(ex.motivo, /Sin kit no hay quien corrija/);
     assert.equal(ex.preguntas.length, 2); assert.equal(ex.preguntas[0].unica, true); assert.match(ex.preguntas[0].enunciado, /Tienes 100 €/); assert.doesNotMatch(ex.preguntas[0].enunciado, /\*\*1\.\*\*/);
     assert.deepEqual(ex.preguntas[1].opciones.map(o => o.linea), [22, 23, 24]);   // líneas del fichero, con el frontmatter
     const r = await (await post('/api/examen/validar', { ruta: 'examenes/01-examen.md', respuestas: { 1: ['b'], 2: ['a', 'b'] } })).json();
