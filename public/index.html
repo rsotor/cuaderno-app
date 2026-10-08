@@ -6,7 +6,6 @@
 <title>Cuaderno</title>
 <link rel="icon" type="image/svg+xml" href="/public/icono.svg">
 <link rel="stylesheet" href="/assets/katex/dist/katex.min.css">
-<link rel="stylesheet" href="/assets/@xterm/xterm/css/xterm.css">
 <link rel="stylesheet" href="/public/estilo.css">
 </head>
 <body>
@@ -40,8 +39,8 @@
     </nav>
     <nav id="arbol" aria-label="Notas"></nav>
     <footer class="pie-lateral">
-      <button type="button" id="btn-terminal" title="Abrir la terminal (Ctrl `)"><svg class="icono" aria-hidden="true"><use href="#i-terminal"/></svg>Terminal</button>
-      <button type="button" id="btn-profesor" title="Abre al profesor en la terminal" hidden><svg class="icono" aria-hidden="true"><use href="#i-birrete"/></svg>Profesor</button>
+      <button type="button" id="btn-terminal" title="Abrir tu terminal en la carpeta del cuaderno (Ctrl `)"><svg class="icono" aria-hidden="true"><use href="#i-terminal"/></svg>Terminal</button>
+      <button type="button" id="btn-profesor" title="Abre al profesor en tu terminal" hidden><svg class="icono" aria-hidden="true"><use href="#i-birrete"/></svg>Profesor</button>
       <button type="button" id="btn-ajustes" title="Ajustes" aria-label="Ajustes"><svg class="icono" aria-hidden="true"><use href="#i-engranaje"/></svg></button>
     </footer>
   </aside>
@@ -50,11 +49,6 @@
     <article id="nota" tabindex="-1"></article>
     <section id="panel" hidden></section>
   </main>
-  <section id="cajon" aria-label="Panel" hidden>
-    <div class="cajon-asa" role="separator" tabindex="0" aria-label="Tamaño del panel" title="Arrastra para cambiar el tamaño; con las flechas también; doble clic vuelve al de siempre"></div>
-    <div class="cajon-barra"><div class="sesiones" role="tablist" aria-label="Sesiones de terminal"></div><button type="button" id="btn-nueva-sesion" title="Abrir otra terminal" aria-label="Abrir otra terminal">+</button><span class="crece"></span><button type="button" id="btn-cerrar-terminal" aria-label="Cerrar el panel">✕</button></div>
-    <div id="terminal"><p class="sin-sesiones" hidden>Sin terminales abiertas: <b>+</b> abre una.</p></div>
-  </section>
 </div>
 <div id="editor" role="dialog" aria-modal="true" aria-labelledby="editor-titulo" hidden>
   <div class="editor-caja">
@@ -94,15 +88,12 @@
       <label>Tema <select id="ajustes-tema"><option value="auto">Como el sistema</option><option value="claro">Claro</option><option value="oscuro">Oscuro</option></select></label>
       <label>Letra <select id="ajustes-letra"><option value="pequeña">Pequeña</option><option value="media">Media</option><option value="grande">Grande</option></select></label>
       <label>Fuente de lectura <select id="ajustes-fuente"><option value="sistema">Del sistema</option><option value="serif">Con serifa</option></select></label>
-      <label>Panel de la terminal <select id="ajustes-panel"><option value="derecha">A la derecha</option><option value="abajo">Abajo</option></select></label>
       <label>Comando del profesor en carpetas sin kit <input id="ajustes-comando" placeholder="claude" autocomplete="off"></label>
     </form>
     <div class="pie"><button type="button" id="ajustes-cerrar">Cerrar</button></div>
   </div>
 </div>
 <script src="/assets/katex/dist/katex.min.js"></script>
-<script src="/assets/@xterm/xterm/lib/xterm.js"></script>
-<script src="/assets/@xterm/addon-fit/lib/addon-fit.js"></script>
 <script src="/public/app.js"></script>
 </body>
 </html>

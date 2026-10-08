@@ -1,4 +1,4 @@
-/* global katex, Terminal, FitAddon */
+/* global katex */
 'use strict';
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -121,7 +121,7 @@ $('#arbol').addEventListener('keydown', e => {
 });
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#buscador').focus(); $('#buscador').select(); }
-  if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); alternarTerminal(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); abrirTerminal(false); }
   if (e.key === 'Escape' && !$('#editor').hidden) cerrarEditor();
 });
 
@@ -335,131 +335,12 @@ async function refrescarContadores() {
   $('#n-tareas').textContent = pend ? `(${pend})` : ''; $('#n-comentarios').textContent = c.length ? `(${c.length})` : '';
 }
 
-// ---------- el cajón: dónde va (derecha o abajo) y cuánto mide, siempre dejando sitio a la nota
-const CAJON_DEFECTO = { derecha: 420, abajo: 320 }, CAJON_MIN = { derecha: 320, abajo: 180 }, NOTA_MIN = { derecha: 480, abajo: 240 }, LATERAL = 280;
-const posicionCajon = () => info.configuracion.panel === 'abajo' ? 'abajo' : 'derecha';
-// El tamaño máximo que cabe en esta ventana para esa posición (lo que queda tras la barra lateral y el mínimo de la nota).
-const maximoCajon = pos => (pos === 'derecha' ? window.innerWidth - LATERAL : window.innerHeight) - NOTA_MIN[pos];
-// El valor guardado está en píxeles y otra ventana u otro monitor pueden dejarlo fuera de rango: se acota al usarlo.
-const acotarCajon = (valor, pos) => Math.round(Math.min(Math.max(Number(valor) || CAJON_DEFECTO[pos], CAJON_MIN[pos]), Math.max(maximoCajon(pos), CAJON_MIN[pos])));
-const tamanoCajon = pos => acotarCajon(pos === 'derecha' ? info.configuracion.panel_ancho : info.configuracion.panel_alto, pos);
-function aplicarCajon() {
-  const app = $('#app'), pos = posicionCajon(), abierto = !$('#cajon').hidden;
-  app.dataset.panel = pos;
-  app.style.setProperty('--panel-ancho', `${tamanoCajon('derecha')}px`);
-  app.style.setProperty('--panel-alto', `${tamanoCajon('abajo')}px`);
-  const capa = window.innerWidth <= 760 || maximoCajon(pos) < CAJON_MIN[pos];
-  app.classList.toggle('cajon-abierto', abierto && !capa);
-  app.classList.toggle('cajon-capa', abierto && capa);
+// ---------- terminal: la del sistema, abierta en la carpeta del cuaderno (con el profesor ya lanzado si se pide)
+async function abrirTerminal(profesor) {
+  try { const r = await api('/api/terminal', { profesor: !!profesor }); avisar(`${profesor ? 'El profesor se abre' : 'Terminal abierta'} en ${r.terminal}, en la carpeta del cuaderno.`); } catch (e) { avisar(e.message); }
 }
-function abrirCajon() { $('#cajon').hidden = false; aplicarCajon(); }
-function cerrarCajon() { $('#cajon').hidden = true; aplicarCajon(); $('#btn-terminal').focus(); }
-window.addEventListener('resize', aplicarCajon);
-// El asa: arrastrar cambia el tamaño en vivo (acotado), soltar lo guarda; las flechas lo mueven de 16 en 16; doble clic
-// vuelve al de siempre. El valor se guarda redondeado: la validación del servidor solo admite enteros.
-const ponerTamanoCajon = (pos, v) => $('#app').style.setProperty(pos === 'derecha' ? '--panel-ancho' : '--panel-alto', `${v}px`);
-async function guardarTamanoCajon(pos, v) {
-  v = acotarCajon(v, pos); ponerTamanoCajon(pos, v);
-  info.configuracion = await api('/api/configuracion', pos === 'derecha' ? { panel_ancho: v } : { panel_alto: v });
-  aplicarCajon();
-}
-{
-  const asa = $('.cajon-asa'); let origen = null;
-  asa.addEventListener('pointerdown', e => {
-    if (e.button !== 0) return;
-    const pos = posicionCajon();
-    origen = { x: e.clientX, y: e.clientY, pos, tam: tamanoCajon(pos), ultimo: tamanoCajon(pos) };
-    asa.setPointerCapture(e.pointerId); asa.classList.add('arrastrando'); document.body.classList.add('redimensionando'); document.body.dataset.panel = pos;
-    e.preventDefault();
-  });
-  asa.addEventListener('pointermove', e => {
-    if (!origen) return;
-    origen.ultimo = acotarCajon(origen.pos === 'derecha' ? origen.tam + origen.x - e.clientX : origen.tam + origen.y - e.clientY, origen.pos);
-    ponerTamanoCajon(origen.pos, origen.ultimo);
-  });
-  const soltar = () => { if (!origen) return; const { pos, ultimo } = origen; origen = null; asa.classList.remove('arrastrando'); document.body.classList.remove('redimensionando'); guardarTamanoCajon(pos, ultimo); };
-  asa.addEventListener('pointerup', soltar); asa.addEventListener('pointercancel', soltar);
-  asa.addEventListener('dblclick', () => guardarTamanoCajon(posicionCajon(), CAJON_DEFECTO[posicionCajon()]));
-  asa.addEventListener('keydown', e => {
-    const pos = posicionCajon(), paso = { ArrowLeft: 16, ArrowRight: -16, ArrowUp: 16, ArrowDown: -16 }[e.key];
-    if (!paso || (pos === 'derecha') !== (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return;
-    e.preventDefault(); guardarTamanoCajon(pos, tamanoCajon(pos) + paso);
-  });
-}
-
-// ---------- terminal: varias sesiones (shell y Profesor) que conviven en el cajón; cada una es su xterm y su /pty
-let sesiones = [], sesionActiva = null, numSesion = 0;
-const wsUrl = ruta => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${ruta}`;
-const variable = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-// Dos paletas: la oscura de siempre y una clara (los 16 colores con contraste 4,5:1 sobre el fondo claro). Cuál toca lo
-// dice el CSS del tema efectivo (--terminal-claro), así «como el sistema» también acierta. xterm no entiende var(--…).
-const PALETA_OSCURA = { foreground: '#d7dae0', cursor: '#7aa2f7', selectionBackground: '#3b4261', black: '#15161e', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68', blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6', brightBlack: '#414868', brightRed: '#f7768e', brightGreen: '#9ece6a', brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7', brightCyan: '#7dcfff', brightWhite: '#c0caf5' };
-const PALETA_CLARA = { foreground: '#1b1d23', cursor: '#1f5fbf', selectionBackground: '#c8d3f5', black: '#1b1d23', red: '#a81e2e', green: '#2f6f2a', yellow: '#8a5a00', blue: '#1f5fbf', magenta: '#7a3bb0', cyan: '#0f6a7a', white: '#5c6370', brightBlack: '#4b5160', brightRed: '#a81e2e', brightGreen: '#2f6f2a', brightYellow: '#8a5a00', brightBlue: '#1f5fbf', brightMagenta: '#7a3bb0', brightCyan: '#0f6a7a', brightWhite: '#1b1d23' };
-const temaTerminal = () => ({ background: variable('--terminal-fondo'), ...(variable('--terminal-claro') === '1' ? PALETA_CLARA : PALETA_OSCURA) });
-const letraTerminal = () => ({ 'pequeña': 12.5, media: 13.5, grande: 15 })[info.configuracion.letra] || 13.5;
-function aplicarAparienciaTerminal() { for (const s of sesiones) { s.term.options.fontSize = letraTerminal(); s.term.options.theme = temaTerminal(); redimensionar(s); } }
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', aplicarAparienciaTerminal);
-// Una pestaña oculta mide 0: ni se ajusta ni se manda un tamaño de 0 columnas a la pty.
-function redimensionar(s) {
-  if (s.elemento.hidden || !s.elemento.clientWidth || !s.elemento.clientHeight) return;
-  s.fit.fit();
-  if (s.term.cols > 0 && s.term.rows > 0 && s.ws && s.ws.readyState === 1) s.ws.send('\u0001' + JSON.stringify({ cols: s.term.cols, rows: s.term.rows }));
-}
-function conectar(s) {
-  s.cerrada = false; s.pendiente = ''; pintarSesiones();
-  const ws = new WebSocket(wsUrl(s.modo === 'profesor' ? '/pty?profesor=1' : '/pty')); s.ws = ws;
-  // Lo tecleado antes de que el canal abra no se pierde: espera y sale junto en cuanto abre.
-  ws.onopen = () => { redimensionar(s); if (s.pendiente) { ws.send(s.pendiente); s.pendiente = ''; } };
-  ws.onmessage = e => s.term.write(e.data);
-  ws.onclose = () => { if (s.ws !== ws) return; s.cerrada = true; s.term.write('\r\n[terminal cerrada: Enter abre otra igual]\r\n'); pintarSesiones(); };
-}
-function crearSesion(modo) {
-  const n = ++numSesion, elemento = document.createElement('div'); elemento.className = 'sesion'; elemento.hidden = true; $('#terminal').append(elemento);
-  const term = new Terminal({ fontFamily: variable('--mono'), fontSize: letraTerminal(), lineHeight: 1.25, cursorBlink: true, cursorStyle: 'bar', scrollback: 5000, allowProposedApi: true, theme: temaTerminal() });
-  const fit = new FitAddon.FitAddon(); term.loadAddon(fit); term.open(elemento);
-  const s = { id: n, modo, titulo: modo === 'profesor' ? 'Profesor' : (n === 1 ? 'Terminal' : `Terminal ${n}`), term, fit, ws: null, elemento, cerrada: false };
-  term.attachCustomKeyEventHandler(e => !((e.ctrlKey || e.metaKey) && e.key === '`'));   // Ctrl ` es de la app: abre y cierra el cajón
-  term.onData(d => { if (s.cerrada) { if (d === '\r') { s.term.reset(); conectar(s); } return; } if (s.ws && s.ws.readyState === 1) s.ws.send(d); else if (s.ws && s.ws.readyState === 0) s.pendiente += d; });
-  conectar(s); sesiones.push(s);
-  return s;
-}
-function activarSesion(s) {
-  sesionActiva = s;
-  for (const o of sesiones) o.elemento.hidden = o !== s;
-  pintarSesiones();
-  s.term.focus();   // ya, para teclear sin esperar; y otra vez tras medir, que el ajuste no se lo lleve
-  requestAnimationFrame(() => { redimensionar(s); s.term.focus(); });
-}
-function cerrarSesion(s) {
-  const ws = s.ws; s.ws = null; if (ws) ws.close();
-  s.term.dispose(); s.elemento.remove();
-  sesiones = sesiones.filter(o => o !== s);
-  if (sesionActiva === s) { sesionActiva = null; if (sesiones.length) return activarSesion(sesiones[sesiones.length - 1]); }
-  pintarSesiones();
-}
-function cerrarSesiones() { for (const s of [...sesiones]) cerrarSesion(s); }
-function pintarSesiones() {
-  $('.sesiones').innerHTML = sesiones.map(s => `<div class="sesion-pestana${s === sesionActiva ? ' activa' : ''}${s.cerrada ? ' cerrada' : ''}" role="tab" aria-selected="${s === sesionActiva}"><button type="button" data-activar="${s.id}">${esc(s.titulo)}</button><button type="button" data-cerrar="${s.id}" aria-label="Cerrar ${esc(s.titulo)}">×</button></div>`).join('');
-  $('.sin-sesiones').hidden = sesiones.length > 0;
-}
-$('.sesiones').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  const s = sesiones.find(o => o.id === +(b.dataset.activar || b.dataset.cerrar)); if (!s) return;
-  if (b.dataset.cerrar) cerrarSesion(s); else activarSesion(s);
-});
-new ResizeObserver(() => { if (sesionActiva) redimensionar(sesionActiva); }).observe($('#terminal'));
-// Abrir la terminal: el cajón y la sesión que toque. «Profesor» reutiliza la suya si sigue viva; nunca mata un shell.
-function abrirTerminal(modo) {
-  abrirCajon();
-  let s = modo === 'profesor' ? sesiones.find(o => o.modo === 'profesor' && !o.cerrada) : (sesionActiva || sesiones[0]);
-  if (!s || (modo === 'nueva')) s = crearSesion(modo === 'profesor' ? 'profesor' : 'shell');
-  activarSesion(s);
-}
-function alternarTerminal() { if ($('#cajon').hidden) abrirTerminal('shell'); else cerrarCajon(); }
-$('#btn-terminal').onclick = () => alternarTerminal();
-$('#btn-cerrar-terminal').onclick = () => cerrarCajon();
-$('#btn-nueva-sesion').onclick = () => abrirTerminal('nueva');
-$('#btn-profesor').onclick = () => abrirTerminal('profesor');
+$('#btn-terminal').onclick = () => abrirTerminal(false);
+$('#btn-profesor').onclick = () => abrirTerminal(true);
 
 // ---------- cuadernos (pantalla de inicio)
 const hace = iso => { if (!iso) return 'nunca'; const d = (Date.now() - new Date(iso)) / 864e5; if (d < 1 / 24) return 'hace un momento'; if (d < 1) return `hace ${Math.round(d * 24)} h`; if (d < 30) return `hace ${Math.round(d)} día${Math.round(d) === 1 ? '' : 's'}`; return `el ${new Date(iso).toLocaleDateString('es')}`; };
@@ -475,7 +356,6 @@ async function abrirCuadernos() {
 }
 async function abrirCarpeta(ruta) {
   try { info = await api('/api/abrir', { ruta }); } catch (e) { avisar(e.message); return; }
-  cerrarSesiones();   // las terminales eran del cuaderno anterior (el servidor ya ha matado sus ptys)
   await cargarCuaderno();
   location.hash = cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/';
   if (location.hash === '#/') enrutar();
@@ -497,7 +377,7 @@ function mostrarResultado(titulo, r, { confirmar = null } = {}) {
 }
 let alConfirmar = null;
 $('#resultado-cerrar').onclick = () => cerrarModal('#resultado');
-$('#resultado-profesor').onclick = () => { cerrarModal('#resultado'); abrirTerminal('profesor'); };
+$('#resultado-profesor').onclick = () => { cerrarModal('#resultado'); abrirTerminal(true); };
 $('#resultado-confirmar').onclick = async () => { const fn = alConfirmar; cerrarModal('#resultado'); if (fn) await fn(); };
 async function refrescarInfo() { info = await api('/api/info'); pintarEstado(); }
 async function accion(ruta, body, titulo, opciones) {
@@ -529,7 +409,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { for (const
 function aplicarApariencia(c) { const r = document.documentElement; r.dataset.tema = c.tema; r.dataset.letra = c.letra; r.dataset.fuente = c.fuente; }
 function abrirAjustes() {
   const c = info.configuracion;
-  $('#ajustes-tema').value = c.tema; $('#ajustes-letra').value = c.letra; $('#ajustes-fuente').value = c.fuente; $('#ajustes-panel').value = posicionCajon(); $('#ajustes-comando').value = c.comando_agente || '';
+  $('#ajustes-tema').value = c.tema; $('#ajustes-letra').value = c.letra; $('#ajustes-fuente').value = c.fuente; $('#ajustes-comando').value = c.comando_agente || '';
   foco = document.activeElement; $('#ajustes').hidden = false; $('#ajustes-tema').focus();
 }
 function cerrarAjustes() { $('#ajustes').hidden = true; if (foco) foco.focus(); }
@@ -540,8 +420,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#latera
 $('#lateral').addEventListener('click', e => { if (e.target.closest('a') && window.innerWidth <= 760) menuLateral(false); });
 $('#ajustes-cerrar').onclick = cerrarAjustes;
 $('#ajustes form').addEventListener('change', async () => {
-  info.configuracion = await api('/api/configuracion', { tema: $('#ajustes-tema').value, letra: $('#ajustes-letra').value, fuente: $('#ajustes-fuente').value, panel: $('#ajustes-panel').value, comando_agente: $('#ajustes-comando').value });
-  aplicarApariencia(info.configuracion); aplicarCajon(); aplicarAparienciaTerminal();
+  info.configuracion = await api('/api/configuracion', { tema: $('#ajustes-tema').value, letra: $('#ajustes-letra').value, fuente: $('#ajustes-fuente').value, comando_agente: $('#ajustes-comando').value });
+  aplicarApariencia(info.configuracion);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ajustes').hidden) cerrarAjustes(); });
 
@@ -576,11 +456,12 @@ function enrutar() {
 window.addEventListener('hashchange', enrutar);
 
 // ---------- recarga en vivo
-try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
+const wsUrl = ruta => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${ruta}`;
+try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
 
 (async () => {
   info = await api('/api/info');
-  aplicarApariencia(info.configuracion); aplicarCajon();
+  aplicarApariencia(info.configuracion);
   await cargarCuaderno();
   enrutar();
 })();

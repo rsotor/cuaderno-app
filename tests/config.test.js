@@ -16,17 +16,6 @@ test('sin fichero: valores por defecto; lo que no vale se descarta', () => {
   assert.deepEqual(config.leer(), config.POR_DEFECTO);
 });
 
-test('panel: posición y tamaños se validan; lo que no vale vuelve al valor por defecto', () => {
-  fs.writeFileSync(path.join(config.carpeta(), 'config.json'), JSON.stringify({ panel: 'izquierda', panel_ancho: 50, panel_alto: 'x' }));
-  let c = config.leer();
-  assert.equal(c.panel, 'derecha'); assert.equal(c.panel_ancho, 420); assert.equal(c.panel_alto, 320);
-  c = config.ajustar({ panel: 'abajo', panel_ancho: 500 });
-  assert.equal(c.panel, 'abajo'); assert.equal(c.panel_ancho, 500); assert.equal(c.panel_alto, 320);
-  c = config.ajustar({ panel_ancho: 99999, panel_alto: 180.7 });
-  assert.equal(c.panel_ancho, 500, 'fuera de rango: se ignora'); assert.equal(c.panel_alto, 320, 'no entero: se ignora');
-  assert.deepEqual(Object.keys(config.apariencia(c)).sort(), ['comando_agente', 'fuente', 'letra', 'panel', 'panel_alto', 'panel_ancho', 'tema']);
-});
-
 test('ajustar solo toca la apariencia y el comando; recientes van del más nuevo al más viejo, sin repetir', () => {
   const c = config.ajustar({ tema: 'oscuro', fuente: 'serif', letra: 'enorme', comando_agente: '  claude ', recientes: ['x'] });
   assert.equal(c.tema, 'oscuro'); assert.equal(c.fuente, 'serif'); assert.equal(c.letra, 'media'); assert.equal(c.comando_agente, 'claude'); assert.deepEqual(c.recientes, []);

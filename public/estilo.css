@@ -2,7 +2,7 @@
 :root {
   --papel: #fbfbfc; --fondo: #f2f3f5; --lateral: #eaecef; --tinta: #1b1b1f; --tinta-suave: #5a5e66; --linea: #dcdfe4;
   --acento: #1e5a96; --acento-suave: #e3ecfa; --sobre-acento: #ffffff; --ok: #15803d; --aviso: #7a4a00; --mal: #b91c1c;
-  --terminal-fondo: #f3f4f7; --terminal-tinta: #1b1d23; --terminal-barra: #e3e6ec; --terminal-barra-tinta: #3b4252; --terminal-claro: 1; --marca: #fff3a8;
+  --marca: #fff3a8;
   --c-info: var(--acento); --c-question: #6d28d9; --c-warning: var(--aviso); --c-danger: var(--mal); --c-success: var(--ok);
   --c-quote: #4b5563; --c-example: #0e7490; --c-tip: #0f766e; --c-comment: #9a3412;
   --radio: 6px; --radio-bloque: 8px;
@@ -14,14 +14,14 @@
 @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) {
   --papel: #1c1e23; --fondo: #141518; --lateral: #181a1f; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
   --acento: #8cc8f0; --acento-suave: #22303c; --sobre-acento: #141518; --ok: #86efac; --aviso: #e0a040; --mal: #fca5a5;
-  --terminal-fondo: #0f1014; --terminal-tinta: #d7dae0; --terminal-barra: #0b0c10; --terminal-barra-tinta: #b4b9c2; --terminal-claro: 0; --marca: #5a4d12;
+  --marca: #5a4d12;
   --c-question: #c4b5fd; --c-quote: #9ca3af; --c-example: #67e8f9; --c-tip: #5eead4; --c-comment: #fb923c;
   --sombra: 0 10px 30px rgba(0, 0, 0, .45);
 } }
 :root[data-tema="oscuro"] {
   --papel: #1c1e23; --fondo: #141518; --lateral: #181a1f; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
   --acento: #8cc8f0; --acento-suave: #22303c; --sobre-acento: #141518; --ok: #86efac; --aviso: #e0a040; --mal: #fca5a5;
-  --terminal-fondo: #0f1014; --terminal-tinta: #d7dae0; --terminal-barra: #0b0c10; --terminal-barra-tinta: #b4b9c2; --terminal-claro: 0; --marca: #5a4d12;
+  --marca: #5a4d12;
   --c-question: #c4b5fd; --c-quote: #9ca3af; --c-example: #67e8f9; --c-tip: #5eead4; --c-comment: #fb923c;
   --sombra: 0 10px 30px rgba(0, 0, 0, .45);
 }
@@ -213,43 +213,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 .tarjeta .botones { display: flex; gap: 10px; flex-wrap: wrap; }
 .tarjeta .botones button { padding: 2px 10px; font-size: 13px; min-height: 26px; }   /* mismo tamaño que Anterior / Siguiente; solo cambia el color */
 .tarjeta .botones [data-tarjeta="sabia"] { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); font-weight: 600; }   /* la decisión es «la sabía / no la sabía»; Destapar es solo un paso */
-
-/* el cajón: la terminal (y, más adelante, el chat), a la derecha o abajo, con el tamaño que diga la configuración.
-   Cerrado, la rejilla es la de siempre (sin columna ni fila fantasma); si no cabe el mínimo, va como capa completa. */
-#app { --panel-ancho: 420px; --panel-alto: 320px; }
-#app.cajon-abierto[data-panel="derecha"] { grid-template-columns: 280px minmax(0, 1fr) var(--panel-ancho); }
-#app.cajon-abierto[data-panel="abajo"] { grid-template-rows: 1fr var(--panel-alto); }
-#cajon { min-width: 0; min-height: 0; overflow: hidden; background: var(--terminal-fondo); display: flex; flex-direction: column; }
-#app[data-panel="derecha"] #cajon { grid-column: 3; grid-row: 1 / 3; border-left: 1px solid var(--linea); }
-#app[data-panel="abajo"] #cajon { grid-column: 2; grid-row: 2; border-top: 1px solid var(--linea); }
-#app.cajon-capa #cajon { position: fixed; inset: 0; z-index: 10; border: none; }
-/* el asa: 6 px visibles en el borde interior, 12 px de zona activa; el acento al pasar, arrastrar o enfocar */
-#cajon { position: relative; }
-.cajon-asa { position: absolute; z-index: 1; background: var(--linea); touch-action: none; }
-.cajon-asa::before { content: ''; position: absolute; inset: 0; }
-#app[data-panel="derecha"] .cajon-asa { left: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; }
-#app[data-panel="derecha"] .cajon-asa::before { left: -3px; right: -3px; }
-#app[data-panel="abajo"] .cajon-asa { top: 0; left: 0; right: 0; height: 6px; cursor: row-resize; }
-#app[data-panel="abajo"] .cajon-asa::before { top: -3px; bottom: -3px; }
-.cajon-asa:hover, .cajon-asa.arrastrando, .cajon-asa:focus-visible { background: var(--acento); outline: none; }
-#app.cajon-capa .cajon-asa { display: none; }
-body.redimensionando { user-select: none; }
-body.redimensionando[data-panel="derecha"] { cursor: col-resize; }
-body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
-.cajon-barra { display: flex; justify-content: space-between; align-items: center; color: var(--terminal-barra-tinta); font-size: 12.5px; padding: 4px 14px; background: var(--terminal-barra); }
-.cajon-barra button { background: none; border: none; color: var(--terminal-barra-tinta); padding: 2px 8px; min-width: 32px; min-height: 28px; }
-.cajon-barra .crece { flex: 1; }
-/* las sesiones de terminal, como pestañas: la activa más clara, una cerrada apagada */
-.sesiones { display: flex; gap: 2px; min-width: 0; overflow-x: auto; }
-.sesion-pestana { display: flex; align-items: center; border-radius: var(--radio); }
-.sesion-pestana.activa { background: var(--terminal-fondo); color: var(--terminal-tinta); }
-.sesion-pestana.activa button { color: inherit; }
-.sesion-pestana.cerrada [data-activar] { opacity: .55; text-decoration: line-through; }
-.sesion-pestana [data-cerrar] { min-width: 24px; padding: 2px 4px; }
-#terminal .sesion { height: 100%; }
-.sin-sesiones { color: var(--terminal-barra-tinta); font-size: 13.5px; padding: 18px 4px; margin: 0; }
-#terminal { flex: 1; padding: 10px 14px 6px; min-height: 0; }
-.xterm { height: 100%; }
 
 /* modales */
 .modal, #editor { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 20; }

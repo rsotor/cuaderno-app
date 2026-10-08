@@ -1,6 +1,6 @@
 # Tests del repo en GitHub Actions.
 #   push                → Linux: npm test + recorridos de navegador (barato, en cada commit).
-#   pull_request        → Linux, macOS y Windows: lo mismo en los tres (el run de Windows compila node-pty con Node 24).
+#   pull_request        → Linux, macOS y Windows: lo mismo en los tres.
 #   workflow_dispatch   → los tres sistemas, a mano, desde la pestaña Actions.
 # Solo se lanza cuando cambia algo que afecta a los tests: código, pantalla, tests, dependencias o este fichero.
 # Un commit que solo toca docs/, capturas o Markdown no gasta nada.
@@ -64,7 +64,7 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Dependencias (compila node-pty en cada sistema)
+      - name: Dependencias
         run: npm ci
 
       - name: Tests de Node
