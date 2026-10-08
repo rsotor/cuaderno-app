@@ -84,6 +84,8 @@ function sinPortada() {
   $('#nota').innerHTML = `<h1>${esc(cuaderno().nombre)}</h1><p class="resumen">Esta carpeta no tiene una nota de portada. Elige una nota en el árbol de la izquierda o busca con <kbd>Ctrl K</kbd>.</p>`;
 }
 async function abrirNota(ruta, lineaDestino) {
+  // La misma nota otra vez (recarga en vivo, un comentario recién escrito) conserva el scroll; una nota nueva empieza arriba.
+  const recarga = rutaActual === ruta && !$('#nota').hidden && lineaDestino == null, scrollAntes = $('#centro').scrollTop;
   if (rutaActual !== ruta) { vistaNota = null; }
   rutaActual = ruta;
   $('#panel').hidden = true; $('#nota').hidden = false;
@@ -108,7 +110,7 @@ async function abrirNota(ruta, lineaDestino) {
     acc.innerHTML = `<button type="button" data-accion="editar" aria-label="Editar este bloque">${icono('lapiz')}editar</button><button type="button" data-accion="comentar" aria-label="Comentar este bloque">${icono('comentar')}comentar</button>`;
     b.prepend(acc);
   });
-  $('#centro').scrollTop = 0;
+  $('#centro').scrollTop = recarga ? scrollAntes : 0;
   if (lineaDestino != null) { const b = [...$('#nota').querySelectorAll('.bloque')].find(x => +x.dataset.desde <= lineaDestino && lineaDestino < +x.dataset.hasta); if (b) { b.scrollIntoView({ block: 'center' }); b.classList.add('resaltado'); setTimeout(() => b.classList.remove('resaltado'), 1500); } }
 }
 async function marcarCasilla(ruta, linea, marcada, trasFallo) {

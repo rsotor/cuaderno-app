@@ -53,3 +53,12 @@ test('frontmatter: claves, listas, booleanos, y las líneas que ocupa; igual con
 test('el HTML crudo de una nota no se ejecuta', () => {
   assert.doesNotMatch(md.render('<script>alert(1)</script>'), /<script>/);
 });
+
+test('imágenes: la ruta relativa se resuelve desde la carpeta de la nota y se sirve desde el cuaderno', () => {
+  const md = crearRender(() => null);
+  const html = md.render('![Plan](../capturas/01.png) ![[foto.png|La foto]] ![web](https://x.org/a.png) [[nota]]\n', { ruta: 'docs/planes/plan.md' });
+  assert.match(html, /<img src="\/fichero\/docs\/capturas\/01\.png" alt="Plan">/);
+  assert.match(html, /<img src="\/fichero\/docs\/planes\/foto\.png" alt="La foto">/);
+  assert.match(html, /<img src="https:\/\/x\.org\/a\.png" alt="web">/);
+  assert.match(html, /class="wiki roto"/, 'el wikilink normal sigue siendo un enlace');
+});

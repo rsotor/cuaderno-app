@@ -107,7 +107,7 @@ class Cuaderno {
     const texto = src.replace(/\r\n/g, '\n');
     const { datos, lineas } = leerFrontmatter(texto);
     const cuerpo = texto.split('\n').slice(lineas).join('\n');
-    let html = this.md.render(cuerpo, {});
+    let html = this.md.render(cuerpo, { ruta: rel });
     if (lineas) html = html.replace(/data-(desde|hasta|linea)="(\d+)"/g, (_, k, n) => `data-${k}="${Number(n) + lineas}"`);
     return { ruta: rel, frontmatter: datos, html, backlinks: this.backlinks(rel), lineas: texto.split('\n').length };
   }
@@ -262,7 +262,8 @@ class Cuaderno {
     let timer = null;
     try {
       this.vigilante = fs.watch(this.base, { recursive: true }, (_, f) => {
-        if (f && (f.includes('node_modules') || path.basename(f).startsWith('.'))) return;
+        // Nada oculto, en ninguna parte de la ruta: .git/index.lock (cada `git status` lo crea) o .obsidian/ no son cambios del cuaderno.
+        if (f && (f.includes('node_modules') || f.split(/[\\/]/).some(s => s.startsWith('.')))) return;
         this.invalidar();
         clearTimeout(timer); timer = setTimeout(() => alCambiar(f), 150);
       });

@@ -65,6 +65,30 @@ function crearRender(resolverWiki) {
     return `<a class="wiki${roto ? ' roto' : ''}" href="${roto ? '#' : k.attrGet('href')}" title="${md.utils.escapeHtml(k.attrGet('title'))}">${md.utils.escapeHtml(k.content)}</a>`;
   };
 
+  // --- Imágenes: una ruta relativa se resuelve desde la carpeta de la nota y se sirve desde el cuaderno (/fichero/…).
+  // Vale para ![texto](ruta) y para el embed de Obsidian ![[fichero.png]]. Las absolutas (http, /) se quedan como están.
+  const rutaImagen = (env, src) => {
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(src)) return src;
+    const carpeta = (env && env.ruta ? env.ruta : '').split('/').slice(0, -1);
+    for (const tramo of src.split('/')) { if (tramo === '..') carpeta.pop(); else if (tramo && tramo !== '.') carpeta.push(tramo); }
+    return `/fichero/${encodeURI(carpeta.join('/'))}`;
+  };
+  const imagenBase = md.renderer.rules.image;
+  md.renderer.rules.image = (t, i, o, env, self) => { t[i].attrSet('src', rutaImagen(env, t[i].attrGet('src') || '')); return imagenBase(t, i, o, env, self); };
+  md.inline.ruler.before('wikilink', 'imagen_wiki', (state, silent) => {
+    const src = state.src, pos = state.pos;
+    if (src[pos] !== '!' || src[pos + 1] !== '[' || src[pos + 2] !== '[') return false;
+    const cierre = src.indexOf(']]', pos + 3);
+    if (cierre < 0) return false;
+    const dentro = src.slice(pos + 3, cierre);
+    if (!dentro || dentro.includes('\n') || !/\.(png|jpe?g|gif|svg|webp)$/i.test(dentro.split('|')[0].trim())) return false;
+    const [fichero, alt] = dentro.split('|').map(s => s.trim());
+    if (!silent) { const t = state.push('imagen_wiki', '', 0); t.attrSet('src', rutaImagen(state.env, fichero)); t.content = alt || fichero; }
+    state.pos = cierre + 2;
+    return true;
+  });
+  md.renderer.rules.imagen_wiki = (t, i) => `<img src="${md.utils.escapeHtml(t[i].attrGet('src'))}" alt="${md.utils.escapeHtml(t[i].content)}">`;
+
   // --- Callouts (> [!tipo]- Título) y casillas (- [ ] / - [x]), con la línea del fichero.
   md.core.ruler.after('block', 'kit', (state) => {
     const ts = state.tokens;
