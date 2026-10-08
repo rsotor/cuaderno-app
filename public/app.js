@@ -10,6 +10,7 @@ async function api(p, body) {
   const r = await fetch(p, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : undefined);
   const d = await r.json().catch(() => ({ error: `respuesta ${r.status}` }));
   if (!r.ok) {
+    if (r.status === 404 && p.startsWith('/api/')) $('#aviso-reinicio').hidden = false;   // una ruta que el servidor no conoce: es de antes
     if (r.status === 403) avisar('El servidor se ha reiniciado y esta pestaña ya no vale: abre la dirección nueva que imprime la terminal.');
     if (r.status === 409 && rutaActual) { avisar('Esta nota cambió en el disco mientras la tenías abierta. La he vuelto a cargar: repite el cambio.'); abrirNota(rutaActual); }
     throw Object.assign(new Error(d.error || `error ${r.status}`), { status: r.status });
@@ -167,10 +168,10 @@ document.addEventListener('click', e => {
 const PAPELERA = /Win/i.test(navigator.platform) ? 'la papelera de reciclaje' : 'la papelera';
 // Copiar la ruta completa del fichero (para pegarla en la terminal, al profesor o en el Finder), con el separador
 // del sistema donde corre la app.
-const rutaCompleta = ruta => { const c = cuaderno(); return c.base + c.sep + ruta.split('/').join(c.sep); };
+const rutaCompleta = ruta => { const c = cuaderno(); if (!c.base || !c.sep) throw new Error('Reinicia la app: el servidor es de una versión anterior y no da la ruta completa'); return c.base + c.sep + ruta.split('/').join(c.sep); };
 const botonCopiar = ruta => `<button type="button" class="copiar" data-copiar="${esc(ruta)}" title="Copiar la ruta del fichero" aria-label="Copiar la ruta de ${esc(ruta.split('/').pop())}">${icono('copiar')}</button>`;
 async function copiarRuta(ruta) {
-  const texto = rutaCompleta(ruta);
+  let texto; try { texto = rutaCompleta(ruta); } catch (e) { return avisar(e.message); }
   try { await navigator.clipboard.writeText(texto); } catch {
     const t = document.createElement('textarea'); t.value = texto; document.body.append(t); t.select(); document.execCommand('copy'); t.remove();
   }
@@ -639,6 +640,7 @@ $('#ajustes form').addEventListener('change', async () => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ajustes').hidden) cerrarAjustes(); });
 
 function pintarEstado() {
+  $('#aviso-reinicio').hidden = !info.desactualizada;
   const c = cuaderno();
   $('#lateral').classList.toggle('sin-cuaderno', !c);
   $('#nombre-curso').textContent = c ? c.nombre : 'Cuaderno';

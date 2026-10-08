@@ -268,3 +268,18 @@ test('la cookie dura un año: con el código fijo, recargar tras reiniciar el se
     assert.match(r.headers.get('set-cookie'), /HttpOnly; SameSite=Strict/);
   } finally { await s.cerrar(); }
 });
+
+test('desactualizada: si el código de la app cambia en el disco tras arrancar, /api/info lo dice', async () => {
+  const fuentes = fs.mkdtempSync(path.join(os.tmpdir(), 'fuentes-'));
+  fs.writeFileSync(path.join(fuentes, 'servidor.js'), '// antes');
+  const c = crearCuaderno();
+  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, c.base), kit: detectar(c.raiz), token: 'ab'.repeat(16), fuentes: [fuentes] });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const pedir = () => fetch(`http://127.0.0.1:${server.address().port}/api/info`, { headers: { cookie: `cuaderno=${'ab'.repeat(16)}`, origin: `http://127.0.0.1:${server.address().port}` } }).then(r => r.json());
+  try {
+    assert.equal((await pedir()).desactualizada, false);
+    const luego = new Date(Date.now() + 5000);
+    fs.utimesSync(path.join(fuentes, 'servidor.js'), luego, luego);
+    assert.equal((await pedir()).desactualizada, true, 'no avisa de que el código cambió');
+  } finally { await new Promise(r => server.close(r)); c.borrar(); fs.rmSync(fuentes, { recursive: true, force: true }); }
+});

@@ -48,3 +48,10 @@ test('el botón de Ajustes dice «Ajustes» y lleva la rueda dentada', async () 
   assert.equal((await b.textContent()).trim(), 'Ajustes');
   assert.equal(await b.locator('use').getAttribute('href'), '#i-engranaje');
 });
+
+test('aviso de reinicio: oculto normalmente; sale si una llamada a la app da 404 (servidor de una versión anterior)', async () => {
+  await e.ir('#/');
+  assert.equal(await e.pagina.locator('#aviso-reinicio').isVisible(), false, 'el aviso sale sin motivo');
+  await e.pagina.evaluate(() => api('/api/no-existe').catch(() => {}));
+  await visible(e.pagina.locator('#aviso-reinicio'), 'aviso', 'el aviso de reiniciar tras un 404 de la API');
+});
