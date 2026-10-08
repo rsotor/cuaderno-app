@@ -119,10 +119,15 @@ test('otra pestaña abre otro cuaderno: esta se entera, lo dice y pasa al nuevo 
 test('árbol: las carpetas salen plegadas salvo la de la nota abierta, y la que abres sigue abierta tras una recarga en vivo', async () => {
   await e.ir('#/n/conceptos/capital.md');
   const abierta = nombre => e.pagina.locator('#arbol details', { has: e.pagina.locator('summary', { hasText: nombre }) }).first().evaluate(d => d.open);
-  assert.equal(await abierta('conceptos'), true, 'árbol: la carpeta de la nota abierta sale plegada');
+  // El árbol se pinta después de la nota: se espera a que marque la nota abierta (en Windows tarda más que en un Mac).
+  await visible(e.pagina.locator('#arbol a.hoja.activa', { hasText: 'Capital' }), 'árbol', 'la nota abierta marcada en el árbol');
+  await hasta(() => abierta('conceptos'), 'árbol', 'la carpeta de la nota abierta sale plegada');
   assert.equal(await abierta('sesiones'), false, 'árbol: una carpeta sin la nota abierta sale desplegada');
   await e.pagina.locator('#arbol summary', { hasText: 'sesiones' }).click();
+  await hasta(() => abierta('sesiones'), 'árbol', 'la carpeta «sesiones» no se abre al pulsarla');
+  // Una recarga en vivo repinta el árbol: se espera a que llegue (la petición del árbol) antes de mirar.
+  const repintado = e.pagina.waitForResponse(r => r.url().endsWith('/api/arbol'), { timeout: 8000 });
   fs.appendFileSync(path.join(e.c.base, 'tareas.md'), '- [ ] Una más\n');
-  await e.pagina.waitForTimeout(1500);
+  await repintado; await e.pagina.waitForTimeout(200);
   assert.equal(await abierta('sesiones'), true, 'árbol: la recarga en vivo ha plegado la carpeta que abrió la persona');
 });
