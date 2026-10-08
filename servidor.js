@@ -11,7 +11,7 @@ const { execFileSync } = require('node:child_process');
 const { WebSocketServer } = require('ws');
 const { Cuaderno, ErrorPeticion } = require('./cuaderno');
 const { detectar } = require('./kit');
-const terminal = require('./terminal');
+const sistema = require('./sistema');
 const config = require('./config');
 const acciones = require('./guardar');
 const formulario = require('./formulario');
@@ -50,9 +50,9 @@ function estadoGit(raiz) {
   } catch { return null; }
 }
 
-function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), lanzar = null }) {
+function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null }) {
   const estado = { cuaderno, kit };
-  const oyentes = new Set();   // pestañas que escuchan cambios
+  const oyentes = new Set(), terminales = new Set();   // pestañas que escuchan cambios; conexiones de terminal abiertas
   const avisarCambio = f => { for (const ws of oyentes) ws.send(JSON.stringify({ fichero: f })); };
   if (cuaderno) cuaderno.vigilar(avisarCambio);
 
@@ -63,6 +63,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
     const k = detectar(raiz);
     if (!fs.existsSync(k.base)) throw new ErrorPeticion('esa carpeta no tiene notas');
     if (estado.cuaderno) estado.cuaderno.cerrar();
+    for (const ws of terminales) ws.close();   // las terminales eran del cuaderno anterior: al cerrar el ws muere su pty
     estado.kit = k; estado.cuaderno = new Cuaderno(raiz, k.base);
     estado.cuaderno.vigilar(avisarCambio);
     avisarCambio('');   // las demás pestañas abiertas se enteran de que el cuaderno es otro
@@ -163,15 +164,8 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
         if (p === '/api/mostrar-en-carpeta') {
           const cu = conCuaderno(), abs = b.ruta ? cu.dentro(String(b.ruta)) : cu.base;
           if (!fs.existsSync(abs)) throw new ErrorPeticion('ese fichero ya no está');
-          terminal.mostrar({ abs, carpeta: fs.statSync(abs).isDirectory(), ...(lanzar ? { lanzar } : {}) });
+          sistema.mostrar({ abs, carpeta: fs.statSync(abs).isDirectory(), ...(lanzar ? { lanzar } : {}) });
           return json(res, { ok: true });
-        }
-        // La terminal es la del sistema: se abre en la carpeta del cuaderno, con el profesor lanzado si se pide.
-        if (p === '/api/terminal') {
-          if (!estado.cuaderno) throw new ErrorPeticion('no hay ningún cuaderno abierto');
-          const comando = b.profesor ? comandoProfesor() : null;
-          if (b.profesor && !comando) throw new ErrorPeticion('este cuaderno no tiene profesor configurado');
-          try { return json(res, { terminal: terminal.abrir({ carpeta: estado.cuaderno.raiz, comando, ...(lanzar ? { lanzar } : {}) }) }); } catch (e) { throw new ErrorPeticion(e.message); }
         }
         if (p === '/api/guardar') return json(res, accion((raiz, k) => acciones.guardar(raiz, k, b.mensaje)));
         if (p === '/api/traer') return json(res, accion((raiz, k) => acciones.traer(raiz, k)));
@@ -203,13 +197,42 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
     }
   });
 
+  // ---------- terminal (pty) por WebSocket, abierta en la raíz del cuaderno. ?profesor=1 lanza el comando del
+  // profesor directamente (el del adaptador del kit, o el configurado por el usuario sin kit): nunca se teclea a ciegas.
+  const wssPty = new WebSocketServer({ noServer: true });
+  wssPty.on('connection', (ws, req) => {
+    if (!pty) { ws.send('\r\n[la terminal no está disponible en este arranque]\r\n'); return ws.close(); }
+    if (!estado.cuaderno) { ws.send('\r\n[no hay ningún cuaderno abierto]\r\n'); return ws.close(); }
+    const url = new URL(req.url, 'http://x');
+    const profesor = url.searchParams.get('profesor') === '1';
+    const shell = process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash');
+    const comando = comandoProfesor();
+    const opciones = { name: 'xterm-256color', cols: 100, rows: 28, cwd: estado.cuaderno.raiz, env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } };
+    let term;
+    try {
+      if (profesor) {
+        if (!comando) { ws.send('\r\n[este cuaderno no tiene profesor configurado]\r\n'); return ws.close(); }
+        const [cmd, ...args] = comando.split(/\s+/);
+        term = pty.spawn(cmd, args, opciones);
+      } else term = pty.spawn(shell, [], opciones);
+    } catch (e) {
+      ws.send(`\r\n[no se ha podido abrir ${profesor ? comando : shell}: ${e.message}]\r\n`); return ws.close();
+    }
+    terminales.add(ws);
+    term.onData(d => ws.readyState === 1 && ws.send(d));
+    term.onExit(() => ws.close());
+    ws.on('message', m => { const s = m.toString(); if (s.startsWith('\u0001')) { try { const { cols, rows } = JSON.parse(s.slice(1)); term.resize(cols, rows); } catch { /* ignorado */ } } else term.write(s); });
+    ws.on('close', () => { terminales.delete(ws); term.kill(); });
+  });
+
   // ---------- recarga en vivo
   const wssCambios = new WebSocketServer({ noServer: true });
   server.on('upgrade', (req, sock, head) => {
     const puerto = server.address().port;
     const url = new URL(req.url, 'http://x');
     if (!hostPropio(req, puerto) || !autorizado(req, token) || req.headers.origin == null || !origenPropio(req, puerto)) { sock.write('HTTP/1.1 403 Forbidden\r\n\r\n'); return sock.destroy(); }
-    if (url.pathname === '/cambios') wssCambios.handleUpgrade(req, sock, head, ws => { oyentes.add(ws); ws.on('close', () => oyentes.delete(ws)); });
+    if (url.pathname === '/pty') wssPty.handleUpgrade(req, sock, head, ws => wssPty.emit('connection', ws, req));
+    else if (url.pathname === '/cambios') wssCambios.handleUpgrade(req, sock, head, ws => { oyentes.add(ws); ws.on('close', () => oyentes.delete(ws)); });
     else sock.destroy();
   });
   server.on('close', () => estado.cuaderno && estado.cuaderno.cerrar());

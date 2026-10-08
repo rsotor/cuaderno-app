@@ -2,7 +2,7 @@
 
 **Tu cuaderno de estudio, en el navegador.** Abre la carpeta de notas de un curso montado con
 [profesor-kit](https://github.com/rsotor/profesor-kit) y la pinta como lo que es: notas con enlaces, exámenes,
-flashcards, tareas y un botón que abre tu terminal con el profesor. Sustituye a Obsidian; todo lo que escribe es
+flashcards, tareas y una terminal para hablar con tu profesor. Sustituye a Obsidian; todo lo que escribe es
 Markdown en tus propios ficheros.
 
 ## Arrancar

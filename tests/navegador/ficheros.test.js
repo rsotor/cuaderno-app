@@ -86,7 +86,9 @@ test('mostrar en el Finder: el botón aparece al pasar el ratón por una fila y 
   const antes = e.lanzado.length;
   await boton.click();
   await hasta(() => e.lanzado.length === antes + 1, 'árbol', 'el botón no lanza el gestor de archivos');
-  assert.ok(e.lanzado.at(-1).args.some(a => a.endsWith('extracto-octubre.pdf')), 'no señala el PDF');
+  // En Linux no hay «señalar»: xdg-open abre la carpeta (sistema.js); allí basta con que se lance en la del fichero.
+  const senala = (nombre, carpeta) => process.platform === 'linux' ? e.lanzado.at(-1).cwd.endsWith(carpeta) : e.lanzado.at(-1).args.some(a => a.endsWith(nombre));
+  assert.ok(senala('extracto-octubre.pdf', 'material'), 'no señala el PDF');
   assert.equal(await e.pagina.locator('#nota iframe.visor-pdf').count(), 0, 'pulsar el botón ha abierto el PDF en vez de mostrarlo en la carpeta');
   // Sobre una carpeta: la muestra y no la pliega.
   const carpeta = e.pagina.locator('#arbol details', { has: e.pagina.locator('summary', { hasText: 'material' }) });
@@ -97,5 +99,5 @@ test('mostrar en el Finder: el botón aparece al pasar el ratón por una fila y 
   // En la miga, siempre visible, para la nota abierta.
   await e.pagina.locator('#miga button.mostrar').click();
   await hasta(() => e.lanzado.length === antes + 3, 'miga', 'el botón de la miga no lanza nada');
-  assert.ok(e.lanzado.at(-1).args.some(a => a.endsWith('material.md')), 'la miga no señala la nota abierta');
+  assert.ok(senala('material.md', 'material'), 'la miga no señala la nota abierta');
 });
