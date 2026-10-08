@@ -81,7 +81,7 @@ async function anadirTareaDesdeBuscador() {
   const nota = notaParaTarea();
   try { await api('/api/tarea', { texto: nota ? `${texto} [[${nota}]]` : texto }); } catch (e) { if (e.status !== 409) avisar(e.message); return; }
   avisar('Tarea añadida');
-  $('#buscador').value = ''; pintarArbol(arbol);
+  $('#buscador').value = ''; buscar('');   // vacía y sale del estado «buscando»: vuelven Inicio/Tareas/Comentarios y el árbol
   refrescarContadores();
   if (enTareas()) abrirTareas();
 }

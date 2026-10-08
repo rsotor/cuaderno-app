@@ -36,6 +36,7 @@ test('«+» en el buscador: la pista, Enter añade a tareas.md y el panel se rep
   await e.pagina.keyboard.press('Enter');
   await visible(e.pagina.locator('.aviso-flotante', { hasText: 'Tarea añadida' }), 'buscador', 'el aviso «Tarea añadida»');
   await ficheroCumple(e.c, 'tareas.md', /- \[x\] Comprar cuaderno\n- \[ \] Pedir apuntes #clase\n$/, 'buscador');
+  await visible(e.pagina.locator('.paginas'), 'buscador', 'Inicio/Tareas/Comentarios de vuelta tras añadir la tarea (el buscador se vacía y sale del estado «buscando»)');
   await hasta(async () => (await e.pagina.locator('#buscador').inputValue()) === '', 'buscador', 'el buscador no se vació tras añadir');
   await visible(e.pagina.locator('#arbol a.hoja'), 'buscador', 'el árbol de notas de vuelta en el lateral');
   await visible(item('Pedir apuntes').locator('.etiqueta', { hasText: '#clase' }), 'tareas', 'la tarea nueva con su etiqueta en el panel');

@@ -29,6 +29,7 @@
 **Después:** fase 9 (terminal cuidada, con la vía del chat ya decidida), fase 10 (inbox).
 
 **Inbox**
+- Revisar entero el bloque buscador / acciones rápidas (Roberto, 2026-10-08): hoy en la misma caja conviven buscar, «+» tarea y la salida con Escape, y al lado el botón Nueva nota; los accesos de arriba se esconden al buscar. Tras tres retoques en un día, pensarlo como un bloque: qué comandos hay, cómo se descubren, qué pasa al terminar cada uno (hoy, al añadir la tarea no volvían los accesos: arreglado). Encaja con la paleta de comandos del Inbox.
 - Guardar y Traer: pasar a asíncrono (hoy `spawnSync` para el servidor mientras git trabaja) y que su resultado no se abra encima del editor si el alumno ya está editando (vídeo de Roberto, 2026-10-08). Y usar este mismo repo como cuaderno hace que «Guardar» haga commits en el repo de la app (`f1d97d8`): para trastear, mejor un cuaderno de `ejemplos/` copiado.
 - Varios cuadernos a la vez en un servidor (uno por pestaña): hoy el servidor tiene un solo cuaderno abierto y la pantalla de Cuadernos lo cambia para todas las pestañas. Decidir si hace falta.
 - Paleta de comandos (modal con Ctrl K) cuando haya varios comandos: Profesor, Guardar, Traer, cambiar de cuaderno. Hoy el buscador de la barra lateral basta (decisión del 2026-10-08, fase 9 o 10).
