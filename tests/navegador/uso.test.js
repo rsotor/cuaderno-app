@@ -57,7 +57,12 @@ test('árbol: las carpetas se pliegan y despliegan, y una nota dentro cambia de 
   await e.ir('#/n/larga.md');
   await e.pagina.evaluate(() => { document.querySelector('#centro').scrollTop = 1500; });
   const carpeta = await visible(e.pagina.locator('#arbol summary', { hasText: 'conceptos' }), 'árbol', 'la carpeta «conceptos»');
+  // La marca de carpeta es un chevron de 14 px que gira al abrir: así se distingue de una página y se ve el estado.
+  const marca = () => carpeta.evaluate(el => { const c = getComputedStyle(el, '::before'); return { ancho: c.width, giro: c.transform }; });
+  const abierta = await marca();
+  assert.equal(abierta.ancho, '14px', `árbol: el chevron de la carpeta mide ${abierta.ancho}, no 14px`);
   await carpeta.click();   // abierta por defecto: el primer clic la pliega
+  await hasta(async () => (await marca()).giro !== abierta.giro, 'árbol', 'el chevron no gira al plegar la carpeta');
   await oculto(e.pagina.locator('#arbol a.hoja', { hasText: 'Capital' }), 'árbol', 'la nota «Capital» con la carpeta plegada');
   await carpeta.click();
   const nota = await visible(e.pagina.locator('#arbol a.hoja', { hasText: 'Capital' }), 'árbol', 'la nota «Capital» dentro de la carpeta abierta');

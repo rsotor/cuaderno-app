@@ -74,12 +74,17 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 .paginas .icono { color: var(--tinta-suave); } .paginas a.activa .icono { color: var(--acento); }
 .contador { font-size: 12px; color: var(--tinta-suave); margin-left: auto; }
 #arbol { flex: 1; overflow: auto; padding: 4px 8px 12px; font-size: 14px; }
-#arbol details { margin-left: 6px; }
-#arbol summary { cursor: pointer; padding: 4px 6px; color: var(--tinta-suave); border-radius: var(--radio); list-style: none; }
+/* Árbol: la carpeta lleva un chevron que gira al abrirse; la página, nada (la sangría ya la coloca bajo su carpeta).
+   Mismo color para las dos; la carpeta, algo más de peso. Cada nivel entra 16 px. */
+#arbol details details, #arbol details .hoja { margin-left: 16px; }
+#arbol summary { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 5px 6px; color: var(--tinta); font-weight: 500; border-radius: var(--radio); list-style: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#arbol summary::-webkit-details-marker { display: none; }
 #arbol summary .num { opacity: .7; font-variant-numeric: tabular-nums; }
-#arbol summary::before { content: "▸ "; font-size: 11px; }
-#arbol details[open] > summary::before { content: "▾ "; }
-#arbol .hoja { margin-left: 14px; display: block; }
+#arbol summary::before { content: ""; flex: none; width: 14px; height: 14px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; opacity: .75; }
+#arbol details[open] > summary::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: no-preference) { #arbol summary::before { transition: transform .15s ease; } }
+#arbol .hoja { display: flex; padding-left: 26px; }   /* el texto alineado con el nombre de la carpeta, tras el chevron */
+#arbol .hoja small { color: var(--tinta-suave); font-size: 12px; margin-left: auto; padding-left: 8px; }   /* dos notas con el mismo título: el fichero las distingue */
 #arbol .resultado { padding: 6px 10px; display: block; }
 #arbol .resultado small { display: block; color: var(--tinta-suave); white-space: normal; font-size: 12px; line-height: 1.35; }
 #arbol .comando { white-space: normal; color: var(--tinta-suave); line-height: 1.45; }   /* la pista del «+»: Enter añade la tarea */

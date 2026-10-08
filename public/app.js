@@ -30,7 +30,7 @@ function pintarArbol(lista) {
   const raiz = {};
   for (const p of lista) { let n = raiz; const partes = p.split('/'); partes.forEach((s, i) => { if (i === partes.length - 1) (n.__f ??= []).push(p); else n = (n[s] ??= {}); }); }
   const pintar = (n, abierto) => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details${abierto ? ' open' : ''}><summary title="${esc(k)}">${nombreCarpeta(k)}</summary>${pintar(n[k], false)}</details>`).join('')
-    + (n.__f || []).map(p => `<a class="hoja" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}">${esc(tituloDe(p))}</a>`).join('');
+    + (n.__f || []).map(p => { const t = tituloDe(p), repetido = (n.__f || []).some(q => q !== p && tituloDe(q) === t); return `<a class="hoja" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}">${esc(t)}${repetido ? `<small>${esc(p.split('/').pop())}</small>` : ''}</a>`; }).join('');
   $('#arbol').innerHTML = lista.length ? pintar(raiz, true) : '<p class="vacio">No hay notas en esta carpeta.</p>';
   marcarActiva();
 }
