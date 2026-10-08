@@ -12,6 +12,12 @@ class ErrorPeticion extends Error { constructor(msg) { super(msg); this.status =
 const quitarAcentos = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const escaparRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const RE_CASILLA = /^(\s*- \[)([ xX])(\] .*)$/;
+// Una etiqueta en línea, como en Obsidian: «#» tras un espacio (o al principio), una letra y luego letras, dígitos,
+// guiones, guiones bajos o barras; acentos admitidos. «#1» y «# título» no lo son. Se busca fuera del código `…`.
+const RE_ETIQUETA = /(^|[\s(])#(\p{L}[\p{L}\p{N}_\-/]*)/gu;
+const RE_WIKI = /\[\[([^\]|]*?)(?:\\?\|[^\]]*)?\]\]/g;
+const sinCodigo = texto => texto.replace(/`[^`]*`/g, m => ' '.repeat(m.length));
+function etiquetasDe(texto) { const e = []; for (const m of sinCodigo(texto).matchAll(RE_ETIQUETA)) if (!e.includes(m[2])) e.push(m[2]); return e; }
 
 class Cuaderno {
   // raiz: la carpeta abierta (donde vive .gitignore). base: la carpeta de las notas (estudio/ con kit).
@@ -133,7 +139,12 @@ class Cuaderno {
       if (tipo === 'examen' || tipo === 'flashcards') continue;   // se contestan en su nota, no son tareas
       const ls = this.lineas(src);
       const items = [];
-      ls.forEach((l, i) => { const m = l.match(RE_CASILLA); if (!m) return; const texto = this.acortarRutas(m[3].slice(2).replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, '$2')); items.push({ linea: i, hecha: m[2] !== ' ', texto, html: this.md.renderInline(texto, {}) }); });
+      ls.forEach((l, i) => {
+        const m = l.match(RE_CASILLA); if (!m) return;
+        const crudo = m[3].slice(2);
+        const texto = this.acortarRutas(crudo.replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, '$2'));
+        items.push({ linea: i, hecha: m[2] !== ' ', texto, html: this.marcarEtiquetas(this.md.renderInline(texto, {})), enlaces: this.enlacesDe(crudo), etiquetas: etiquetasDe(crudo.replace(RE_WIKI, ' ')) });
+      });
       if (items.length) grupos.push({ ruta: p, generado: /^> Lo genera tu profesor/m.test(ls.slice(0, 6).join('\n')), items });
     }
     grupos.sort((a, b) => (a.ruta === 'tareas.md' ? -1 : b.ruta === 'tareas.md' ? 1 : a.generado - b.generado));
@@ -144,6 +155,26 @@ class Cuaderno {
   acortarRutas(texto) {
     const notas = new Set(this.listar().map(p => p.replace(/\.md$/, '')));
     return texto.replace(/[\w.-]+(?:\/[\w.-]+)+/g, t => notas.has(t.replace(/\.md$/, '')) ? t.replace(/\.md$/, '').split('/').pop() : t);
+  }
+  // Los destinos de los [[wikilinks]] de una línea, sin alias ni #sección, como nombre de nota (el fichero sin ruta
+  // ni .md). Si el enlace no resuelve a ninguna nota, se deja el nombre tal como está escrito.
+  enlacesDe(texto) {
+    const nombres = [];
+    for (const m of sinCodigo(texto).matchAll(RE_WIKI)) {
+      const destino = m[1].trim(); if (!destino) continue;
+      const ruta = this.resolverWiki(destino);
+      const nombre = (ruta || destino.replace(/#.*$/, '')).replace(/\.md$/, '').split('/').pop();
+      if (nombre && !nombres.includes(nombre)) nombres.push(nombre);
+    }
+    return nombres;
+  }
+  // Las #etiquetas del HTML en línea de una tarea, envueltas para pintarlas; solo en el texto, nunca dentro de <code>.
+  marcarEtiquetas(html) {
+    let enCodigo = 0;
+    return html.split(/(<[^>]*>)/).map(t => {
+      if (t.startsWith('<')) { if (/^<code[\s>]/.test(t)) enCodigo++; else if (/^<\/code>/.test(t)) enCodigo = Math.max(0, enCodigo - 1); return t; }
+      return enCodigo ? t : t.replace(RE_ETIQUETA, (_, antes, e) => `${antes}<span class="etiqueta">#${e}</span>`);
+    }).join('');
   }
   comentarios() {
     const lista = [];

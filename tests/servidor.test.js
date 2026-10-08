@@ -73,6 +73,9 @@ test('la API: info, árbol, nota, escrituras y el 409 cuando la nota cambió', a
     assert.equal((await (await s.pedir('/api/comentarios')).json()).length, 1);
     assert.equal((await post('/api/tarea', { texto: 'Nueva' })).status, 200);
     assert.equal((await (await s.pedir('/api/tareas')).json())[0].items.length, 2);
+    assert.equal((await post('/api/tarea', { texto: 'Releer [[conceptos/interes]] #repaso' })).status, 200);
+    const ultima = (await (await s.pedir('/api/tareas')).json())[0].items.at(-1);
+    assert.deepEqual([ultima.texto, ultima.enlaces, ultima.etiquetas], ['Releer interes #repaso', ['interes'], ['repaso']]);
     assert.equal((await s.pedir('/fichero/conceptos/capital.md')).status, 200);
     assert.equal((await s.pedir('/fichero/..%2F..%2Fx')).status, 400);
   } finally { await s.cerrar(); }

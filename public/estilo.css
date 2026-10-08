@@ -82,6 +82,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 #arbol .hoja { margin-left: 14px; display: block; }
 #arbol .resultado { padding: 6px 10px; display: block; }
 #arbol .resultado small { display: block; color: var(--tinta-suave); white-space: normal; font-size: 12px; line-height: 1.35; }
+#arbol .comando { white-space: normal; color: var(--tinta-suave); line-height: 1.45; }   /* la pista del «+»: Enter añade la tarea */
+#arbol .comando b { color: var(--tinta); font-weight: 600; overflow-wrap: anywhere; }
 .pie-lateral { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--linea); }
 .pie-lateral button { flex: 1; white-space: nowrap; }
 .pie-lateral #btn-ajustes { flex: 0 0 auto; padding: 6px 9px; }
@@ -113,7 +115,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 .propiedades { display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; font-size: 13px; color: var(--tinta-suave); border-top: 1px solid var(--linea); border-bottom: 1px solid var(--linea); padding: 8px 2px; margin: -6px 0 22px; }
 .propiedades dt { color: var(--tinta-suave); }
 .propiedades dd { margin: 0; overflow-wrap: anywhere; }
-.propiedades .etiqueta { display: inline-block; background: var(--acento-suave); color: var(--acento); border-radius: 999px; padding: 0 8px; margin: 1px 4px 1px 0; font-size: 12px; }
+.etiqueta { display: inline-block; background: var(--acento-suave); color: var(--acento); border-radius: 999px; padding: 0 8px; margin: 1px 4px 1px 0; font-size: 12px; }   /* propiedades del frontmatter y #etiquetas de las tareas */
 
 /* callouts: un color por tipo y por tema */
 .callout { margin: 14px 0; padding: 0; border: 1px solid var(--linea); border-left: 4px solid var(--c, var(--acento)); border-radius: var(--radio-bloque); background: var(--papel); overflow: hidden; }
@@ -161,6 +163,12 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 .cuaderno.ausente h2 { color: var(--mal); }
 .nueva-tarea { display: flex; gap: 8px; margin: 0 0 14px; }
 .nueva-tarea input { flex: 1; padding: 8px 12px; }
+/* filtros del panel Tareas: una fila que se parte en estrecho; el foco es el anillo global */
+.filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 6px; padding: 8px 0; border-top: 1px solid var(--linea); font-size: 13px; color: var(--tinta-suave); }
+.filtros label { color: var(--tinta-suave); }
+.filtros select { padding: 5px 8px; min-height: 32px; max-width: 100%; background: var(--fondo); color: var(--tinta); margin-right: 6px; }
+.filtros .pista { margin-left: auto; margin-right: 0; }
+.item .etiqueta { vertical-align: 1px; }
 
 /* examen como formulario */
 .examen fieldset.pregunta { border: 0; border-top: 1px solid var(--linea); padding: 8px 0 14px; margin: 10px 0; }

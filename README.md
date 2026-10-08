@@ -19,7 +19,9 @@ cuaderno le da nombre y portada (`{ "nombre": "Finanzas", "portada": "inicio.md"
 La terminal imprime la dirección que hay que abrir (lleva un código que cambia en cada arranque: así ninguna otra
 web abierta en el navegador puede hablar con tu cuaderno). Necesita Node 24 o más reciente.
 
-`npm test` lanza los tests. `node pruebas/recorrido.js <carpeta>` recorre un cuaderno y lista los enlaces rotos.
+`npm test` lanza los tests. `npm run test:navegador` lanza los recorridos de navegador (Playwright con Chromium headless;
+en un ordenador normal hace falta `npx playwright install chromium` una vez, o la variable `CUADERNO_CHROMIUM` con la ruta
+de otro Chromium). `node pruebas/recorrido.js <carpeta>` recorre un cuaderno y lista los enlaces rotos.
 
 ## Estado
 

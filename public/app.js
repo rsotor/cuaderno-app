@@ -35,15 +35,36 @@ function pintarArbol(lista) {
   marcarActiva();
 }
 function marcarActiva() {
-  document.querySelectorAll('#arbol a, .paginas a').forEach(a => { const activa = a.getAttribute('href') === location.hash; a.classList.toggle('activa', activa); if (activa) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  const actual = location.hash.split('?')[0];   // sin la consulta: #/tareas?estado=hechas sigue siendo Tareas
+  document.querySelectorAll('#arbol a, .paginas a').forEach(a => { const activa = a.getAttribute('href') === actual; a.classList.toggle('activa', activa); if (activa) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   const a = document.querySelector('#arbol a.activa'); if (a) { let d = a.parentElement; while (d && d.id !== 'arbol') { if (d.tagName === 'DETAILS') d.open = true; d = d.parentElement; } }
 }
 
 // ---------- buscador
 let tBusqueda;
 $('#buscador').addEventListener('input', e => { clearTimeout(tBusqueda); tBusqueda = setTimeout(() => buscar(e.target.value), 120); });
+// El buscador también es el comando: lo que empieza por «+» no busca, Enter lo añade como tarea a tareas.md.
+// Si se está leyendo una nota, la tarea la enlaza al final ([[ruta/sin/extensión]]).
+const comandoTarea = q => (q.trimStart().startsWith('+') ? q.trimStart().slice(1).trim() : null);
+const notaParaTarea = () => (rutaActual && rutaActual.endsWith('.md') ? rutaActual.replace(/\.md$/, '') : null);
+function pintarComando(texto) {
+  const nota = notaParaTarea();
+  $('#arbol').innerHTML = `<div class="resultado comando" role="status">${texto ? `<kbd>Enter</kbd> añade la tarea: <b>${esc(texto)}</b>${nota ? `<small>enlazada a ${esc(tituloDe(rutaActual))}</small>` : ''}` : 'Escribe la tarea después del <b>+</b> y pulsa <kbd>Enter</kbd>.'}</div>`;
+}
+async function anadirTareaDesdeBuscador() {
+  const texto = comandoTarea($('#buscador').value);
+  if (!texto) return;
+  const nota = notaParaTarea();
+  try { await api('/api/tarea', { texto: nota ? `${texto} [[${nota}]]` : texto }); } catch (e) { if (e.status !== 409) avisar(e.message); return; }
+  avisar('Tarea añadida');
+  $('#buscador').value = ''; pintarArbol(arbol);
+  refrescarContadores();
+  if (enTareas()) abrirTareas();
+}
+$('#buscador').addEventListener('keydown', e => { if (e.key === 'Enter' && comandoTarea(e.target.value) != null) { e.preventDefault(); clearTimeout(tBusqueda); anadirTareaDesdeBuscador(); } });
 async function buscar(q) {
   if (!q.trim()) return pintarArbol(arbol);
+  if (comandoTarea(q) != null) return pintarComando(comandoTarea(q));
   const r = await api(`/api/buscar?q=${encodeURIComponent(q)}`);
   const re = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig');
   const marcar = s => esc(s).replace(re, m => `<mark>${m}</mark>`);
@@ -195,16 +216,60 @@ $('#editor-guardar').onclick = async () => { const cb = alGuardar; const v = $('
 $('#editor-texto').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') $('#editor-guardar').click(); });
 
 // ---------- paneles
+// Los filtros del panel viven en el hash (#/tareas?nota=…&etiqueta=…&estado=…): así sobreviven a la recarga en vivo
+// y a volver atrás. El filtrado es del navegador: el cuaderno no cambia.
+const enTareas = () => location.hash.split('?')[0] === '#/tareas';
+const filtrosTareas = () => { const q = new URLSearchParams(location.hash.split('?')[1] || ''); return { nota: q.get('nota') || '', etiqueta: q.get('etiqueta') || '', estado: ['pendientes', 'hechas'].includes(q.get('estado')) ? q.get('estado') : 'todas' }; };
+const rutaDeNombre = nombre => arbol.find(p => p.replace(/\.md$/, '') === nombre) || arbol.find(p => nombreNota(p) === nombre) || null;
 async function abrirTareas() {
   $('#nota').hidden = true; $('#panel').hidden = false; rutaActual = null;
   $('#miga').innerHTML = '<strong>Tareas</strong>';
   const g = await api('/api/tareas');
+  if (!enTareas()) return;   // mientras llegaba la respuesta se cambió de pantalla
+  // Si el panel ya estaba pintado (recarga en vivo, tarea nueva), el foco y lo escrito en «Nueva tarea» se conservan.
+  const activo = document.activeElement && $('#panel').contains(document.activeElement) ? document.activeElement.id : null;
+  const borrador = $('#tarea-nueva') ? $('#tarea-nueva').value : '';
   const total = g.reduce((a, x) => a + x.items.length, 0), hechas = g.reduce((a, x) => a + x.items.filter(i => i.hecha).length, 0);
   const nota = cuaderno().kit !== 'carpeta' ? 'Lo que marcas aquí se escribe en su nota. Los exámenes y las flashcards se contestan en la suya.' : 'Tu lista propia, en <code>tareas.md</code>.';
-  $('#panel').innerHTML = `<h1>Tareas</h1><p class="resumen">${hechas} de ${total} hechas. ${nota}</p><form class="nueva-tarea" id="nueva-tarea"><label class="oculto" for="tarea-nueva">Nueva tarea</label><input id="tarea-nueva" placeholder="Nueva tarea para mí…" autocomplete="off"><button type="submit">Añadir</button></form>`
+  const f = filtrosTareas();
+  const notas = [...new Set(g.flatMap(x => x.items.flatMap(i => i.enlaces || [])))].sort((a, b) => a.localeCompare(b, 'es'));
+  const etiquetas = [...new Set(g.flatMap(x => x.items.flatMap(i => i.etiquetas || [])))].sort((a, b) => a.localeCompare(b, 'es'));
+  const opcion = (v, texto, actual) => `<option value="${esc(v)}"${v === actual ? ' selected' : ''}>${esc(texto)}</option>`;
+  const filtros = `<form class="filtros" id="filtros-tareas" aria-label="Filtrar las tareas">`
+    + (notas.length ? `<label for="filtro-nota">Nota</label><select id="filtro-nota" name="nota">${opcion('', 'Todas', f.nota)}${notas.map(n => opcion(n, rutaDeNombre(n) ? tituloDe(rutaDeNombre(n)) : n, f.nota)).join('')}</select>` : '')
+    + (etiquetas.length ? `<label for="filtro-etiqueta">Etiqueta</label><select id="filtro-etiqueta" name="etiqueta">${opcion('', 'Todas', f.etiqueta)}${etiquetas.map(e => opcion(e, `#${e}`, f.etiqueta)).join('')}</select>` : '')
+    + `<label for="filtro-estado">Estado</label><select id="filtro-estado" name="estado">${opcion('todas', 'Todas', f.estado)}${opcion('pendientes', 'Pendientes', f.estado)}${opcion('hechas', 'Hechas', f.estado)}</select>`
+    + `<span class="pista" id="filtro-resumen" role="status"></span><button type="button" class="secundario pequeno" id="filtro-quitar" hidden>Quitar filtros</button></form>`;
+  $('#panel').innerHTML = `<h1>Tareas</h1><p class="resumen">${hechas} de ${total} hechas. ${nota}</p><form class="nueva-tarea" id="nueva-tarea"><label class="oculto" for="tarea-nueva">Nueva tarea</label><input id="tarea-nueva" placeholder="Nueva tarea para mí…" autocomplete="off"><button type="submit">Añadir</button></form>${filtros}`
     + g.map(gr => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(gr.ruta)}" title="${esc(gr.ruta)}">${esc(tituloDe(gr.ruta))}</a>${gr.generado ? '<span class="solo-lectura">la escribe el profesor al guardar</span>' : ''}</h2>`
-      + gr.items.map(i => `<label class="item${i.hecha ? ' hecha' : ''}"><input type="checkbox" data-ruta="${esc(gr.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${gr.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('') + '</section>').join('');
+      + gr.items.map(i => `<label class="item${i.hecha ? ' hecha' : ''}" data-hecha="${i.hecha ? 1 : 0}" data-enlaces="${esc(JSON.stringify(i.enlaces || []))}" data-etiquetas="${esc(JSON.stringify(i.etiquetas || []))}"><input type="checkbox" data-ruta="${esc(gr.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${gr.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('') + '</section>').join('');
+  aplicarFiltrosTareas();
+  if (borrador && $('#tarea-nueva')) $('#tarea-nueva').value = borrador;
+  if (activo && $(`#${activo}`)) $(`#${activo}`).focus();
 }
+// Filtra en el sitio (sin repintar: el foco se queda en el control) y deja los filtros en el hash sin añadir historial.
+function aplicarFiltrosTareas() {
+  const f = filtrosTareas();
+  const activos = !!(f.nota || f.etiqueta || f.estado !== 'todas');
+  let visibles = 0, total = 0;
+  document.querySelectorAll('#panel .item').forEach(it => {
+    total++;
+    const cumple = (!f.nota || JSON.parse(it.dataset.enlaces).includes(f.nota)) && (!f.etiqueta || JSON.parse(it.dataset.etiquetas).includes(f.etiqueta))
+      && (f.estado === 'todas' || (f.estado === 'hechas') === (it.dataset.hecha === '1'));
+    it.hidden = !cumple; if (cumple) visibles++;
+  });
+  document.querySelectorAll('#panel .grupo').forEach(gr => { gr.hidden = ![...gr.querySelectorAll('.item')].some(it => !it.hidden); });
+  const r = $('#filtro-resumen'); if (r) r.textContent = activos ? (visibles ? `${visibles} de ${total} tareas` : 'Ninguna tarea cumple los filtros') : '';
+  const q = $('#filtro-quitar'); if (q) q.hidden = !activos;
+}
+$('#panel').addEventListener('change', e => {
+  const form = e.target.closest('#filtros-tareas'); if (!form) return;
+  const q = new URLSearchParams();
+  for (const [k, v] of new FormData(form)) if (v && v !== 'todas') q.set(k, v);
+  history.replaceState(null, '', `#/tareas${q.size ? `?${q}` : ''}`);
+  aplicarFiltrosTareas(); marcarActiva();
+});
+$('#panel').addEventListener('click', e => { if (e.target.id === 'filtro-quitar') { history.replaceState(null, '', '#/tareas'); abrirTareas().then(() => { const s = $('#filtro-estado'); if (s) s.focus(); }); } });
 $('#panel').addEventListener('submit', async e => { if (e.target.id !== 'nueva-tarea') return; e.preventDefault(); const i = e.target.querySelector('input'); if (!i.value.trim()) return; await api('/api/tarea', { texto: i.value }); avisar('Tarea añadida'); abrirTareas(); refrescarContadores(); });
 $('#panel').addEventListener('change', async e => { const t = e.target; if (t.type !== 'checkbox') return; const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { avisar(err.message); abrirTareas(); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); refrescarContadores(); } });
 async function abrirComentarios() {
@@ -289,7 +354,7 @@ async function accion(ruta, body, titulo, opciones) {
   let r;
   try { r = await api(ruta, body || {}); } catch (e) { r = { codigo: 1, salida: e.message }; }
   await refrescarInfo();
-  if (rutaActual) abrirNota(rutaActual); else if (location.hash === '#/tareas') abrirTareas();
+  if (rutaActual) abrirNota(rutaActual); else if (enTareas()) abrirTareas();
   mostrarResultado(titulo, r, opciones);
   return r;
 }
@@ -352,7 +417,7 @@ async function cargarCuaderno() {
 function enrutar() {
   const h = location.hash;
   if (!cuaderno() || h === '#/cuadernos') { abrirCuadernos(); marcarActiva(); return; }
-  if (h === '#/tareas') abrirTareas(); else if (h === '#/comentarios') abrirComentarios();
+  if (enTareas()) abrirTareas(); else if (h === '#/comentarios') abrirComentarios();
   else if (h.startsWith('#/n/')) { const [ruta, q] = h.slice(4).split('?'); const l = q && new URLSearchParams(q).get('l'); abrirNota(decodeURI(ruta), l != null ? +l : null); }
   else if (cuaderno().portada) location.hash = `#/n/${encodeURI(cuaderno().portada)}`;
   else { rutaActual = null; $('#panel').hidden = true; $('#nota').hidden = false; sinPortada(); }
@@ -361,7 +426,7 @@ function enrutar() {
 window.addEventListener('hashchange', enrutar);
 
 // ---------- recarga en vivo
-try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; info = await api('/api/info'); pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (location.hash === '#/tareas') abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
+try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; info = await api('/api/info'); pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
 
 (async () => {
   info = await api('/api/info');

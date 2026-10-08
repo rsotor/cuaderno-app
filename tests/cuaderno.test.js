@@ -56,6 +56,19 @@ test('tareas: por nota, sin exámenes, tareas.md primero; sin kit solo las propi
   assert.deepEqual(cu.tareas({ soloPropias: true }).map(x => x.ruta), ['tareas.md']);
 }));
 
+test('tareas: enlaces y etiquetas de cada línea; no cuentan #1, «# título» ni lo que va en código', con({}, (c, cu) => {
+  const items = cu.tareas().find(g => g.ruta === 'conceptos/interes.md').items;
+  assert.deepEqual(items.map(i => [i.enlaces, i.etiquetas]), [[['capital', '01-01-01-sesion'], ['repaso', 'tema/dinero']], [[], []]]);
+  assert.equal(items[0].texto, 'Repasar con capital y la sesión #repaso #tema/dinero');
+  assert.equal(items[0].html, 'Repasar con capital y la sesión <span class="etiqueta">#repaso</span> <span class="etiqueta">#tema/dinero</span>');
+  assert.equal(items[1].html, 'Apuntar <code>#codigo</code> #1 # ni esto');
+  assert.deepEqual(cu.tareas().find(g => g.ruta === 'sesiones/01-01-01-sesion.md').items.map(i => i.enlaces), [[], ['interes'], []]);
+  // una tarea añadida desde la app con la nota abierta: la ruta sin extensión resuelve a la nota
+  cu.nuevaTarea('Releer esto [[conceptos/interes]] #ñandú');
+  const nueva = cu.tareas()[0].items.at(-1);
+  assert.deepEqual([nueva.texto, nueva.enlaces, nueva.etiquetas], ['Releer esto interes #ñandú', ['interes'], ['ñandú']]);
+}));
+
 test('editar un bloque deja el fichero como a mano y rechaza si cambió debajo', con({}, (c, cu) => {
   cu.escribirBloque('conceptos/capital.md', 2, 3, 'Lo que pones tú.', 'Lo que pones. Enlaza con [[interes|el interés]].');
   assert.equal(c.leer('conceptos/capital.md'), '# Capital\n\nLo que pones tú.\n');
