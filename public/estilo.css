@@ -94,8 +94,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 button.mostrar, button.ocultar { flex: none; display: inline-flex; align-items: center; justify-content: center; padding: 0; min-width: 26px; min-height: 26px; border: none; background: none; color: var(--tinta-suave); border-radius: var(--radio); opacity: 0; }
 button.mostrar:hover, button.ocultar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 button.mostrar:focus-visible, button.ocultar:focus-visible { opacity: 1; }
-#arbol .fila .acciones-fila { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; gap: 2px; }
-#arbol summary .acciones-fila { margin-left: auto; display: flex; gap: 2px; }
+#arbol .fila .acciones-fila { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; }
+#arbol summary .acciones-fila { margin-left: auto; display: flex; gap: 6px; }
 #arbol .fila:hover :is(.mostrar, .ocultar), #arbol .fila:focus-within :is(.mostrar, .ocultar), #arbol summary:hover :is(.mostrar, .ocultar), #arbol summary:focus-within :is(.mostrar, .ocultar), #miga .mostrar { opacity: 1; }
 @media (hover: none) { button.mostrar, button.ocultar { opacity: 1; } }
 #miga .mostrar { vertical-align: middle; margin-left: 6px; min-width: 24px; min-height: 24px; }
@@ -284,6 +284,7 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 #guardar-mensaje { padding: 10px 12px; background: var(--fondo); resize: vertical; }
 .editor-caja .pie { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
 .ajustes { display: flex; flex-direction: column; gap: 10px; }
+.ajustes-alcance { margin: -6px 0 2px; }
 .ocultas-cuaderno { border-top: 1px solid var(--linea); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .ocultas-cuaderno ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .ocultas-cuaderno li { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; }
