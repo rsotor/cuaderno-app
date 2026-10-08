@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { arrancar, hasta, visible, oculto, conTexto, ficheroCumple } = require('./ayuda');
+const { arrancar, hasta, visible, oculto, conTexto, ficheroCumple, hashCumple } = require('./ayuda');
 const { crearCuaderno } = require('../ayuda');
 
 let e, remoto;
@@ -60,27 +60,6 @@ test('Guardar, Traer y Deshacer desde la pantalla, sin kit: commit con el mensaj
   await ficheroCumple(e.c, 'tareas.md', /^(?![\s\S]*Desde la prueba de guardar)/, 'deshacer');
 });
 
-test('pantalla de Cuadernos: el abierto sale en recientes; abrir otro por su ruta y quitarlo de la lista', async () => {
-  const otro = crearCuaderno({ kit: false });
-  try {
-    // El cuaderno de los recorridos se abre al arrancar, sin pasar por la lista: se abre una vez por su ruta para que entre.
-    await e.ir('#/cuadernos');
-    await e.pagina.fill('#ruta-carpeta', e.c.raiz); await e.pagina.press('#ruta-carpeta', 'Enter');
-    await e.ir('#/cuadernos');
-    await visible(e.pagina.locator('#panel .cuaderno.abierto'), 'cuadernos', 'el cuaderno abierto en recientes');
-    await e.pagina.fill('#ruta-carpeta', otro.raiz); await e.pagina.press('#ruta-carpeta', 'Enter');
-    await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(path.basename(otro.raiz)), 'cuadernos', 'el nombre del cuaderno abierto');
-    await e.ir('#/cuadernos');
-    const fila = e.pagina.locator('#panel .cuaderno', { hasText: path.basename(e.c.raiz) });
-    await (await visible(fila, 'cuadernos', 'el cuaderno anterior en recientes')).locator('button[data-olvidar]').click();
-    await oculto(fila, 'cuadernos', 'el cuaderno quitado de la lista');
-    assert.ok(fs.existsSync(e.c.raiz), 'quitar de la lista ha borrado la carpeta');
-    // De vuelta al cuaderno del resto de recorridos.
-    await e.pagina.fill('#ruta-carpeta', e.c.raiz); await e.pagina.press('#ruta-carpeta', 'Enter');
-    await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(path.basename(e.c.raiz)), 'cuadernos', 'de vuelta al cuaderno');
-  } finally { otro.borrar(); }
-});
-
 test('render: propiedades de cada tipo, enlaces de cada forma, callouts, imágenes, código y fórmulas', async () => {
   await e.ir('#/n/render/propiedades.md');
   for (const [k, v] of [['titulo', 'Presupuesto de octubre'], ['importe_total', '1800'], ['revisado', 'true'], ['fecha', '2026-10-01']]) {
@@ -124,5 +103,30 @@ test('Tareas sin kit: el panel solo enseña tareas.md (no las casillas de otras 
   await e.pagina.keyboard.press('Control+k');
   await e.pagina.keyboard.type('+ Una tarea sin kit');
   await e.pagina.keyboard.press('Enter');
-  await ficheroCumple(e.c, 'tareas.md', /\n- \[ \] Una tarea sin kit\n/, 'tareas');
+  await ficheroCumple(e.c, 'tareas.md', /\r?\n- \[ \] Una tarea sin kit\r?\n/, 'tareas');   // CRLF en Windows: git lo convierte al deshacer en el recorrido de Guardar
+});
+
+// Al final: cambia el cuaderno abierto en el servidor, y los recorridos de antes cuentan con el del principio.
+test('pantalla de Cuadernos: el abierto sale en recientes; abrir otro por su ruta y quitarlo de la lista', async () => {
+  const otro = crearCuaderno({ kit: false });
+  try {
+    // El cuaderno de los recorridos se abre al arrancar, sin pasar por la lista: se abre una vez por su ruta para que entre.
+    await e.ir('#/cuadernos');
+    await e.pagina.fill('#ruta-carpeta', e.c.raiz); await e.pagina.press('#ruta-carpeta', 'Enter');
+    // Abrir termina saltando a la portada: se espera, o ese salto se lleva por delante la pantalla siguiente.
+    await hashCumple(e.pagina, /^#\/n\/inicio\.md$/, 'cuadernos');
+    await e.ir('#/cuadernos');
+    await visible(e.pagina.locator('#panel .cuaderno.abierto'), 'cuadernos', 'el cuaderno abierto en recientes');
+    await e.pagina.fill('#ruta-carpeta', otro.raiz); await e.pagina.press('#ruta-carpeta', 'Enter');
+    await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(path.basename(otro.raiz)), 'cuadernos', 'el nombre del cuaderno abierto');
+    await hashCumple(e.pagina, /^#\/n\/inicio\.md$/, 'cuadernos');
+    await e.ir('#/cuadernos');
+    const fila = e.pagina.locator('#panel .cuaderno', { hasText: path.basename(e.c.raiz) });
+    await (await visible(fila, 'cuadernos', 'el cuaderno anterior en recientes')).locator('button[data-olvidar]').click();
+    await oculto(fila, 'cuadernos', 'el cuaderno quitado de la lista');
+    assert.ok(fs.existsSync(e.c.raiz), 'quitar de la lista ha borrado la carpeta');
+    // De vuelta al cuaderno del resto de recorridos.
+    await e.pagina.fill('#ruta-carpeta', e.c.raiz); await e.pagina.press('#ruta-carpeta', 'Enter');
+    await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(path.basename(e.c.raiz)), 'cuadernos', 'de vuelta al cuaderno');
+  } finally { otro.borrar(); }
 });
