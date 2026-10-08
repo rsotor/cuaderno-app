@@ -32,7 +32,7 @@ function pintarArbol(lista) {
   const raiz = {};
   for (const p of lista) { let n = raiz; const partes = p.split('/'); partes.forEach((s, i) => { if (i === partes.length - 1) (n.__f ??= []).push(p); else n = (n[s] ??= {}); }); }
   const pintar = (n, abierto, prefijo = '') => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details${abierto ? ' open' : ''}><summary title="${esc(k)}"><span class="nombre">${nombreCarpeta(k)}</span>${botonMostrar(prefijo + k, k)}</summary>${pintar(n[k], false, `${prefijo}${k}/`)}</details>`).join('')
-    + (n.__f || []).map(p => { const t = tituloDe(p), repetido = (n.__f || []).some(q => q !== p && tituloDe(q) === t); return `<div class="fila"><a class="hoja${p.endsWith('.md') ? '' : ' fichero'}" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}"><span class="nombre">${esc(t)}</span>${repetido ? `<small>${esc(p.split('/').pop())}</small>` : ''}</a>${botonMostrar(p, t)}</div>`; }).join('');
+    + (n.__f || []).map(p => { const t = tituloDe(p), repetido = (n.__f || []).some(q => q !== p && tituloDe(q) === t); return `<div class="fila"><a class="hoja${p.endsWith('.md') ? '' : ' fichero'}" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}"><span class="nombre">${esc(t)}</span>${repetido ? `<small>${esc(p.split('/').pop())}</small>` : ''}</a><span class="botones-fila">${botonMostrar(p, t)}${botonPapelera(p, t)}</span></div>`; }).join('');
   $('#arbol').innerHTML = lista.length ? pintar(raiz, true) : '<p class="vacio">No hay notas en esta carpeta.</p>';
   pintarCarpetas(lista);
   marcarActiva();
@@ -135,12 +135,31 @@ document.addEventListener('click', e => {
   mostrarEnCarpeta(b.dataset.mostrar);
 });
 
-// ---------- ficheros que no son notas: PDF en el visor del navegador; JSON, CSV y texto tal cual, solo lectura
+// ---------- papelera: el fichero va a la papelera del sistema, sin confirmar (de allí se recupera; Roberto, 2026-10-08)
+const PAPELERA = /Win/i.test(navigator.platform) ? 'la papelera de reciclaje' : 'la papelera';
+const botonPapelera = (ruta, nombre) => `<button type="button" class="papelera" data-papelera="${esc(ruta)}" title="Mandar a ${PAPELERA}" aria-label="Mandar ${esc(String(nombre).replace(/<[^>]*>/g, ''))} a ${PAPELERA}">${icono('papelera')}</button>`;
+async function mandarAPapelera(ruta) {
+  try { await api('/api/papelera', { ruta }); } catch (e) { avisar(e.message); return; }
+  avisar(`«${ruta.split('/').pop()}» está en ${PAPELERA}`);
+  [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]);
+  if (!$('#buscador').value.trim()) pintarArbol(arbol);
+  if (rutaActual === ruta) { rutaActual = null; location.hash = cuaderno().portada && cuaderno().portada !== ruta ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; }
+  refrescarContadores();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-papelera]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  mandarAPapelera(b.dataset.papelera);
+});
+
+// ---------- ficheros que no son notas: PDF en el visor del navegador; imágenes a su tamaño (como mucho, el de la columna);
+// JSON, CSV y texto tal cual, solo lectura
 const TOPE_TEXTO = 1e6;
 async function abrirFichero(ruta, tipo) {
   const url = `/fichero/${encodeURI(ruta)}`, nombre = ruta.split('/').pop();
   ancho(tipo === 'pdf');
   if (tipo === 'pdf') { $('#nota').innerHTML = `<iframe class="visor-pdf" src="${url}" title="${esc(nombre)}"></iframe>`; return; }
+  if (/^(png|jpe?g|gif|webp|avif|svg)$/.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><img class="visor-imagen" src="${url}" alt="${esc(nombre)}">`; return; }
   let texto;
   try { const r = await fetch(url); if (!r.ok) throw new Error(`respuesta ${r.status}`); texto = await r.text(); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   const cortado = texto.length > TOPE_TEXTO;
@@ -176,7 +195,7 @@ async function abrirNota(ruta, lineaDestino) {
   $('#panel').hidden = true; $('#nota').hidden = false;
   let n;
   try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
-  $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop());
+  $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonPapelera(ruta, ruta.split('/').pop());
   ancho(!!n.esHtml);
   if (n.esFichero) return abrirFichero(ruta, n.tipo);
   const tipo = n.frontmatter && n.frontmatter.tipo;
@@ -190,11 +209,12 @@ async function abrirNota(ruta, lineaDestino) {
   const h1 = $('#nota .bloque > h1');
   if (props) (h1 ? h1.closest('.bloque') : $('#nota')).insertAdjacentHTML(h1 ? 'afterend' : 'afterbegin', props);
   $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* se queda el texto */ } });
-  // acciones por bloque: editar y comentar. Con teclado: Tab hasta el bloque y las acciones aparecen.
+  // acciones por bloque: editar y comentar, dos iconos en el margen izquierdo; el bloque no cambia de color (Roberto,
+  // 2026-10-08: el fondo al pasar el ratón distraía). Con teclado: Tab hasta el bloque y aparecen.
   $('#nota').querySelectorAll('.bloque').forEach(b => {
     b.tabIndex = 0;
     const acc = document.createElement('div'); acc.className = 'acciones';
-    acc.innerHTML = `<button type="button" data-accion="editar" aria-label="Editar este bloque">${icono('lapiz')}editar</button><button type="button" data-accion="comentar" aria-label="Comentar este bloque">${icono('comentar')}comentar</button>`;
+    acc.innerHTML = `<button type="button" data-accion="editar" aria-label="Editar este bloque" title="Editar">${icono('lapiz')}</button><button type="button" data-accion="comentar" aria-label="Comentar este bloque" title="Comentar">${icono('comentar')}</button>`;
     b.prepend(acc);
   });
   $('#centro').scrollTop = recarga ? scrollAntes : 0;

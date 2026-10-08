@@ -13,8 +13,9 @@ const { crearCuaderno } = require('./ayuda');
 async function arrancar(opciones = {}) {
   const c = crearCuaderno(opciones);
   const kit = detectar(c.raiz);
-  const lanzado = [];   // lo que la app habría abierto como terminal del sistema (no se abre nada en los tests)
+  const lanzado = [], ejecutado = [];   // lo que la app habría abierto como terminal del sistema (no se abre nada en los tests)
   const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, kit.base), kit, token: 'ab'.repeat(16), lanzar: (cmd, args, o) => lanzado.push({ cmd, args, cwd: o.cwd }),
+    ejecutar: (cmd, args) => { ejecutado.push({ cmd, args }); fs.rmSync(args.at(-1)); },   // la papelera, simulada: el fichero desaparece
     plataforma: 'darwin' });   // fija: el resultado no depende del sistema que corre los tests (cada uno, en terminal.test.js)
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const puerto = server.address().port;
@@ -22,7 +23,7 @@ async function arrancar(opciones = {}) {
   const cookie = `cuaderno=${server.token}`;
   const pedir = (ruta, opts = {}) => fetch(base + ruta, { redirect: 'manual', ...opts, headers: { cookie, ...(opts.headers || {}) } });
   const cerrar = () => new Promise(r => server.close(() => { c.borrar(); r(); }));
-  return { c, server, base, puerto, cookie, pedir, cerrar, lanzado };
+  return { c, server, base, puerto, cookie, pedir, cerrar, lanzado, ejecutado };
 }
 
 test('sin cookie no se entra; con el token de la URL se fija la cookie y se redirige', async () => {
@@ -231,5 +232,24 @@ test('mostrar en carpeta: lanza el gestor de archivos con la ruta del fichero o 
     assert.equal((await post({ ruta: '../../etc' })).status, 400);
     assert.equal((await post({ ruta: 'no-existe.pdf' })).status, 400);
     assert.equal(s.lanzado.length, 2);
+  } finally { await s.cerrar(); }
+});
+
+test('papelera y árbol: un fichero va a la papelera del sistema; una carpeta, uno de fuera o uno que no está, no; el árbol no enseña carpetas con «_»', async () => {
+  const s = await arrancar();
+  const post = body => s.pedir('/api/papelera', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    fs.mkdirSync(path.join(s.c.base, '_meta')); fs.writeFileSync(path.join(s.c.base, '_meta', 'estado.md'), '# Estado\n');
+    s.server.estado.cuaderno.invalidar();
+    const arbol = await (await s.pedir('/api/arbol')).json();
+    assert.ok(arbol.includes('material/reparto-50-30-20.png') && !arbol.includes('_meta/estado.md'));
+    assert.equal((await post({ ruta: 'material/apuntes-de-clase.txt' })).status, 200);
+    assert.ok(!fs.existsSync(path.join(s.c.base, 'material', 'apuntes-de-clase.txt')));
+    assert.ok(s.ejecutado.at(-1).args.at(-1).endsWith('apuntes-de-clase.txt'));
+    assert.ok(!(await (await s.pedir('/api/arbol')).json()).includes('material/apuntes-de-clase.txt'), 'el árbol sigue enseñando el fichero');
+    assert.match((await (await post({ ruta: 'material' })).json()).error, /no carpetas/);
+    assert.equal((await post({ ruta: '../../etc/passwd' })).status, 400);
+    assert.equal((await post({ ruta: 'no-existe.md' })).status, 400);
+    assert.equal(s.ejecutado.length, 1);
   } finally { await s.cerrar(); }
 });

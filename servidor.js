@@ -19,7 +19,7 @@ const { leerTarjetas } = require('./tarjetas');
 const { leerFrontmatter } = require('./markdown');
 
 const COOKIE = 'cuaderno';
-const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' , '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8'};
+const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.avif': 'image/avif', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' , '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8'};
 const PUBLICO = path.join(__dirname, 'public');
 const NODE_MODULES = path.join(__dirname, 'node_modules');
 // Ruta relativa a la raíz del cuaderno tal como se le pasa a una herramienta del kit: siempre con «/», también en
@@ -50,7 +50,7 @@ function estadoGit(raiz) {
   } catch { return null; }
 }
 
-function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), lanzar = null, plataforma = process.platform }) {
+function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), lanzar = null, ejecutar = null, plataforma = process.platform }) {
   const estado = { cuaderno, kit };
   const oyentes = new Set();   // pestañas que escuchan cambios
   const avisarCambio = f => { for (const ws of oyentes) ws.send(JSON.stringify({ fichero: f })); };
@@ -129,7 +129,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
       if (p.startsWith('/assets/')) return servir(res, path.join(NODE_MODULES, path.normalize(p.slice(8))));
       if (p === '/api/info') return json(res, info());
       if (p === '/api/cuadernos') return json(res, cuadernos());
-      if (p === '/api/arbol') return json(res, conCuaderno().listar());
+      if (p === '/api/arbol') return json(res, conCuaderno().arbol());
       if (p === '/api/titulos') return json(res, conCuaderno().titulos());
       if (p === '/api/buscar') return json(res, conCuaderno().buscar(url.searchParams.get('q') || ''));
       if (p === '/api/nota') return json(res, conCuaderno().nota(url.searchParams.get('p')));
@@ -164,6 +164,15 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
           const cu = conCuaderno(), abs = b.ruta ? cu.dentro(String(b.ruta)) : cu.base;
           if (!fs.existsSync(abs)) throw new ErrorPeticion('ese fichero ya no está');
           terminal.mostrar({ abs, carpeta: fs.statSync(abs).isDirectory(), plataforma, ...(lanzar ? { lanzar } : {}) });
+          return json(res, { ok: true });
+        }
+        // Borrar un fichero del cuaderno es mandarlo a la papelera del sistema; una carpeta, no.
+        if (p === '/api/papelera') {
+          const cu = conCuaderno(), abs = cu.dentro(String(b.ruta || ''));
+          if (!fs.existsSync(abs)) throw new ErrorPeticion('ese fichero ya no está');
+          if (fs.lstatSync(abs).isDirectory()) throw new ErrorPeticion('solo se mandan ficheros a la papelera, no carpetas');
+          try { terminal.aPapelera({ abs, plataforma, ...(ejecutar ? { ejecutar } : {}) }); } catch (e) { throw new ErrorPeticion(e.message); }
+          cu.invalidar();
           return json(res, { ok: true });
         }
         // La terminal es la del sistema: se abre en la carpeta del cuaderno, con el profesor lanzado si se pide.

@@ -11,7 +11,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { spawn, execFileSync } = require('node:child_process');
 
 const APPS_MAC = { ghostty: 'Ghostty', 'iTerm.app': 'iTerm', WezTerm: 'WezTerm', Apple_Terminal: 'Terminal' };
 // Terminales de Linux y cómo se les pasa la carpeta y el comando (`-e` o `--` según cada una).
@@ -89,4 +89,27 @@ function mostrar({ abs, carpeta, plataforma = process.platform, lanzar = lanzarS
   lanzar(cmd, args, { cwd: carpeta ? abs : path.dirname(abs), env: process.env });
 }
 
-module.exports = { elegir, comandoDe, abrir, scriptMac, existeEnPath, comandoMostrar, mostrar };
+// Mandar un fichero a la papelera del sistema, de donde se recupera (Roberto, 2026-10-08: sin pedir confirmación). Sin
+// dependencias: la orden de cada sistema. macOS `trash` (la trae el sistema desde macOS 15) o, si no está, el Finder por
+// AppleScript; Windows, la papelera de reciclaje por PowerShell (la ruta va en una variable de entorno, sin comillas que
+// escapar); Linux, `gio trash` o `trash-put`. La ruta siempre como argumento, nunca dentro de una línea de shell.
+function comandoPapelera({ abs, plataforma = process.platform, env = process.env, existe = n => existeEnPath(n, env) }) {
+  if (plataforma === 'darwin') return existe('trash') ? { cmd: 'trash', args: [abs] }
+    : { cmd: 'osascript', args: ['-e', 'on run argv', '-e', 'tell application "Finder" to delete (POSIX file (item 1 of argv) as alias)', '-e', 'end run', abs] };
+  if (plataforma === 'win32') return { cmd: 'powershell', args: ['-NoProfile', '-NonInteractive', '-Command', "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($env:CUADERNO_PAPELERA, 'OnlyErrorDialogs', 'SendToRecycleBin')"], env: { CUADERNO_PAPELERA: abs } };
+  if (existe('gio')) return { cmd: 'gio', args: ['trash', abs] };
+  if (existe('trash-put')) return { cmd: 'trash-put', args: [abs] };
+  return null;
+}
+// Espera a que la orden acabe y comprueba que el fichero ya no está: si sigue ahí, lanza con lo que dijo la orden.
+// `ejecutar` se inyecta en los tests.
+function aPapelera({ abs, plataforma = process.platform, env = process.env, existe, ejecutar = ejecutarEsperando }) {
+  const c = comandoPapelera({ abs, plataforma, env, ...(existe ? { existe } : {}) });
+  if (!c) throw new Error('no he encontrado cómo mandar a la papelera en este sistema (gio o trash-put)');
+  let detalle = '';
+  try { ejecutar(c.cmd, c.args, { env: { ...env, ...(c.env || {}) } }); } catch (e) { detalle = String(e.stderr || e.message || '').trim(); }
+  if (fs.existsSync(abs)) throw new Error(`no se ha podido mandar a la papelera${detalle ? `: ${detalle}` : ''}`);
+}
+function ejecutarEsperando(cmd, args, opciones) { execFileSync(cmd, args, { ...opciones, stdio: ['ignore', 'ignore', 'pipe'], timeout: 15000, windowsHide: true }); }
+
+module.exports = { elegir, comandoDe, abrir, scriptMac, existeEnPath, comandoMostrar, mostrar, comandoPapelera, aPapelera };

@@ -184,3 +184,27 @@ test('enlaces a ficheros: [[x.json]] resuelve y [[x]] sin extensión no; un enla
   assert.doesNotMatch(html, /wiki roto/);
   assert.deepEqual(cu.nota('material/extracto-octubre.pdf'), { ruta: 'material/extracto-octubre.pdf', tipo: 'pdf', esFichero: true });
 }));
+
+test('carpetas que empiezan por «_»: fuera del árbol y del buscador, dentro del índice (se enlazan y se abren)', con({}, (c, cu) => {
+  fs.mkdirSync(path.join(c.base, '_meta')); fs.writeFileSync(path.join(c.base, '_meta', 'estado.md'), '# Estado del curso\n\nTrastienda.\n');
+  fs.mkdirSync(path.join(c.base, 'conceptos', '_borradores')); fs.writeFileSync(path.join(c.base, 'conceptos', '_borradores', 'idea.md'), '# Idea suelta\n\nTrastienda.\n');
+  fs.writeFileSync(path.join(c.base, 'conceptos', '_suelta.md'), '# Nota con guion bajo\n');   // un fichero con «_» no es una carpeta: se ve
+  cu.invalidar();
+  assert.ok(cu.listar().includes('_meta/estado.md') && cu.listar().includes('conceptos/_borradores/idea.md'), 'el índice las pierde');
+  assert.ok(!cu.arbol().some(p => p.includes('_meta/') || p.includes('_borradores/')), 'el árbol enseña una carpeta con «_»');
+  assert.ok(cu.arbol().includes('conceptos/_suelta.md'));
+  const r = cu.buscar('trastienda');
+  assert.deepEqual([r.ficheros, r.lineas], [[], []], 'el buscador entra en una carpeta con «_»');
+  assert.deepEqual(cu.buscar('Estado del curso').ficheros, []);
+  assert.equal(cu.resolverWiki('_meta/estado'), '_meta/estado.md');
+  assert.equal(cu.resolverWiki('idea'), 'conceptos/_borradores/idea.md');
+  assert.match(cu.nota('_meta/estado.md').html, /Estado del curso/);
+}));
+
+test('las imágenes salen en el índice como ficheros', con({}, (c, cu) => {
+  assert.ok(cu.listar().includes('material/reparto-50-30-20.png'));
+  for (const ext of ['jpg', 'jpeg', 'gif', 'webp', 'svg']) fs.writeFileSync(path.join(c.base, 'material', `foto.${ext}`), '');
+  cu.invalidar();
+  assert.deepEqual(cu.listar().filter(p => p.startsWith('material/foto.')), ['material/foto.gif', 'material/foto.jpeg', 'material/foto.jpg', 'material/foto.svg', 'material/foto.webp']);
+  assert.deepEqual(cu.nota('material/reparto-50-30-20.png'), { ruta: 'material/reparto-50-30-20.png', tipo: 'png', esFichero: true });
+}));

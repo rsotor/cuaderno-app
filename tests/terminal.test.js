@@ -64,3 +64,27 @@ test('mostrar en el gestor de archivos: macOS señala con open -R, Windows con e
   assert.deepEqual(terminal.comandoMostrar({ abs: '/c/mat/a.pdf', carpeta: false, plataforma: 'linux' }), { cmd: 'xdg-open', args: ['/c/mat'] });
   assert.deepEqual(terminal.comandoMostrar({ abs: '/c/mat', carpeta: true, plataforma: 'linux' }), { cmd: 'xdg-open', args: ['/c/mat'] });
 });
+
+test('papelera: la orden de cada sistema, con la ruta como argumento', () => {
+  const abs = "/c/la nota de 'Ana'.md", hay = (...n) => x => n.includes(x);
+  assert.deepEqual(terminal.comandoPapelera({ abs, plataforma: 'darwin', existe: hay('trash') }), { cmd: 'trash', args: [abs] });
+  const mac = terminal.comandoPapelera({ abs, plataforma: 'darwin', existe: hay() });
+  assert.equal(mac.cmd, 'osascript'); assert.equal(mac.args.at(-1), abs); assert.match(mac.args.join(' '), /Finder" to delete/);
+  const win = terminal.comandoPapelera({ abs, plataforma: 'win32', existe: hay() });
+  assert.equal(win.cmd, 'powershell'); assert.match(win.args.at(-1), /SendToRecycleBin/); assert.deepEqual(win.env, { CUADERNO_PAPELERA: abs });
+  assert.ok(!win.args.join(' ').includes(abs), 'en Windows la ruta va en una variable de entorno, no en la orden');
+  assert.deepEqual(terminal.comandoPapelera({ abs, plataforma: 'linux', existe: hay('gio', 'trash-put') }), { cmd: 'gio', args: ['trash', abs] });
+  assert.deepEqual(terminal.comandoPapelera({ abs, plataforma: 'linux', existe: hay('trash-put') }), { cmd: 'trash-put', args: [abs] });
+  assert.equal(terminal.comandoPapelera({ abs, plataforma: 'linux', existe: hay() }), null);
+});
+
+test('aPapelera: si el fichero sigue ahí después de la orden, falla con lo que dijo la orden', () => {
+  const dir = fs.mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'papelera-')), abs = require('node:path').join(dir, 'a.md');
+  fs.writeFileSync(abs, '# A\n');
+  assert.throws(() => terminal.aPapelera({ abs, plataforma: 'linux', existe: n => n === 'gio', ejecutar: () => { throw Object.assign(new Error('x'), { stderr: 'gio: sin papelera' }); } }), /no se ha podido mandar a la papelera: gio: sin papelera/);
+  assert.throws(() => terminal.aPapelera({ abs, plataforma: 'linux', existe: () => false, ejecutar: () => {} }), /gio o trash-put/);
+  let visto;
+  terminal.aPapelera({ abs, plataforma: 'win32', env: {}, ejecutar: (cmd, args, o) => { visto = o.env.CUADERNO_PAPELERA; fs.rmSync(abs); } });
+  assert.equal(visto, abs); assert.ok(!fs.existsSync(abs));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
