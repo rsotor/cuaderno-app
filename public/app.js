@@ -335,12 +335,33 @@ async function refrescarContadores() {
   $('#n-tareas').textContent = pend ? `(${pend})` : ''; $('#n-comentarios').textContent = c.length ? `(${c.length})` : '';
 }
 
+// ---------- el cajón: dónde va (derecha o abajo) y cuánto mide, siempre dejando sitio a la nota
+const CAJON_DEFECTO = { derecha: 420, abajo: 320 }, CAJON_MIN = { derecha: 320, abajo: 180 }, NOTA_MIN = { derecha: 480, abajo: 240 }, LATERAL = 280;
+const posicionCajon = () => info.configuracion.panel === 'abajo' ? 'abajo' : 'derecha';
+// El tamaño máximo que cabe en esta ventana para esa posición (lo que queda tras la barra lateral y el mínimo de la nota).
+const maximoCajon = pos => (pos === 'derecha' ? window.innerWidth - LATERAL : window.innerHeight) - NOTA_MIN[pos];
+// El valor guardado está en píxeles y otra ventana u otro monitor pueden dejarlo fuera de rango: se acota al usarlo.
+const acotarCajon = (valor, pos) => Math.round(Math.min(Math.max(Number(valor) || CAJON_DEFECTO[pos], CAJON_MIN[pos]), Math.max(maximoCajon(pos), CAJON_MIN[pos])));
+const tamanoCajon = pos => acotarCajon(pos === 'derecha' ? info.configuracion.panel_ancho : info.configuracion.panel_alto, pos);
+function aplicarCajon() {
+  const app = $('#app'), pos = posicionCajon(), abierto = !$('#cajon').hidden;
+  app.dataset.panel = pos;
+  app.style.setProperty('--panel-ancho', `${tamanoCajon('derecha')}px`);
+  app.style.setProperty('--panel-alto', `${tamanoCajon('abajo')}px`);
+  const capa = window.innerWidth <= 760 || maximoCajon(pos) < CAJON_MIN[pos];
+  app.classList.toggle('cajon-abierto', abierto && !capa);
+  app.classList.toggle('cajon-capa', abierto && capa);
+}
+function abrirCajon() { $('#cajon').hidden = false; aplicarCajon(); }
+function cerrarCajon() { $('#cajon').hidden = true; aplicarCajon(); $('#btn-terminal').focus(); }
+window.addEventListener('resize', aplicarCajon);
+
 // ---------- terminal
 let term, fit, ws, modoTerminal = null;
 const wsUrl = ruta => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${ruta}`;
 function abrirTerminal(modo) {
   if (term && modoTerminal !== modo) { ws && ws.close(); term.dispose(); term = null; }
-  const panel = $('#terminal-panel'); panel.hidden = false;
+  abrirCajon();
   if (!term) {
     modoTerminal = modo;
     term = new Terminal({ fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--mono'), fontSize: 13.5, lineHeight: 1.25, cursorBlink: true, cursorStyle: 'bar', scrollback: 5000, allowProposedApi: true,
@@ -356,7 +377,7 @@ function abrirTerminal(modo) {
   }
   setTimeout(() => { fit && fit.fit(); term && term.focus(); }, 30);
 }
-function alternarTerminal() { const panel = $('#terminal-panel'); if (panel.hidden) abrirTerminal(modoTerminal || 'shell'); else { panel.hidden = true; $('#btn-terminal').focus(); } }
+function alternarTerminal() { if ($('#cajon').hidden) abrirTerminal(modoTerminal || 'shell'); else cerrarCajon(); }
 $('#btn-terminal').onclick = () => alternarTerminal();
 $('#btn-cerrar-terminal').onclick = () => alternarTerminal();
 $('#btn-profesor').onclick = () => abrirTerminal('profesor');
@@ -428,19 +449,19 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { for (const
 function aplicarApariencia(c) { const r = document.documentElement; r.dataset.tema = c.tema; r.dataset.letra = c.letra; r.dataset.fuente = c.fuente; }
 function abrirAjustes() {
   const c = info.configuracion;
-  $('#ajustes-tema').value = c.tema; $('#ajustes-letra').value = c.letra; $('#ajustes-fuente').value = c.fuente; $('#ajustes-comando').value = c.comando_agente || '';
+  $('#ajustes-tema').value = c.tema; $('#ajustes-letra').value = c.letra; $('#ajustes-fuente').value = c.fuente; $('#ajustes-panel').value = posicionCajon(); $('#ajustes-comando').value = c.comando_agente || '';
   foco = document.activeElement; $('#ajustes').hidden = false; $('#ajustes-tema').focus();
 }
 function cerrarAjustes() { $('#ajustes').hidden = true; if (foco) foco.focus(); }
 $('#btn-ajustes').onclick = abrirAjustes;
-function cajon(abrir) { const l = $('#lateral'); l.classList.toggle('abierto', abrir); $('#btn-menu').setAttribute('aria-expanded', String(abrir)); if (!abrir && window.innerWidth <= 760) $('#btn-menu').focus(); }
-$('#btn-menu').onclick = () => cajon(!$('#lateral').classList.contains('abierto'));
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#lateral').classList.contains('abierto')) cajon(false); });
-$('#lateral').addEventListener('click', e => { if (e.target.closest('a') && window.innerWidth <= 760) cajon(false); });
+function menuLateral(abrir) { const l = $('#lateral'); l.classList.toggle('abierto', abrir); $('#btn-menu').setAttribute('aria-expanded', String(abrir)); if (!abrir && window.innerWidth <= 760) $('#btn-menu').focus(); }
+$('#btn-menu').onclick = () => menuLateral(!$('#lateral').classList.contains('abierto'));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#lateral').classList.contains('abierto')) menuLateral(false); });
+$('#lateral').addEventListener('click', e => { if (e.target.closest('a') && window.innerWidth <= 760) menuLateral(false); });
 $('#ajustes-cerrar').onclick = cerrarAjustes;
 $('#ajustes form').addEventListener('change', async () => {
-  info.configuracion = await api('/api/configuracion', { tema: $('#ajustes-tema').value, letra: $('#ajustes-letra').value, fuente: $('#ajustes-fuente').value, comando_agente: $('#ajustes-comando').value });
-  aplicarApariencia(info.configuracion);
+  info.configuracion = await api('/api/configuracion', { tema: $('#ajustes-tema').value, letra: $('#ajustes-letra').value, fuente: $('#ajustes-fuente').value, panel: $('#ajustes-panel').value, comando_agente: $('#ajustes-comando').value });
+  aplicarApariencia(info.configuracion); aplicarCajon();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ajustes').hidden) cerrarAjustes(); });
 
@@ -479,7 +500,7 @@ try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if
 
 (async () => {
   info = await api('/api/info');
-  aplicarApariencia(info.configuracion);
+  aplicarApariencia(info.configuracion); aplicarCajon();
   await cargarCuaderno();
   enrutar();
 })();

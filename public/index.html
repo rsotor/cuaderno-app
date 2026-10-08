@@ -50,8 +50,8 @@
     <article id="nota" tabindex="-1"></article>
     <section id="panel" hidden></section>
   </main>
-  <section id="terminal-panel" aria-label="Terminal" hidden>
-    <div class="terminal-barra"><span id="terminal-titulo">Terminal</span><button type="button" id="btn-cerrar-terminal" aria-label="Cerrar la terminal">✕</button></div>
+  <section id="cajon" aria-label="Panel" hidden>
+    <div class="cajon-barra"><span id="terminal-titulo">Terminal</span><button type="button" id="btn-cerrar-terminal" aria-label="Cerrar el panel">✕</button></div>
     <div id="terminal"></div>
   </section>
 </div>
@@ -93,6 +93,7 @@
       <label>Tema <select id="ajustes-tema"><option value="auto">Como el sistema</option><option value="claro">Claro</option><option value="oscuro">Oscuro</option></select></label>
       <label>Letra <select id="ajustes-letra"><option value="pequeña">Pequeña</option><option value="media">Media</option><option value="grande">Grande</option></select></label>
       <label>Fuente de lectura <select id="ajustes-fuente"><option value="sistema">Del sistema</option><option value="serif">Con serifa</option></select></label>
+      <label>Panel de la terminal <select id="ajustes-panel"><option value="derecha">A la derecha</option><option value="abajo">Abajo</option></select></label>
       <label>Comando del profesor en carpetas sin kit <input id="ajustes-comando" placeholder="claude" autocomplete="off"></label>
     </form>
     <div class="pie"><button type="button" id="ajustes-cerrar">Cerrar</button></div>
