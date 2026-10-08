@@ -118,7 +118,7 @@ test('con CRLF: se lee igual y toda escritura conserva CRLF', con({ crlf: true }
   assert.equal(c.leer('tareas.md'), NOTAS['tareas.md'].replace(/\n/g, '\r\n').replace('- [ ] Comprar', '- [x] Comprar') + '- [ ] Otra\r\n');
 }));
 
-test('nombre: cuaderno.json, luego nombre_curso del kit, luego la carpeta', con({ kit: 'kit' }, (c, cu) => {
+test('nombre: cuaderno.json, luego nombre_curso del kit, luego la carpeta', con({ kit: true }, (c, cu) => {
   assert.equal(cu.nombre(), path.basename(c.raiz));
   fs.writeFileSync(path.join(c.raiz, 'config', 'ajustes.json'), JSON.stringify({ nombre_curso: 'Finanzas' }));
   assert.equal(new Cuaderno(c.raiz, c.base).nombre(), 'Finanzas');
@@ -136,7 +136,7 @@ test('títulos: el # de cada nota, sin wikilinks; las tareas llevan el Markdown 
 
 test('recorrido: cuenta notas, enlaces rotos y fallos', con({}, (c, cu) => {
   const r = cu.recorrido();
-  assert.equal(r.notas, 8);   // 7 notas del curso de ejemplo más material.md (fase 10), cuyos enlaces a ficheros resuelven todos
+  assert.equal(r.notas, 16);   // las 8 del curso demo más las 8 notas nuevas de cuaderno-ejemplo (render/, estructura/); sus enlaces resuelven todos: el único roto sigue siendo el de interes.md
   assert.deepEqual(r.rotos, [{ ruta: 'conceptos/interes.md', destino: 'no-existe' }]);
   assert.deepEqual(r.fallos, []);
 }));

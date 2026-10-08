@@ -39,7 +39,7 @@ function ptyFalso() {
 
 // Arranca servidor + navegador y abre la app con el token de la URL (fija la cookie y redirige a /).
 // `pty` (ptyFalso(), normalmente) da terminal a los recorridos que la necesitan; sin él, la pestaña dice que no hay.
-async function arrancar({ pty = null, ...opciones } = { kit: 'kit' }) {
+async function arrancar({ pty = null, ...opciones } = { kit: true }) {
   const c = crearCuaderno(opciones);
   const kit = detectar(c.raiz);
   const lanzado = [], ejecutado = [];   // lo que la app habría lanzado en el sistema (el gestor de archivos); en los tests no se abre nada

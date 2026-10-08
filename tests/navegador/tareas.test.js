@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const { arrancar, hasta, visible, oculto, conTexto, ficheroCumple, hashCumple } = require('./ayuda');
 
 let e;
-test.before(async () => { e = await arrancar({ kit: 'kit' }); });
+test.before(async () => { e = await arrancar({ kit: true }); });
 test.after(async () => { if (e) await e.cerrar(); });
 
 const item = texto => e.pagina.locator('#panel .item', { hasText: texto });

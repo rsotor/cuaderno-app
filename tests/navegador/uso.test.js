@@ -12,7 +12,7 @@ const { arrancar, hasta, visible, oculto, conTexto, hashCumple } = require('./ay
 let e;
 const git = (...args) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: e.c.raiz, stdio: 'pipe' });
 test.before(async () => {
-  e = await arrancar({ kit: 'carpeta' });
+  e = await arrancar({ kit: false });
   // Una nota larga de verdad y un repo debajo, como cualquier cuaderno real: cada `git status` del servidor crea .git/index.lock.
   fs.writeFileSync(path.join(e.c.base, 'larga.md'), `# Larga\n\n${Array.from({ length: 120 }, (_, i) => `Párrafo ${i + 1} de una nota que no cabe en la pantalla.\n`).join('\n')}`);
   git('init', '-q'); git('add', '-A'); git('commit', '-q', '-m', 'base');
@@ -101,7 +101,7 @@ test('buscador sin resultados: no crea nada con Enter (buscar, «+» tarea y not
 
 test('otra pestaña abre otro cuaderno: esta se entera, lo dice y pasa al nuevo (un servidor, un cuaderno)', async () => {
   const { crearCuaderno } = require('../ayuda');
-  const otro = crearCuaderno({ kit: 'carpeta' });
+  const otro = crearCuaderno({ kit: false });
   try {
     await e.ir('#/n/larga.md');
     await conTexto(e.pagina.locator('#nota h1'), /^Larga$/, 'nota larga', 'el título');

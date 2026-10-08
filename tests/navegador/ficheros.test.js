@@ -14,7 +14,7 @@ const abrirDelArbol = async nombre => {
   if (!(await carpeta.evaluate(d => d.open))) await carpeta.locator('summary .nombre').click();
   await (await visible(hoja(nombre), 'árbol', `«${nombre}» en la carpeta material`)).click();
 };
-test.before(async () => { e = await arrancar({ kit: 'carpeta' }); });
+test.before(async () => { e = await arrancar({ kit: false }); });
 test.after(async () => { if (e) await e.cerrar(); });
 
 test('HTML: la página corre con su script, ocupa el ancho y casi todo el alto, y el árbol la titula con su <title>', async () => {

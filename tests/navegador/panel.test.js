@@ -17,7 +17,7 @@ const ponerPosicion = async pos => {
   await e.pagina.click('#ajustes-cerrar');
 };
 
-test.before(async () => { pty = ptyFalso(); e = await arrancar({ kit: 'kit', pty }); });
+test.before(async () => { pty = ptyFalso(); e = await arrancar({ kit: true, pty }); });
 test.after(async () => { if (e) await e.cerrar(); });
 
 test('cerrado no reserva sitio; abierto a la derecha mide 420 px y se los quita a la columna de la nota', async () => {
@@ -162,7 +162,7 @@ test('cambiar de cuaderno cierra las terminales: la pty muere y no queda ninguna
   await e.ir('#/'); await recargar(); const base = pty.procesos.length;
   await abrirPanel();
   await hasta(() => pty.procesos.length === base + 1, 'terminal', 'abrir el panel no abre una pty');
-  const otro = crearCuaderno({ kit: 'carpeta' });
+  const otro = crearCuaderno({ kit: false });
   try {
     await e.ir('#/cuadernos');
     await e.pagina.fill('#ruta-carpeta', otro.raiz); await e.pagina.press('#ruta-carpeta', 'Enter');
