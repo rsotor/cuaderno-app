@@ -1,6 +1,15 @@
 # El chat en la app: diseño
 
-**2026-10-08 · estado: borrador en discusión.** Sale de las notas de Roberto en `chat-alcances.md` y de dos decisiones
+**2026-10-08 · estado: diseño hecho, pendiente de ronda completa cuando se abra la fase del chat.** Decisión de
+Roberto al final de la sesión del 2026-10-08: **el chat propio dentro de la app sigue siendo la meta** («si podemos
+meter el chat lo tenemos todo»), pero no se olvida y se hace más adelante; ahora va el panel (fase 9, plan en
+`plan-panel.md`). Visto también hoy, con fuentes en `chat-interfaces-existentes.md`: las apps de escritorio oficiales
+cubren el caso «dos ventanas» pero no se embeben; **Cowork no es el profesor** (ejecuta en servidores de Anthropic y no
+documenta leer AGENTS.md ni las skills del kit); la pestaña Code sí comparte todo con el CLI; **Remote Control**
+(`claude --remote-control`) enseña la sesión local de la terminal como chat en claude.ai y en el móvil, con imágenes y
+permisos, sin riesgo de política y sin código nuestro: complemento barato para Claude, anotado para la fase 9 o 12.
+Sobre la consulta a Anthropic antes de publicar: Roberto no la ve necesaria; queda como riesgo asumido por él, y el
+repo sigue privado mientras tanto. Sale de las notas de Roberto en `chat-alcances.md` y de dos decisiones
 suyas de hoy: el chat es una **sesión propia** por cuaderno (ya no hace falta que sea la misma que la terminal) y
 el **proveedor es uno para toda la app** (ajuste global), con **Claude Code y Codex desde el día 1**. La
 investigación de los puentes está en `chat-puentes.md`; el plan por tareas saldrá de este documento cuando se apruebe.

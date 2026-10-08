@@ -1,6 +1,6 @@
 # El chat con el profesor: vías, alcances y tiempos
 
-**Fase 8 del plan vivo · 2026-10-08 · estado: para decidir.** Este documento compara las formas de que el alumno
+**Fase 8 del plan vivo · 2026-10-08 · estado: superado el mismo día.** Las notas de Roberto de abajo cambiaron el encargo (cajón propio, Claude y Codex, imágenes, página abierta); la recomendación vigente está en `chat-diseno.md` con la investigación de `chat-puentes.md` y `chat-interfaces-existentes.md`. Se conserva por las vías descartadas y sus fuentes. Este documento compara las formas de que el alumno
 hable con el profesor desde la app, con lo que da y lo que no da cada una, sus riesgos y una estimación de
 esfuerzo. Termina con una recomendación. La decisión es de Roberto; hasta entonces no se toca la terminal (fase 9).
 
