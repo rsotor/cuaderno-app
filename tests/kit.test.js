@@ -14,14 +14,14 @@ test('una carpeta de notas cualquiera: sin kit, las notas en la raíz', () => {
 });
 
 test('estudio/ y config/ sin .kit/: salida del kit sin motor', () => {
-  const c = crearCuaderno({ kit: 'salida-sin-motor' });
+  const c = crearCuaderno({ kit: 'sin-motor' });
   const k = detectar(c.raiz);
   assert.equal(k.tipo, 'salida-sin-motor'); assert.equal(k.base, path.join(c.raiz, 'estudio')); assert.equal(k.comando, null);
   c.borrar();
 });
 
 test('con .kit/motor.json: kit, y el comando del profesor sale del adaptador', () => {
-  const c = crearCuaderno({ kit: 'kit' });
+  const c = crearCuaderno({ kit: true });
   let k = detectar(c.raiz);
   assert.equal(k.tipo, 'kit'); assert.equal(k.comando, 'claude'); assert.equal(k.motor.repo, 'rsotor/profesor-kit');
   // El adaptador del curso manda si es del LLM elegido

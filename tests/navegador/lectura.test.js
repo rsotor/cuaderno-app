@@ -6,7 +6,7 @@ const path = require('node:path');
 const { arrancar, hasta, visible, oculto, conTexto, ficheroCumple, hashCumple } = require('./ayuda');
 
 let e;
-test.before(async () => { e = await arrancar({ kit: 'kit' }); });
+test.before(async () => { e = await arrancar({ kit: true }); });
 test.after(async () => { if (e) await e.cerrar(); });
 
 test('portada: se ve el título de inicio.md, el nombre del cuaderno y el árbol con títulos', async () => {

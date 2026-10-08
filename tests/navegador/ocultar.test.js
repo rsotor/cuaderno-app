@@ -7,7 +7,7 @@ const path = require('node:path');
 const { arrancar, hasta, visible, oculto } = require('./ayuda');
 
 let e;
-test.before(async () => { e = await arrancar({ kit: 'carpeta' }); });
+test.before(async () => { e = await arrancar({ kit: false }); });
 test.after(async () => { if (e) await e.cerrar(); });
 
 test('ocultar una carpeta desde el árbol: desaparece, sigue oculta al recargar, el disco no cambia y Ajustes la devuelve', async () => {

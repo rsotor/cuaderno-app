@@ -56,7 +56,7 @@ test('Host y Origin ajenos se rechazan; el cuerpo tiene que ser JSON', async () 
 });
 
 test('la API: info, árbol, nota, escrituras y el 409 cuando la nota cambió', async () => {
-  const s = await arrancar({ kit: 'kit' });
+  const s = await arrancar({ kit: true });
   try {
     const info = await (await s.pedir('/api/info')).json();
     assert.deepEqual(info.cuaderno, { nombre: path.basename(s.c.raiz), ruta: s.c.raiz, base: s.c.base, sep: path.sep, kit: 'kit', profesor: true, portada: 'inicio.md', git: null });
@@ -107,7 +107,7 @@ test('WebSocket: sin cookie o con Origin ajeno no hay terminal ni recarga', asyn
 });
 
 test('sin cuaderno abierto: la API lo dice; abrir una carpeta cambia el cuaderno y lo apunta en recientes', async () => {
-  const otro = crearCuaderno({ kit: 'salida-sin-motor' });
+  const otro = crearCuaderno({ kit: 'sin-motor' });
   fs.writeFileSync(path.join(otro.raiz, 'cuaderno.json'), JSON.stringify({ nombre: 'Mi otro curso', portada: 'tareas.md' }));
   const server = crearServidor({ token: 'cd'.repeat(16) });
   await new Promise(r => server.listen(0, '127.0.0.1', r));
@@ -137,7 +137,7 @@ test('sin cuaderno abierto: la API lo dice; abrir una carpeta cambia el cuaderno
 });
 
 test('examen: formulario, validar sin motor guarda las marcas; con kit lanza examen.js --corregir', async () => {
-  const s = await arrancar({ kit: 'salida-sin-motor' });
+  const s = await arrancar({ kit: 'sin-motor' });
   try {
     const post = (ruta, body) => s.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     const ex = await (await s.pedir('/api/examen?p=examenes/01-examen.md')).json();
@@ -150,7 +150,7 @@ test('examen: formulario, validar sin motor guarda las marcas; con kit lanza exa
     assert.match(texto, /^---\ntipo: examen\n/); assert.match(texto, /- \[x\] b\) Baja/); assert.match(texto, /- \[x\] b\) Unidad de cuenta\n- \[ \] c\)/);
     assert.equal((await (await s.pedir('/api/examen?p=examenes/01-examen.md')).json()).preguntas[0].opciones[1].marcada, true);
   } finally { await s.cerrar(); }
-  const k = await arrancar({ kit: 'kit' });
+  const k = await arrancar({ kit: true });
   try {
     const falsa = `const a = process.argv.slice(2); if (a[0] === '--revision') { process.stdout.write('Revisión resuelta'); process.exit(0); } process.stdout.write('examen.js ' + JSON.stringify(a)); process.exit(0);`;
     fs.mkdirSync(path.join(k.c.raiz, '.kit', 'herramientas'), { recursive: true });

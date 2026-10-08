@@ -18,21 +18,24 @@ function leerCarpeta(base, dir = '') {
   }
   return out;
 }
-const NOTAS = leerCarpeta(path.join(EJEMPLOS, 'curso-demo'));
+const NOTAS = leerCarpeta(path.join(EJEMPLOS, 'cuaderno-ejemplo'));
 // Solo para probar el ignorado (.gitignore / .obsidianignore / ocultos): no son notas del curso y git no las dejaría entrar.
 const RELLENO_IGNORADO = { 'node_modules/paquete/README.md': '# No soy una nota\n', 'oculta/.secreto.md': '# Oculta\n' };
 
-// opciones: { crlf, kit: 'kit' | 'salida-sin-motor' | 'carpeta', ignorar: texto de .gitignore, obsidianignore }
-function crearCuaderno({ crlf = false, kit = 'carpeta', ignorar = '', obsidianignore = '' } = {}) {
+// El cuaderno de ejemplo montado de una de dos formas (AGENTS.md, «Cuadernos de prueba»): sin kit (la base, notas en la
+// raíz) o con kit (notas en estudio/, más .kit/ con su motor y adaptador y config/). 'sin-motor' es el curso del kit sin
+// motor: estudio/ y config/ sin .kit/motor.json (un caso del modo con kit, con un solo test).
+// opciones: { kit: false | true | 'sin-motor', crlf, ignorar: texto de .gitignore, obsidianignore }
+function crearCuaderno({ crlf = false, kit = false, ignorar = '', obsidianignore = '' } = {}) {
   const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'cuaderno-test-'));
-  const base = kit === 'carpeta' ? raiz : path.join(raiz, 'estudio');
+  const base = kit ? path.join(raiz, 'estudio') : raiz;
   for (const [rel, texto] of Object.entries({ ...NOTAS, ...RELLENO_IGNORADO })) {
     const abs = path.join(base, rel);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, crlf && typeof texto === 'string' ? texto.replace(/\n/g, '\r\n') : texto);
   }
-  if (kit !== 'carpeta') fs.mkdirSync(path.join(raiz, 'config'), { recursive: true });
-  if (kit === 'kit') {
+  if (kit) fs.mkdirSync(path.join(raiz, 'config'), { recursive: true });
+  if (kit === true) {
     fs.mkdirSync(path.join(raiz, '.kit', 'adaptadores'), { recursive: true });
     fs.writeFileSync(path.join(raiz, '.kit', 'motor.json'), JSON.stringify({ repo: 'rsotor/profesor-kit', version_datos: 9 }));
     fs.writeFileSync(path.join(raiz, '.kit', 'adaptadores', 'claude-code.json'), JSON.stringify({ id: 'claude-code', comando: 'claude' }));

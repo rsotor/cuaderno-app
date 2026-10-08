@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const { arrancar, visible, oculto, conTexto, ficheroCumple } = require('./ayuda');
 
 let e;
-test.before(async () => { e = await arrancar({ kit: 'kit' }); });
+test.before(async () => { e = await arrancar({ kit: true }); });
 test.after(async () => { if (e) await e.cerrar(); });
 
 const RUTA = 'flashcards/01-tarjetas.md';
