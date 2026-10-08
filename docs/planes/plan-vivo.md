@@ -4,9 +4,31 @@
 
 ## 0. Estado
 
-**Última actualización:** 2026-10-08.
+**Última actualización:** 2026-10-08, cierre de sesión.
 
 **Ahora**
+- **Fases 1 a 7 cerradas y validadas en un primer uso real (2026-10-08).** Roberto usó la app sobre este repo y sobre el vault demo; salieron y se arreglaron el mismo día: bucle de recarga por `.git`, scroll, imágenes relativas, árbol sin jerarquía, buscador mezclado, nota nueva, columna estrecha, favicon, cambio de cuaderno entre pestañas, listas ineditables (bug de siempre) y terminal sin pty (permiso del ayudante). Detalle en el diario de abajo. 52 tests de Node, 20 recorridos de navegador, CI en verde.
+- **Decisiones de hoy, en §6:** cuadernos de ejemplo en `ejemplos/` como único mock; ronda de crítica de diseño por tanda antes del commit (regla en AGENTS.md; primera ronda hecha, 5 de 5 aplicadas); `CUADERNO_TOKEN` para desarrollar.
+- **Notas de Roberto para el chat, guardadas** en `docs/planes/chat-alcances.md` (2 `@@` en §0 y 3 comentarios): cajón dentro de la app, multiproveedor con ajustes de conexión, sesión por cuaderno, formato, imágenes, permisos y página actual. Cambian la recomendación del análisis; no se ha rehecho a propósito: se hace de golpe en la sesión limpia.
+
+**Después:** **sesión limpia para el plan del chat**, con el skill `plan` (vía arquitectónica): (1) rehacer la recomendación de `chat-alcances.md` con las notas de Roberto; (2) el **panel de terminal y chat como un mismo espacio**: dónde va (abajo o a la derecha, a elegir), tamaño ajustable por el alumno (hoy la terminal se queda con poco sitio), y la terminal cuidada de la fase 9 dentro. Después, fase 10 (inbox).
+
+**Inbox**
+- Buscador / acciones rápidas, revisarlo como un bloque (Roberto, 2026-10-08): en la misma caja conviven buscar, «+» tarea y Escape, al lado el botón Nueva nota, y los accesos de arriba se esconden al buscar. Qué comandos hay, cómo se descubren, qué pasa al terminar cada uno. Encaja con una paleta de comandos (Ctrl K) cuando haya varios: Profesor, Guardar, Traer, cambiar de cuaderno.
+- Servidor: Guardar y Traer en asíncrono (hoy `spawnSync` para el servidor mientras git trabaja) y que su resultado no se abra encima del editor; y decidir si un servidor puede tener varios cuadernos a la vez (hoy uno, la pantalla de Cuadernos lo cambia para todas las pestañas). Usar este repo como cuaderno hace que «Guardar» haga commits en el repo de la app: para trastear, copia de `ejemplos/`.
+- Barra lateral plegable también en escritorio (hoy solo a 760 px o menos): pendiente de que Roberto diga si le estorba la barra entera.
+- Comentarios de la app vs. notas `@@`: misma función, formato distinto (callout `> [!comment] Alumno (fecha)`). Propuesta: un solo formato, el callout, y que el profesor del kit lo recoja; decisión del kit (issue en profesor-kit cuando Roberto confirme). Hoy las líneas `@@` se pintan como texto normal.
+- Visor de PDF y de ficheros de texto (JSON, txt): hoy el índice solo lista `.md` y `.html`; ejemplos en `ejemplos/vault-demo` (`attachments/condiciones-reserva.pdf`, `mapa-estaciones/stations-sample.json`), enlazados desde la reunión del 2026-10-06. PDF en iframe, texto preformateado, solo lectura. Fase 10.
+- Vault de trabajo (segundo caso): 9 enlaces `[[reserva-anticipada]]` / `[[mapa-estaciones]]` salen rotos porque apuntan a una carpeta, no a una nota (Obsidian tampoco los resuelve): decidir si una carpeta con `brief.md` cuenta como destino. Un cuaderno dentro de un repo mayor toma el repo padre como suyo: decidir si se admite o se avisa. Sin `inicio.md` se ve un aviso, no el árbol; sin kit, el panel Tareas se limita a `tareas.md`.
+- Para las fases 9 a 11 y el kit: el «[terminal cerrada]» en headless era casi seguro el permiso del ayudante de node-pty (confirmar con un recorrido en la fase 9); en Windows quedan los ficheros CRLF en un Windows real (fase 11; una web no puede lanzar `npm start`, por eso la app arranca como servicio del sistema); el cuaderno de pruebas con kit se monta en temporal copiando `.kit/`, AGENTS.md, CLAUDE.md, .gitignore y .claude/settings.json más `estudio/` y `config/` del curso de ejemplo, `git init`, `preparar-curso.js --subir no`, `reparar.js` y un commit (`CUADERNO_KIT_PRUEBA=<carpeta>`); para profesor-kit: `pendientes.md` trae textos cortados («solo trae el títu») y `tareas.md` lo crea la app (¿del kit?).
+
+**Contexto:** las decisiones y el orden de fases están abajo; los detalles del kit (formatos, herramientas, reglas) viven en el repo del kit. Para medir diseño otra vez: `pruebas/sonda-navegador.js` lanza las sondas de `ux-ui-audit` y captura con el viewport exacto (solo macOS; los recorridos de navegador de `tests/navegador/` corren en cualquier sistema); el curso de prueba con kit se monta como dice el Inbox. El repo está en GitHub (`rsotor/cuaderno-app`, privado). Arrancar para trastear: `CUADERNO_TOKEN=<fijo> node server.js <cuaderno> [puerto]` sobre una copia de `ejemplos/`.
+
+**Rondas de abogado del diablo:** 2026-10-07, sobre el punto 0 y el prototipo, 7 objeciones → reorden de fases (§7), tabla caso → kit (§4b) y decisiones nuevas (§6) · 2026-10-07, sobre la crítica de diseño, 7 objeciones → todas atendidas (ver el final de `docs/diseno/critica-2026-10-07.md`).
+
+**Rondas de crítica de diseño:** 2026-10-08, tanda del primer uso (árbol, buscador, páginas, vault), 5 objeciones → las 5 aplicadas (`docs/diseno/critica-2026-10-08.md`).
+
+**Diario del 2026-10-08 (lo que estaba en «Ahora»; detalle de cada cambio y por qué):**
 - Fase 6 cerrada el 2026-10-07 tras la ronda de abogado del diablo (7 objeciones atendidas): crítica con cifras en `docs/diseno/critica-2026-10-07.md` (18 hallazgos), cambios aplicados y medidos otra vez: 0 fallos de contraste en 15 pantallas y dos temas, foco 9,6:1 / 6,0:1, sin desbordamiento a 390 px. Decisiones de Roberto: fuente del sistema, Destapar discreto, botón «Corregir». Capturas antes y después en `docs/capturas/`. 46 tests.
 - Validación de Roberto (2026-10-08) sobre tres cosas: no hay tests de navegador (solo la sonda de macOS); no hay comando rápido para crear tareas (solo Ctrl K para buscar); las tareas no se pueden relacionar con notas ni filtrar. Decisiones en §6 (Tests de navegador, Tareas rápidas) y dos fases nuevas en §7.
 - **Fase 7 cerrada el 2026-10-08.** El buscador es el comando: `+` y Enter añaden la tarea a `tareas.md`, con `[[la nota]]` al final si hay una abierta. `tareas()` devuelve `enlaces` y `etiquetas` de cada línea y el panel Tareas filtra por nota, etiqueta y estado con los filtros en el hash (`#/tareas?nota=…&etiqueta=…&estado=…`), sin escribir nada nuevo en el cuaderno. La recarga en vivo ya no se lleva el foco ni el borrador del panel. 47 tests de Node (2 saltados).
@@ -26,9 +48,7 @@
 - **Buscador, solo busca (2026-10-08, Roberto: «estamos mezclando las cosas»):** el Enter sin resultados ya no crea una nota; con «+» delante es tarea y la nota nueva tiene su botón. El aviso de «nada con…» lo recuerda. Lo que Roberto vio como «todos los espacios» en la carpeta de Nueva nota es que este repo, usado como cuaderno, contiene `ejemplos/` con los dos cuadernos de muestra; con un cuaderno de verdad solo salen sus carpetas.
 - **Notas de Roberto para la fase del chat (2026-10-08), guardadas en `docs/planes/chat-alcances.md` (2 `@@` en §0 y 3 comentarios):** el chat va dentro de la app, como cajón a la derecha; con formato sencillo (listas, enlaces), imágenes, permiso para crear carpetas y ficheros, y sabiendo qué página se está viendo; multiproveedor (Claude, Codex, Gemini…) con unos ajustes para iniciar sesión y guardar la conexión; el asistente lee la configuración del proyecto al que está conectado el cuaderno y cada cuaderno puede ser una sesión distinta. Esto cambia la recomendación del análisis (`fakechat` embebido no cubre imágenes, página actual ni otros proveedores): se rehace cuando se abra la fase del chat, todo de golpe, con el skill `plan` (es arquitectura). Decisión de Roberto: se guardan y se lanzan juntas.
 
-**Después:** fase 9 (terminal cuidada, con la vía del chat ya decidida), fase 10 (inbox).
-
-**Inbox**
+**Inbox anterior, por si falta algo al regrupar (se borra en el próximo cierre):**
 - Revisar entero el bloque buscador / acciones rápidas (Roberto, 2026-10-08): hoy en la misma caja conviven buscar, «+» tarea y la salida con Escape, y al lado el botón Nueva nota; los accesos de arriba se esconden al buscar. Tras tres retoques en un día, pensarlo como un bloque: qué comandos hay, cómo se descubren, qué pasa al terminar cada uno (hoy, al añadir la tarea no volvían los accesos: arreglado). Encaja con la paleta de comandos del Inbox.
 - Guardar y Traer: pasar a asíncrono (hoy `spawnSync` para el servidor mientras git trabaja) y que su resultado no se abra encima del editor si el alumno ya está editando (vídeo de Roberto, 2026-10-08). Y usar este mismo repo como cuaderno hace que «Guardar» haga commits en el repo de la app (`f1d97d8`): para trastear, mejor un cuaderno de `ejemplos/` copiado.
 - Varios cuadernos a la vez en un servidor (uno por pestaña): hoy el servidor tiene un solo cuaderno abierto y la pantalla de Cuadernos lo cambia para todas las pestañas. Decidir si hace falta.
@@ -43,12 +63,6 @@
 - Fase 11: el CI ya compila `node-pty` y pasa los recorridos en Windows con Node 24; quedan los ficheros CRLF en un Windows de verdad. El arranque sin terminal ya está en la fase (§7). Lo que no se puede hacer, y por qué: una página web no puede lanzar `npm start` en el ordenador; el navegador lo impide por diseño, y es la misma barrera que protege el cuaderno de otras webs. Por eso la app se arranca como servicio del sistema y el icono solo abre el navegador.
 - Visto con la bóveda sin kit (2026-10-07): sin `inicio.md` la app enseña un error en vez del árbol; el panel Tareas toma como tarea cualquier casilla de cualquier nota (miles en una bóveda grande): sin kit, Tareas debe limitarse a lo que configure el usuario o no mostrarse. Con `node_modules` fuera, las respuestas tardan menos de 0,2 s.
 - Cuaderno de pruebas con kit: se monta en una carpeta temporal copiando el motor del kit (`.kit/`, AGENTS.md, CLAUDE.md, .gitignore, .claude/settings.json) más `estudio/` y `config/` del curso de ejemplo, `git init`, `preparar-curso.js --subir no`, `reparar.js` y un commit base. El test `guardar y deshacer con el kit de verdad` corre con `CUADERNO_KIT_PRUEBA=<esa carpeta>`.
-
-**Contexto:** las decisiones y el orden de fases están abajo; los detalles del kit (formatos, herramientas, reglas) viven en el repo del kit. Para medir diseño otra vez: `pruebas/sonda-navegador.js` lanza las sondas de `ux-ui-audit` y captura con el viewport exacto (solo macOS; los recorridos de navegador de `tests/navegador/` corren en cualquier sistema); el curso de prueba con kit se monta como dice el Inbox. El repo está en GitHub (`rsotor/cuaderno-app`, privado).
-
-**Rondas de abogado del diablo:** 2026-10-07, sobre el punto 0 y el prototipo, 7 objeciones → reorden de fases (§7), tabla caso → kit (§4b) y decisiones nuevas (§6) · 2026-10-07, sobre la crítica de diseño, 7 objeciones → todas atendidas (ver el final de `docs/diseno/critica-2026-10-07.md`).
-
-**Rondas de crítica de diseño:** 2026-10-08, tanda del primer uso (árbol, buscador, páginas, vault), 5 objeciones → las 5 aplicadas (`docs/diseno/critica-2026-10-08.md`).
 
 ## 1. Qué es
 
