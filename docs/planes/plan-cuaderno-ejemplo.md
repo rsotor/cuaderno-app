@@ -1,6 +1,6 @@
 # Plan · un solo cuaderno de ejemplo, la app sin kit como base y el kit como capa
 
-**2026-10-09 · estado: para aprobar.** Decisiones de Roberto en la conversación del 2026-10-09 (literal o casi):
+**2026-10-09 · estado: hecho** (T1 a T6 en los PR #8 a #13; además T7, a petición de Roberto: suelo del 85 % de cobertura y un test por ruta de la API, PR #14). Decisiones de Roberto en la conversación del 2026-10-09 (literal o casi):
 «podemos unificarlo en uno grande que cubra todos los casos de uso y que nos sirva para todos los test»; «cualquier
 nuevo desarrollo debe meter algo nuevo para poder validarlo así en la CI»; «yo no ordenaría el contenido por uso:
 sesiones, conceptos e iniciativas son lo mismo»; «tampoco hace falta tener una nota súper grande»; «el examen es una
