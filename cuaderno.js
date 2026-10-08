@@ -17,10 +17,13 @@ const RE_CASILLA = /^(\s*- \[)([ xX])(\] .*)$/;
 const RE_ETIQUETA = /(^|[\s(])#(\p{L}[\p{L}\p{N}_\-/]*)/gu;
 const RE_WIKI = /\[\[([^\]|]*?)(?:\\?\|[^\]]*)?\]\]/g;
 const sinCodigo = texto => texto.replace(/`[^`]*`/g, m => ' '.repeat(m.length));
-// Lo que lista el índice: las notas (Markdown y páginas HTML) y los ficheros que la app sabe enseñar (PDF, datos y texto).
-// Los ficheros salen en el árbol y en el buscador por su nombre; la búsqueda en el texto, los backlinks y las tareas
-// siguen siendo solo de notas. Un fichero solo se enlaza con su extensión: [[datos.json]].
-const RE_LISTADO = /\.(md|html|pdf|json|txt|csv)$/i;
+// Lo que lista el índice: las notas (Markdown y páginas HTML) y los ficheros que la app sabe enseñar (PDF, imágenes,
+// datos y texto). Los ficheros salen en el árbol y en el buscador por su nombre; la búsqueda en el texto, los backlinks
+// y las tareas siguen siendo solo de notas. Un fichero solo se enlaza con su extensión: [[datos.json]].
+const RE_LISTADO = /\.(md|html|pdf|json|txt|csv|png|jpe?g|gif|webp|avif|svg)$/i;
+// Una carpeta que empieza por «_» (_meta, _archive, _plantillas) es de trastienda: no sale en el árbol ni en el
+// buscador, pero sigue en el índice, así que sus notas se pueden enlazar y abrir (Roberto, 2026-10-08).
+const enCarpetaOculta = p => p.split('/').slice(0, -1).some(s => s.startsWith('_'));
 const esNota = p => /\.(md|html)$/i.test(p);
 const tipoDe = p => (p.match(/\.([a-z]+)$/i) || [, ''])[1].toLowerCase();
 function etiquetasDe(texto) { const e = []; for (const m of sinCodigo(texto).matchAll(RE_ETIQUETA)) if (!e.includes(m[2])) e.push(m[2]); return e; }
@@ -57,6 +60,8 @@ class Cuaderno {
     return this.indice;
   }
   invalidar() { this.indice = null; this.cacheTitulos = null; }
+  // Lo que enseña el árbol: el índice sin las carpetas de trastienda.
+  arbol() { return this.listar().filter(p => !enCarpetaOculta(p)); }
   // El título (# …) de cada nota, para que la app enseñe títulos y no nombres de fichero.
   titulos() {
     if (this.cacheTitulos) return this.cacheTitulos;
@@ -138,7 +143,7 @@ class Cuaderno {
   buscar(q, tope = 60) {
     const nq = quitarAcentos(String(q || '').trim());
     if (!nq) return { ficheros: [], lineas: [] };
-    const todos = this.listar();
+    const todos = this.arbol();
     const titulos = this.titulos();
     const ficheros = todos.filter(p => quitarAcentos(p).includes(nq) || (titulos[p] && quitarAcentos(titulos[p]).includes(nq)));
     const lineas = [];

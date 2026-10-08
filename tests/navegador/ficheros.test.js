@@ -99,3 +99,35 @@ test('mostrar en el Finder: el botón aparece al pasar el ratón por una fila y 
   await hasta(() => e.lanzado.length === antes + 3, 'miga', 'el botón de la miga no lanza nada');
   assert.ok(e.lanzado.at(-1).args.some(a => a.endsWith('material.md')), 'la miga no señala la nota abierta');
 });
+
+test('imagen: sale en el árbol y se ve a su tamaño, sin pasarse de la columna', async () => {
+  await e.ir('#/');
+  await abrirDelArbol('reparto-50-30-20.png');
+  const img = await visible(e.pagina.locator('#nota img.visor-imagen'), 'imagen', 'la imagen');
+  await hasta(() => img.evaluate(i => i.complete && i.naturalWidth === 300), 'imagen', 'la imagen no carga');
+  assert.equal(await img.evaluate(i => i.clientWidth), 300, 'la imagen no sale a su tamaño (sin contar el borde)');
+  await e.ir('#/n/material/material.md');
+  await e.pagina.locator('#nota a.wiki', { hasText: 'reparto-50-30-20.png' }).click();
+  await visible(e.pagina.locator('#nota img.visor-imagen'), 'enlace', 'la imagen tras pulsar [[reparto-50-30-20.png]]');
+});
+
+test('papelera: el botón de la fila manda el fichero a la papelera sin preguntar y desaparece del árbol; el de la miga, con la nota abierta, vuelve a la portada', async () => {
+  await e.ir('#/n/material/material.md');
+  const fila = e.pagina.locator('#arbol .fila', { has: e.pagina.locator('a.hoja', { hasText: 'gastos-octubre.json' }) });
+  const boton = fila.locator('button.papelera');
+  assert.equal(await boton.evaluate(b => getComputedStyle(b).opacity), '0', 'el botón se ve sin pasar el ratón');
+  await fila.hover();
+  assert.match(await boton.getAttribute('aria-label'), /^Mandar gastos-octubre\.json a la papelera/);
+  const antes = e.ejecutado.length;
+  await boton.click();
+  await hasta(() => e.ejecutado.length === antes + 1, 'árbol', 'el botón no manda nada a la papelera');
+  assert.ok(e.ejecutado.at(-1).args.at(-1).endsWith('gastos-octubre.json'));
+  await hasta(async () => (await hoja('gastos-octubre.json').count()) === 0, 'árbol', 'el fichero sigue en el árbol');
+  await conTexto(e.pagina.locator('.aviso-flotante'), /gastos-octubre\.json.*papelera/, 'árbol', 'el aviso');
+  assert.equal(await e.pagina.locator('#arbol details', { has: e.pagina.locator('summary', { hasText: 'material' }) }).locator('summary button.papelera').count(), 0, 'una carpeta lleva botón de papelera');
+  // Desde la miga: la nota abierta va a la papelera y la app vuelve a la portada.
+  await e.ir('#/n/material/apuntes-de-clase.txt');
+  await e.pagina.locator('#miga button.papelera').click();
+  await hasta(() => e.ejecutado.length === antes + 2, 'miga', 'el botón de la miga no manda nada a la papelera');
+  await hasta(async () => !(await e.pagina.evaluate(() => location.hash)).includes('apuntes-de-clase'), 'miga', 'la app se queda en el fichero borrado');
+});

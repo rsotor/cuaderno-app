@@ -33,7 +33,7 @@
 [hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--tinta); font: 15px/1.6 var(--fuente); }
 :focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
-@media (prefers-reduced-motion: no-preference) { .bloque, .respuesta-tarjeta { transition: background-color .15s ease; } }
+@media (prefers-reduced-motion: no-preference) { .bloque, .respuesta-tarjeta { transition: background-color .15s ease; } .bloque .acciones { transition: opacity .12s ease; } }
 .oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .saltar { position: absolute; left: -999px; top: 8px; z-index: 50; background: var(--acento); color: var(--sobre-acento); padding: 8px 14px; border-radius: var(--radio); text-decoration: none; }
 .saltar:focus { left: 8px; }
@@ -89,17 +89,22 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 /* «Mostrar en el Finder»: un botón al final de cada fila (carpeta o fichero); aparece al pasar el ratón o al llegar
    con el teclado, y siempre en pantallas táctiles */
 #arbol .fila { position: relative; }
-#arbol .fila .hoja { padding-right: 60px; }
+#arbol .fila .hoja { padding-right: 8px; }   /* el nombre entero; el sitio de los botones, solo cuando salen (crítica 2026-10-08, 2) */
+#arbol .fila:is(:hover, :focus-within) .hoja { padding-right: 98px; }
+@media (hover: none) { #arbol .fila .hoja { padding-right: 98px; } }
 #arbol summary .nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-button.mostrar, button.ocultar { flex: none; display: inline-flex; align-items: center; justify-content: center; padding: 0; min-width: 26px; min-height: 26px; border: none; background: none; color: var(--tinta-suave); border-radius: var(--radio); opacity: 0; }
+button.mostrar, button.ocultar, button.papelera { flex: none; display: inline-flex; align-items: center; justify-content: center; padding: 0; min-width: 26px; min-height: 26px; border: none; background: none; color: var(--tinta-suave); border-radius: var(--radio); opacity: 0; }
 button.mostrar:hover, button.ocultar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
-button.mostrar:focus-visible, button.ocultar:focus-visible { opacity: 1; }
+button.papelera:hover { color: var(--mal); background: rgba(127,127,127,.15); }
+button.mostrar:focus-visible, button.ocultar:focus-visible, button.papelera:focus-visible { opacity: 1; }
 #arbol .fila .acciones-fila { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; }
 #arbol summary .acciones-fila { margin-left: auto; display: flex; gap: 6px; }
-#arbol .fila:hover :is(.mostrar, .ocultar), #arbol .fila:focus-within :is(.mostrar, .ocultar), #arbol summary:hover :is(.mostrar, .ocultar), #arbol summary:focus-within :is(.mostrar, .ocultar), #miga .mostrar { opacity: 1; }
-@media (hover: none) { button.mostrar, button.ocultar { opacity: 1; } }
-#miga .mostrar { vertical-align: middle; margin-left: 6px; min-width: 24px; min-height: 24px; }
-#miga .mostrar .icono { width: 15px; height: 15px; }
+#arbol .acciones-fila .papelera { margin-left: 4px; }   /* sin confirmar, la separación es lo que evita mandar a la papelera por un píxel */
+#arbol .fila:hover :is(.mostrar, .ocultar, .papelera), #arbol .fila:focus-within :is(.mostrar, .ocultar, .papelera), #arbol summary:hover :is(.mostrar, .ocultar), #arbol summary:focus-within :is(.mostrar, .ocultar), #miga :is(.mostrar, .papelera) { opacity: 1; }
+@media (hover: none) { button.mostrar, button.ocultar, button.papelera { opacity: 1; } }
+#miga :is(.mostrar, .papelera) { vertical-align: middle; margin-left: 6px; min-width: 24px; min-height: 24px; }
+#miga .papelera { margin-left: 10px; }
+#miga :is(.mostrar, .papelera) .icono { width: 15px; height: 15px; }
 /* ficheros que no son notas */
 #nota.ancha { max-width: none; }
 .miga-barra.ancha { padding-left: 40px; }
@@ -108,6 +113,7 @@ button.mostrar:focus-visible, button.ocultar:focus-visible { opacity: 1; }
 #nota .como-texto { margin-top: 14px; }
 #nota .como-texto summary { cursor: pointer; color: var(--tinta-suave); font-size: 13.5px; margin-bottom: 8px; }
 #nota .visor-pdf { width: 100%; height: calc(100vh - 70px); border: 1px solid var(--linea); border-radius: var(--radio-bloque); background: #fff; }
+#nota .visor-imagen { display: block; max-width: 100%; height: auto; border: 1px solid var(--linea); border-radius: 2px; background: repeating-conic-gradient(rgba(127,127,127,.12) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }   /* el damero deja ver la transparencia */
 #nota .fichero-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio-bloque); padding: 14px 16px; margin: 0; }
 #arbol .hoja small { color: var(--tinta-suave); font-size: 12px; margin-left: auto; padding-left: 8px; }   /* dos notas con el mismo título: el fichero las distingue */
 #lateral.buscando .paginas { display: none; }   /* buscando, los resultados necesitan el sitio */
@@ -174,13 +180,16 @@ button.mostrar:focus-visible, button.ocultar:focus-visible { opacity: 1; }
 .callout-warning .callout-icono::before { content: "⚠\FE0E"; } .callout-quote .callout-icono::before { content: "❝"; } .callout-example .callout-icono::before { content: "✎"; }
 .callout-comment .callout-icono::before { content: "✎"; } .callout-danger .callout-icono::before { content: "✕"; } .callout-tip .callout-icono::before { content: "✦"; }
 
-/* bloques editables */
-.bloque { position: relative; border-radius: var(--radio); margin: 0 -10px; padding: 1px 10px; }   /* 25 px de alto mínimo: también es foco de teclado */
-.bloque:hover, .bloque:focus-within, .bloque.resaltado { background: var(--acento-suave); }
+/* bloques editables: leyendo, el bloque no cambia (Roberto, 2026-10-08: el fondo al pasar el ratón distraía y clicar
+   dentro lo dejaba marcado). Editar y comentar son dos iconos en el margen izquierdo, fuera del texto: el bloque se
+   alarga hacia el margen (sin color) para que el ratón llegue a ellos sin salir. Con teclado, el anillo de foco. */
+.bloque { position: relative; border-radius: var(--radio); margin: 0 -10px 0 -40px; padding: 0 10px 0 40px; }   /* sin relleno arriba ni abajo: el margen del primer hijo sale fuera y el bloque empieza en su primera línea (crítica 2026-10-08, 1) */
+.bloque.resaltado { background: var(--acento-suave); }   /* el destino de un resultado del buscador, un momento */
 .bloque:focus-visible { outline-offset: 0; }
-.bloque .acciones { position: absolute; right: -4px; top: 2px; display: none; gap: 4px; }
-.bloque:hover .acciones, .bloque:focus-within .acciones { display: flex; }
-.bloque .acciones button { padding: 2px 8px; font-size: 12.5px; min-height: 26px; }
+.bloque .acciones { position: absolute; left: 6px; top: -1px; display: flex; flex-direction: column; gap: 2px; opacity: 0; pointer-events: none; }
+.bloque:hover > .acciones, .bloque:focus-visible > .acciones, .bloque:has(> .acciones :focus-visible) > .acciones { opacity: 1; pointer-events: auto; }
+.bloque .acciones button { padding: 0; min-width: 26px; min-height: 26px; border: none; background: none; color: var(--tinta-suave); }
+.bloque .acciones button:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .backlinks { margin-top: 48px; padding-top: 12px; border-top: 1px solid var(--linea); font-size: 14px; color: var(--tinta-suave); }
 .backlinks a { margin-right: 12px; }
 
@@ -304,6 +313,7 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
   #nota, #panel { padding: 8px 16px 40px; }
   .miga-barra { padding: 8px 12px 6px; }
   .bloque { margin: 0; padding: 0 4px; }
-  .bloque .acciones { position: static; justify-content: flex-end; margin-bottom: 2px; }
+  .bloque .acciones { position: static; flex-direction: row; justify-content: flex-end; display: none; }
+  .bloque:focus-within > .acciones { display: flex; opacity: 1; pointer-events: auto; }   /* sin margen ni ratón: al tocar el bloque */
   #nota table { display: block; overflow-x: auto; }
 }

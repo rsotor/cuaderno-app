@@ -85,3 +85,26 @@ test('editar un bloque: el editor trae el Markdown del tramo y guardar cambia el
   await conTexto(e.pagina.locator('#nota'), /Lo que pones tú\./, 'nota Capital', 'el texto nuevo tras guardar');
   await oculto(e.pagina.locator('#editor'), 'editor', 'el diálogo de edición tras guardar');
 });
+
+test('bloques: al pasar el ratón el fondo no cambia y editar y comentar salen en el margen, fuera del texto; clicar en el texto no deja nada marcado', async () => {
+  await e.ir('#/n/conceptos/interes.md');
+  const bloque = await visible(e.pagina.locator('#nota .bloque', { has: e.pagina.locator('ul') }), 'nota Interés', 'la lista');
+  const acciones = bloque.locator('.acciones');
+  const fondo = () => bloque.evaluate(b => getComputedStyle(b).backgroundColor);
+  await e.pagina.mouse.move(5, 5);   // el ratón, fuera de la nota (el recorrido anterior lo dejó encima)
+  await hasta(() => acciones.evaluate(a => getComputedStyle(a).opacity === '0'), 'nota Interés', 'las acciones se ven sin pasar el ratón');
+  const transparente = 'rgba(0, 0, 0, 0)';
+  await bloque.hover();
+  await hasta(() => acciones.evaluate(a => getComputedStyle(a).opacity === '1'), 'nota Interés', 'las acciones no aparecen al pasar el ratón');
+  assert.equal(await fondo(), transparente, 'el bloque cambia de fondo al pasar el ratón');
+  const texto = await bloque.locator('ul').boundingBox(), caja = await acciones.boundingBox();
+  assert.ok(caja.x + caja.width <= texto.x, `las acciones (x=${caja.x}, ${caja.width} px) pisan el texto (x=${texto.x})`);
+  assert.equal(await acciones.locator('button').count(), 2);
+  const lapiz = await acciones.locator('button').first().boundingBox(), linea = await bloque.locator('ul li').first().boundingBox();
+  assert.ok(Math.abs((lapiz.y + lapiz.height / 2) - (linea.y + linea.height / 2)) < 6, `el lápiz (centro y=${lapiz.y + lapiz.height / 2}) no está a la altura de la primera línea (y=${linea.y + linea.height / 2})`);
+  // Clicar en el texto y sacar el ratón: ni fondo ni acciones se quedan.
+  await bloque.locator('ul li').first().click({ position: { x: 200, y: 5 } });
+  await e.pagina.mouse.move(5, 5);
+  await hasta(() => acciones.evaluate(a => getComputedStyle(a).opacity === '0'), 'nota Interés', 'las acciones se quedan tras clicar en el texto y salir');
+  assert.equal(await fondo(), transparente, 'el bloque se queda marcado tras clicar en el texto');
+});

@@ -19,7 +19,7 @@ const { leerTarjetas } = require('./tarjetas');
 const { leerFrontmatter } = require('./markdown');
 
 const COOKIE = 'cuaderno';
-const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' , '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8'};
+const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.avif': 'image/avif', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' , '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8'};
 const PUBLICO = path.join(__dirname, 'public');
 const NODE_MODULES = path.join(__dirname, 'node_modules');
 // Ruta relativa a la raíz del cuaderno tal como se le pasa a una herramienta del kit: siempre con «/», también en
@@ -50,7 +50,7 @@ function estadoGit(raiz) {
   } catch { return null; }
 }
 
-function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null, plataforma = process.platform }) {
+function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null, ejecutar = null, plataforma = process.platform }) {
   const estado = { cuaderno, kit };
   const oyentes = new Set(), terminales = new Set();   // pestañas que escuchan cambios; conexiones de terminal abiertas
   const avisarCambio = f => { for (const ws of oyentes) ws.send(JSON.stringify({ fichero: f })); };
@@ -133,7 +133,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
       if (p.startsWith('/assets/')) return servir(res, path.join(NODE_MODULES, path.normalize(p.slice(8))));
       if (p === '/api/info') return json(res, info());
       if (p === '/api/cuadernos') return json(res, cuadernos());
-      if (p === '/api/arbol') return json(res, conCuaderno().listar().filter(r => !oculta(r)));
+      if (p === '/api/arbol') return json(res, conCuaderno().arbol().filter(r => !oculta(r)));
       if (p === '/api/ocultas') return json(res, config.ocultas(conCuaderno().raiz));
       if (p === '/api/titulos') return json(res, conCuaderno().titulos());
       if (p === '/api/buscar') { const r = conCuaderno().buscar(url.searchParams.get('q') || ''); return json(res, { ficheros: r.ficheros.filter(f => !oculta(f)), lineas: r.lineas.filter(l => !oculta(l.ruta)) }); }
@@ -175,6 +175,15 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
           const cu = conCuaderno(), abs = b.ruta ? cu.dentro(String(b.ruta)) : cu.base;
           if (!fs.existsSync(abs)) throw new ErrorPeticion('ese fichero ya no está');
           sistema.mostrar({ abs, carpeta: fs.statSync(abs).isDirectory(), plataforma, ...(lanzar ? { lanzar } : {}) });
+          return json(res, { ok: true });
+        }
+        // Borrar un fichero del cuaderno es mandarlo a la papelera del sistema; una carpeta, no.
+        if (p === '/api/papelera') {
+          const cu = conCuaderno(), abs = cu.dentro(String(b.ruta || ''));
+          if (!fs.existsSync(abs)) throw new ErrorPeticion('ese fichero ya no está');
+          if (fs.lstatSync(abs).isDirectory()) throw new ErrorPeticion('solo se mandan ficheros a la papelera, no carpetas');
+          try { sistema.aPapelera({ abs, plataforma, ...(ejecutar ? { ejecutar } : {}) }); } catch (e) { throw new ErrorPeticion(e.message); }
+          cu.invalidar();
           return json(res, { ok: true });
         }
         if (p === '/api/guardar') return json(res, accion((raiz, k) => acciones.guardar(raiz, k, b.mensaje)));
