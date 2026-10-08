@@ -391,7 +391,14 @@ async function guardarTamanoCajon(pos, v) {
 let sesiones = [], sesionActiva = null, numSesion = 0;
 const wsUrl = ruta => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${ruta}`;
 const variable = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const temaTerminal = () => ({ background: variable('--terminal-fondo'), foreground: '#d7dae0', cursor: '#7aa2f7', selectionBackground: '#3b4261', black: '#15161e', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68', blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6', brightBlack: '#414868', brightRed: '#f7768e', brightGreen: '#9ece6a', brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7', brightCyan: '#7dcfff', brightWhite: '#c0caf5' });
+// Dos paletas: la oscura de siempre y una clara (los 16 colores con contraste 4,5:1 sobre el fondo claro). Cuál toca lo
+// dice el CSS del tema efectivo (--terminal-claro), así «como el sistema» también acierta. xterm no entiende var(--…).
+const PALETA_OSCURA = { foreground: '#d7dae0', cursor: '#7aa2f7', selectionBackground: '#3b4261', black: '#15161e', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68', blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6', brightBlack: '#414868', brightRed: '#f7768e', brightGreen: '#9ece6a', brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7', brightCyan: '#7dcfff', brightWhite: '#c0caf5' };
+const PALETA_CLARA = { foreground: '#1b1d23', cursor: '#1f5fbf', selectionBackground: '#c8d3f5', black: '#1b1d23', red: '#a81e2e', green: '#2f6f2a', yellow: '#8a5a00', blue: '#1f5fbf', magenta: '#7a3bb0', cyan: '#0f6a7a', white: '#5c6370', brightBlack: '#4b5160', brightRed: '#a81e2e', brightGreen: '#2f6f2a', brightYellow: '#8a5a00', brightBlue: '#1f5fbf', brightMagenta: '#7a3bb0', brightCyan: '#0f6a7a', brightWhite: '#1b1d23' };
+const temaTerminal = () => ({ background: variable('--terminal-fondo'), ...(variable('--terminal-claro') === '1' ? PALETA_CLARA : PALETA_OSCURA) });
+const letraTerminal = () => ({ 'pequeña': 12.5, media: 13.5, grande: 15 })[info.configuracion.letra] || 13.5;
+function aplicarAparienciaTerminal() { for (const s of sesiones) { s.term.options.fontSize = letraTerminal(); s.term.options.theme = temaTerminal(); redimensionar(s); } }
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', aplicarAparienciaTerminal);
 // Una pestaña oculta mide 0: ni se ajusta ni se manda un tamaño de 0 columnas a la pty.
 function redimensionar(s) {
   if (s.elemento.hidden || !s.elemento.clientWidth || !s.elemento.clientHeight) return;
@@ -408,7 +415,7 @@ function conectar(s) {
 }
 function crearSesion(modo) {
   const n = ++numSesion, elemento = document.createElement('div'); elemento.className = 'sesion'; elemento.hidden = true; $('#terminal').append(elemento);
-  const term = new Terminal({ fontFamily: variable('--mono'), fontSize: 13.5, lineHeight: 1.25, cursorBlink: true, cursorStyle: 'bar', scrollback: 5000, allowProposedApi: true, theme: temaTerminal() });
+  const term = new Terminal({ fontFamily: variable('--mono'), fontSize: letraTerminal(), lineHeight: 1.25, cursorBlink: true, cursorStyle: 'bar', scrollback: 5000, allowProposedApi: true, theme: temaTerminal() });
   const fit = new FitAddon.FitAddon(); term.loadAddon(fit); term.open(elemento);
   const s = { id: n, modo, titulo: modo === 'profesor' ? 'Profesor' : (n === 1 ? 'Terminal' : `Terminal ${n}`), term, fit, ws: null, elemento, cerrada: false };
   term.attachCustomKeyEventHandler(e => !((e.ctrlKey || e.metaKey) && e.key === '`'));   // Ctrl ` es de la app: abre y cierra el cajón
@@ -534,7 +541,7 @@ $('#lateral').addEventListener('click', e => { if (e.target.closest('a') && wind
 $('#ajustes-cerrar').onclick = cerrarAjustes;
 $('#ajustes form').addEventListener('change', async () => {
   info.configuracion = await api('/api/configuracion', { tema: $('#ajustes-tema').value, letra: $('#ajustes-letra').value, fuente: $('#ajustes-fuente').value, panel: $('#ajustes-panel').value, comando_agente: $('#ajustes-comando').value });
-  aplicarApariencia(info.configuracion); aplicarCajon();
+  aplicarApariencia(info.configuracion); aplicarCajon(); aplicarAparienciaTerminal();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ajustes').hidden) cerrarAjustes(); });
 

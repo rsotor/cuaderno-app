@@ -168,3 +168,17 @@ test('cambiar de cuaderno cierra las terminales: la pty muere y no queda ninguna
     await hasta(async () => (await pestanas().count()) === 0, 'cuadernos', 'siguen las pestañas de terminal del cuaderno anterior');
   } finally { otro.borrar(); }
 });
+
+test('la terminal sigue los Ajustes: con letra grande mide 15 px y con tema claro el xterm es claro', async () => {
+  await e.ir('#/'); await recargar();
+  await abrirPanel();
+  await e.pagina.click('#btn-ajustes'); await visible(e.pagina.locator('#ajustes-letra'), 'ajustes', 'el selector de letra');
+  await e.pagina.selectOption('#ajustes-letra', 'grande');
+  await hasta(() => e.pagina.evaluate(() => getComputedStyle(document.querySelector('#terminal .sesion:not([hidden]) .xterm-rows')).fontSize === '15px'), 'terminal', 'con letra grande el xterm no pasa a 15 px');
+  await e.pagina.selectOption('#ajustes-tema', 'claro');
+  await hasta(() => e.pagina.evaluate(() => /rgb\(2\d\d, 2\d\d, 2\d\d\)/.test(getComputedStyle(document.querySelector('#terminal .sesion:not([hidden]) .xterm-viewport')).backgroundColor)), 'terminal', 'con tema claro el fondo del xterm sigue oscuro');
+  await e.pagina.selectOption('#ajustes-tema', 'oscuro');
+  await hasta(() => e.pagina.evaluate(() => /rgb\(\d{1,2}, \d{1,2}, \d{1,2}\)/.test(getComputedStyle(document.querySelector('#terminal .sesion:not([hidden]) .xterm-viewport')).backgroundColor)), 'terminal', 'con tema oscuro el fondo del xterm no vuelve a ser oscuro');
+  await e.pagina.selectOption('#ajustes-tema', 'auto'); await e.pagina.selectOption('#ajustes-letra', 'media');
+  await e.pagina.click('#ajustes-cerrar');
+});
