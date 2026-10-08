@@ -69,3 +69,10 @@ test('bloques: una lista seguida de línea en blanco acaba donde acaba la lista,
   assert.match(html, /data-desde="2" data-hasta="4">\s*<ul/, 'la lista ocupa las líneas 2 y 3; markdown-it le daba también la 4 (en blanco)');
   assert.match(html, /data-desde="5" data-hasta="6">\s*<p/);
 });
+
+test('propiedades: una lista en varias líneas (como la escribe Obsidian) es una lista; una clave vacía, vacía', () => {
+  const { datos } = leerFrontmatter('---\netiquetas:\n  - presupuesto\n  - "mensual"\nvacia:\nn: 3\n---\n# T\n');
+  assert.deepEqual(datos.etiquetas, ['presupuesto', 'mensual']);
+  assert.equal(datos.vacia, '');
+  assert.equal(datos.n, '3');
+});

@@ -2,6 +2,8 @@
 // Recorridos del panel Tareas: marcar una casilla, añadir con «+» desde el buscador (sin nota y con una abierta) y
 // los filtros por nota, etiqueta y estado, que viven en el hash y sobreviven a recargar. En orden: cada paso
 // cuenta con lo que escribió el anterior.
+// Con kit: agrupar las casillas de todas las notas por nota es lo que añade el kit; sin kit el panel solo lee tareas.md
+// (eso lo prueba casos.test.js).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { arrancar, hasta, visible, oculto, conTexto, ficheroCumple, hashCumple } = require('./ayuda');

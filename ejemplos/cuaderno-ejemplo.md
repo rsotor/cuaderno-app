@@ -14,10 +14,41 @@ nuevo entra en una nota o carpeta nueva, con su fila aquí y su test. Las rutas 
 | Examen (formulario de preguntas) | `examenes/01-examen.md` | `tests/formulario.test.js`, `tests/navegador/examen.test.js` |
 | Tarjetas (flashcards) | `flashcards/01-tarjetas.md` | `tests/tarjetas.test.js`, `tests/navegador/tarjetas.test.js` |
 | Ficheros que no son notas: PDF, JSON, CSV, TXT, HTML con script, PNG; enlaces a ellos | `material/` | `tests/navegador/ficheros.test.js` |
-| Propiedades de cada tipo (texto, lista, número, booleano, fecha) | `render/propiedades.md` | TBD (T4) |
-| Enlaces: por nombre, con ruta y alias, a encabezado, a fichero, relativo, a una web, en tabla | `render/enlaces.md` | TBD (T4) |
-| Callouts de tipo nota, aviso y plegado; imagen en Markdown y `![[ ]]`; línea `@@` | `render/callouts-e-imagenes.md` | TBD (T4) |
-| Código en línea y en bloque; fórmulas en línea y en bloque | `render/codigo-y-formulas.md` | TBD (T4) |
-| Nombre de fichero con acentos y espacios | `estructura/Nota con acentos y espacios.md` | TBD (T4) |
-| Dos notas con el mismo título en la misma carpeta | `estructura/repetida-a.md`, `estructura/repetida-b.md` | TBD (T4) |
-| Carpeta que empieza por `_`: no sale en el árbol | `estructura/_archivo/archivada.md` | TBD (T4) |
+| Propiedades de cada tipo (texto, lista, número, booleano, fecha) | `render/propiedades.md` | `tests/navegador/casos.test.js`, `tests/markdown.test.js` |
+| Enlaces: por nombre, con ruta y alias, a encabezado, a fichero, relativo, a una web, en tabla | `render/enlaces.md` | `tests/navegador/casos.test.js` |
+| Callouts de tipo nota, aviso y plegado; imagen en Markdown y `![[ ]]`; línea `@@` | `render/callouts-e-imagenes.md` | `tests/navegador/casos.test.js` |
+| Código en línea y en bloque; fórmulas en línea y en bloque | `render/codigo-y-formulas.md` | `tests/navegador/casos.test.js` |
+| Nombre de fichero con acentos y espacios | `estructura/Nota con acentos y espacios.md` | `tests/navegador/casos.test.js` |
+| Dos notas con el mismo título en la misma carpeta | `estructura/repetida-a.md`, `estructura/repetida-b.md` | `tests/navegador/casos.test.js` |
+| Carpeta que empieza por `_`: no sale en el árbol | `estructura/_archivo/archivada.md` | `tests/navegador/casos.test.js` |
+
+## Casos de uso y su recorrido
+
+Cada caso de uso de la app (plan vivo §4, más los de después) con el recorrido de navegador que lo usa entero. El
+test del índice comprueba que el fichero existe y que tiene un recorrido que empieza por el texto de la columna.
+«Modo» dice cómo se monta el cuaderno: la base es sin kit; con kit, solo lo que el kit añade.
+
+| # | Caso de uso | Recorrido | Empieza por | Modo |
+|---|---|---|---|---|
+| 1 | Abrir el cuaderno: portada y árbol | `tests/navegador/lectura.test.js` | portada: | sin kit |
+| 2 | Buscar por nombre y por texto | `tests/navegador/lectura.test.js` | buscar: | sin kit |
+| 3 | Leer una nota: propiedades, enlaces, callouts, imágenes, código, fórmulas | `tests/navegador/casos.test.js` | render: | sin kit |
+| 4 | Editar un bloque | `tests/navegador/lectura.test.js` | editar un bloque: | sin kit |
+| 5 | Comentar un bloque y verlo en Comentarios | `tests/navegador/casos.test.js` | comentar un bloque: | sin kit |
+| 6 | Marcar una sesión como estudiada | — | — | **no implementado** en la app |
+| 7 | Repasar tarjetas | `tests/navegador/tarjetas.test.js` | modo tarjeta: | sin kit |
+| 8 | Hacer y corregir un examen | `tests/navegador/examen.test.js` | con examen.js en el kit: | con kit |
+| 9a | Tareas: solo `tareas.md` y «+» | `tests/navegador/casos.test.js` | Tareas sin kit: | sin kit |
+| 9b | Tareas: todas las casillas por nota, filtros | `tests/navegador/tareas.test.js` | panel Tareas: | con kit |
+| 10 | Terminal dentro de la app (y el profesor) | `tests/navegador/panel.test.js` | un solo botón, Terminal; | con kit |
+| 11 | Ver el material: PDF, JSON, CSV, TXT, HTML, imágenes | `tests/navegador/ficheros.test.js` | PDF: | sin kit |
+| 12a | Guardar, Traer y Deshacer con git | `tests/navegador/casos.test.js` | Guardar, Traer y Deshacer | sin kit |
+| 12b | Guardar y Deshacer con las herramientas del kit | `tests/guardar.test.js` | guardar y deshacer con el kit de verdad | con kit · **se salta en la CI** (necesita un curso con kit: `CUADERNO_KIT_PRUEBA`) |
+| 13 | Varios cuadernos: recientes, abrir, quitar | `tests/navegador/casos.test.js` | pantalla de Cuadernos: | sin kit |
+| 14 | Crear una nota | `tests/navegador/uso.test.js` | nota nueva: | sin kit |
+| 15 | Árbol plegado y carpetas | `tests/navegador/uso.test.js` | árbol: las carpetas salen plegadas | sin kit |
+| 16 | Ajustes: tema y fuente | `tests/navegador/uso.test.js` | ajustes: | sin kit |
+| 17 | Ocultar en la app | `tests/navegador/ocultar.test.js` | ocultar una carpeta | sin kit |
+| 18 | Mostrar en el Finder, copiar la ruta, papelera | `tests/navegador/ficheros.test.js` | mostrar en el Finder: | sin kit |
+| 19 | Aviso de app desactualizada | `tests/navegador/ocultar.test.js` | aviso de reinicio: | sin kit |
+| 20 | Un curso del kit sin motor no guarda | `tests/guardar.test.js` | salida del kit sin motor: | con kit (sin motor) |
