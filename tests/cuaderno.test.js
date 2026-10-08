@@ -136,7 +136,7 @@ test('títulos: el # de cada nota, sin wikilinks; las tareas llevan el Markdown 
 
 test('recorrido: cuenta notas, enlaces rotos y fallos', con({}, (c, cu) => {
   const r = cu.recorrido();
-  assert.equal(r.notas, 7);
+  assert.equal(r.notas, 8);   // 7 notas del curso de ejemplo más material.md (fase 10), cuyos enlaces a ficheros resuelven todos
   assert.deepEqual(r.rotos, [{ ruta: 'conceptos/interes.md', destino: 'no-existe' }]);
   assert.deepEqual(r.fallos, []);
 }));
@@ -158,4 +158,29 @@ test('editar y comentar una lista: el original con línea en blanco final no es 
   assert.doesNotThrow(() => cu.comprobarOriginal(ls, 10, 12, ls.slice(10, 12).join('\n') + '\n'));
   cu.escribirBloque('sesiones/01-01-01-sesion.md', 10, 12, '- [ ] Leer [[interes]]\n- [x] Hecho ya\n- [ ] Otra', ls.slice(10, 12).join('\n') + '\n');
   assert.match(c.leer('sesiones/01-01-01-sesion.md'), /- \[x\] Hecho ya\n- \[ \] Otra\n$/);
+}));
+
+test('ficheros que no son notas: el árbol lista PDF, JSON, CSV y TXT (no un .docx); el buscador los encuentra por nombre, no por dentro', con({}, (c, cu) => {
+  fs.writeFileSync(path.join(c.base, 'material', 'apuntes.docx'), 'no soy texto');
+  cu.invalidar();
+  const l = cu.listar();
+  for (const f of ['material/extracto-octubre.pdf', 'material/gastos-octubre.json', 'material/gastos-octubre.csv', 'material/apuntes-de-clase.txt', 'material/calculadora-50-30-20.html']) assert.ok(l.includes(f), `falta ${f} en el árbol`);
+  assert.ok(!l.includes('material/apuntes.docx'), 'un .docx no sale en el árbol');
+  const r = cu.buscar('extracto');
+  assert.deepEqual(r.ficheros, ['material/extracto-octubre.pdf'], 'el PDF sale por su nombre');
+  assert.ok(!cu.buscar('Supermercado').lineas.some(x => !x.ruta.endsWith('.md')), 'la búsqueda en el texto no entra en el JSON ni el CSV');
+  assert.equal(cu.titulos()['material/calculadora-50-30-20.html'], 'Calculadora 50/30/20', 'una página HTML se titula con su <title>');
+  assert.equal(cu.titulos()['material/extracto-octubre.pdf'], undefined);
+}));
+
+test('enlaces a ficheros: [[x.json]] resuelve y [[x]] sin extensión no; un enlace relativo lleva a la vista del fichero; nota() no lee un PDF', con({}, (c, cu) => {
+  assert.equal(cu.resolverWiki('gastos-octubre.json'), 'material/gastos-octubre.json');
+  assert.equal(cu.resolverWiki('extracto-octubre.pdf'), 'material/extracto-octubre.pdf');
+  assert.equal(cu.resolverWiki('gastos-octubre'), null, 'sin extensión, un fichero que no es nota no resuelve');
+  assert.equal(cu.resolverWiki('capital'), 'conceptos/capital.md', 'las notas siguen resolviendo sin .md');
+  const html = cu.nota('material/material.md').html;
+  assert.match(html, /href="#\/n\/material\/gastos-octubre\.json"/, 'el enlace relativo [..](gastos-octubre.json) no lleva a la vista del fichero');
+  assert.match(html, /href="#\/n\/material\/extracto-octubre\.pdf"/);
+  assert.doesNotMatch(html, /wiki roto/);
+  assert.deepEqual(cu.nota('material/extracto-octubre.pdf'), { ruta: 'material/extracto-octubre.pdf', tipo: 'pdf', esFichero: true });
 }));

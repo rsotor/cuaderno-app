@@ -73,6 +73,17 @@ function crearRender(resolverWiki) {
     for (const tramo of src.split('/')) { if (tramo === '..') carpeta.pop(); else if (tramo && tramo !== '.') carpeta.push(tramo); }
     return `/fichero/${encodeURI(carpeta.join('/'))}`;
   };
+  // --- Enlaces relativos ([texto](otra-nota.md), [datos](datos.json)): a la vista de ese fichero en la app (#/n/…),
+  // resueltos desde la carpeta de la nota. Las URL y las anclas (#sección) se quedan como están.
+  const enlaceBase = md.renderer.rules.link_open || ((t, i, o, env, self) => self.renderToken(t, i, o));
+  md.renderer.rules.link_open = (t, i, o, env, self) => {
+    const href = t[i].attrGet('href') || '';
+    if (href && !/^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(href)) {
+      const [ruta] = href.split('#');
+      t[i].attrSet('href', `#/n/${rutaImagen(env, decodeURI(ruta)).slice('/fichero/'.length)}`);
+    }
+    return enlaceBase(t, i, o, env, self);
+  };
   const imagenBase = md.renderer.rules.image;
   md.renderer.rules.image = (t, i, o, env, self) => { t[i].attrSet('src', rutaImagen(env, t[i].attrGet('src') || '')); return imagenBase(t, i, o, env, self); };
   md.inline.ruler.before('wikilink', 'imagen_wiki', (state, silent) => {

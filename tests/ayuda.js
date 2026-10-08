@@ -12,7 +12,8 @@ function leerCarpeta(base, dir = '') {
   const out = {};
   for (const e of fs.readdirSync(path.join(base, dir), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
     const rel = dir ? `${dir}/${e.name}` : e.name;
-    if (e.isDirectory()) Object.assign(out, leerCarpeta(base, rel)); else out[rel] = fs.readFileSync(path.join(base, rel), 'utf8');
+    // Los binarios (un PDF) se copian tal cual; el resto como texto, para poder pasarlo a CRLF.
+    if (e.isDirectory()) Object.assign(out, leerCarpeta(base, rel)); else out[rel] = /\.(pdf|png|jpe?g)$/i.test(e.name) ? fs.readFileSync(path.join(base, rel)) : fs.readFileSync(path.join(base, rel), 'utf8');
   }
   return out;
 }
@@ -27,7 +28,7 @@ function crearCuaderno({ crlf = false, kit = 'carpeta', ignorar = '', obsidianig
   for (const [rel, texto] of Object.entries({ ...NOTAS, ...RELLENO_IGNORADO })) {
     const abs = path.join(base, rel);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, crlf ? texto.replace(/\n/g, '\r\n') : texto);
+    fs.writeFileSync(abs, crlf && typeof texto === 'string' ? texto.replace(/\n/g, '\r\n') : texto);
   }
   if (kit !== 'carpeta') fs.mkdirSync(path.join(raiz, 'config'), { recursive: true });
   if (kit === 'kit') {

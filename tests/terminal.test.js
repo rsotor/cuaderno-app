@@ -55,3 +55,11 @@ test('abrir: lanza el proceso con la carpeta como cwd y devuelve el nombre; en m
   assert.ok(fs.statSync(script).mode & 0o100, 'el .command no es ejecutable');
   fs.rmSync(require('node:path').dirname(script), { recursive: true, force: true });
 });
+
+test('mostrar en el gestor de archivos: macOS señala con open -R, Windows con explorer /select, Linux abre la carpeta', () => {
+  assert.deepEqual(terminal.comandoMostrar({ abs: '/c/a.pdf', carpeta: false, plataforma: 'darwin' }), { cmd: 'open', args: ['-R', '/c/a.pdf'] });
+  assert.deepEqual(terminal.comandoMostrar({ abs: '/c/mat', carpeta: true, plataforma: 'darwin' }), { cmd: 'open', args: ['/c/mat'] });
+  assert.deepEqual(terminal.comandoMostrar({ abs: 'C:\\c\\a.pdf', carpeta: false, plataforma: 'win32' }), { cmd: 'explorer', args: ['/select,C:\\c\\a.pdf'] });
+  assert.deepEqual(terminal.comandoMostrar({ abs: '/c/mat/a.pdf', carpeta: false, plataforma: 'linux' }), { cmd: 'xdg-open', args: ['/c/mat'] });
+  assert.deepEqual(terminal.comandoMostrar({ abs: '/c/mat', carpeta: true, plataforma: 'linux' }), { cmd: 'xdg-open', args: ['/c/mat'] });
+});

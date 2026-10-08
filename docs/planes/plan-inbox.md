@@ -1,6 +1,6 @@
 # Fase 10 · ver cualquier fichero del cuaderno y abrir su carpeta: diseño
 
-**2026-10-08 · estado: diseño corto para aprobar.** Roberto recortó la fase (2026-10-08): nada de página Inbox ni de
+**2026-10-08 · estado: hecho el mismo día** (Roberto pidió un ejemplo de cada tipo con sus recorridos: `ejemplos/curso-demo/material/` y `tests/navegador/ficheros.test.js`). Roberto recortó la fase (2026-10-08): nada de página Inbox ni de
 añadir documentos; preparar una clase se hace hablando con el profesor. Lo que entra:
 
 1. **El árbol enseña también PDF, JSON y texto.** Hoy solo lista `.md` y `.html`, así que una carpeta como

@@ -199,3 +199,36 @@ test('terminal: la del sistema se abre en la carpeta del cuaderno; con profesor,
     assert.equal(sin.lanzado.length, 0);
   } finally { await sin.cerrar(); }
 });
+
+test('ficheros: /fichero sirve el PDF con su tipo y nosniff, aísla un .svg y un .html, y no sigue un enlace simbólico que sale del cuaderno', async () => {
+  const s = await arrancar();
+  try {
+    const pdf = await s.pedir('/fichero/material/extracto-octubre.pdf');
+    assert.equal(pdf.status, 200); assert.equal(pdf.headers.get('content-type'), 'application/pdf'); assert.equal(pdf.headers.get('x-content-type-options'), 'nosniff');
+    fs.writeFileSync(path.join(s.c.base, 'material', 'dibujo.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    assert.match((await s.pedir('/fichero/material/dibujo.svg')).headers.get('content-security-policy') || '', /^sandbox/, 'un .svg se sirve sin aislar');
+    assert.match((await s.pedir('/fichero/material/calculadora-50-30-20.html')).headers.get('content-security-policy') || '', /^sandbox allow-scripts/);
+    const fuera = fs.mkdtempSync(path.join(os.tmpdir(), 'fuera-'));
+    fs.writeFileSync(path.join(fuera, 'secreto.txt'), 'no deberías verme');
+    fs.symlinkSync(path.join(fuera, 'secreto.txt'), path.join(s.c.base, 'material', 'enlace.txt'));
+    const r = await s.pedir('/fichero/material/enlace.txt');
+    assert.equal(r.status, 400, 'un enlace simbólico saca un fichero de fuera del cuaderno');
+    assert.doesNotMatch(await r.text(), /no deberías verme/);
+    fs.rmSync(fuera, { recursive: true, force: true });
+  } finally { await s.cerrar(); }
+});
+
+test('mostrar en carpeta: lanza el gestor de archivos con la ruta del fichero o de la carpeta; fuera del cuaderno, no', async () => {
+  const s = await arrancar();
+  const post = body => s.pedir('/api/mostrar-en-carpeta', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    assert.equal((await post({ ruta: 'material/extracto-octubre.pdf' })).status, 200);
+    assert.equal(s.lanzado.at(-1).cwd, path.join(s.c.base, 'material'));
+    assert.ok(s.lanzado.at(-1).args.some(a => a.includes('extracto-octubre.pdf')), 'no señala el fichero');
+    assert.equal((await post({ ruta: 'material' })).status, 200);
+    assert.equal(s.lanzado.at(-1).cwd, path.join(s.c.base, 'material'));
+    assert.equal((await post({ ruta: '../../etc' })).status, 400);
+    assert.equal((await post({ ruta: 'no-existe.pdf' })).status, 400);
+    assert.equal(s.lanzado.length, 2);
+  } finally { await s.cerrar(); }
+});

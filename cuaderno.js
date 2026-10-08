@@ -17,6 +17,12 @@ const RE_CASILLA = /^(\s*- \[)([ xX])(\] .*)$/;
 const RE_ETIQUETA = /(^|[\s(])#(\p{L}[\p{L}\p{N}_\-/]*)/gu;
 const RE_WIKI = /\[\[([^\]|]*?)(?:\\?\|[^\]]*)?\]\]/g;
 const sinCodigo = texto => texto.replace(/`[^`]*`/g, m => ' '.repeat(m.length));
+// Lo que lista el índice: las notas (Markdown y páginas HTML) y los ficheros que la app sabe enseñar (PDF, datos y texto).
+// Los ficheros salen en el árbol y en el buscador por su nombre; la búsqueda en el texto, los backlinks y las tareas
+// siguen siendo solo de notas. Un fichero solo se enlaza con su extensión: [[datos.json]].
+const RE_LISTADO = /\.(md|html|pdf|json|txt|csv)$/i;
+const esNota = p => /\.(md|html)$/i.test(p);
+const tipoDe = p => (p.match(/\.([a-z]+)$/i) || [, ''])[1].toLowerCase();
 function etiquetasDe(texto) { const e = []; for (const m of sinCodigo(texto).matchAll(RE_ETIQUETA)) if (!e.includes(m[2])) e.push(m[2]); return e; }
 
 class Cuaderno {
@@ -56,6 +62,11 @@ class Cuaderno {
     if (this.cacheTitulos) return this.cacheTitulos;
     const t = {};
     for (const p of this.listar()) {
+      if (p.endsWith('.html')) {   // una página HTML: su <title>, leído del principio del fichero
+        const m = this.principio(p, 8192).match(/<title[^>]*>([^<]*)<\/title>/i);
+        if (m && m[1].trim()) t[p] = m[1].replace(/\s+/g, ' ').trim();
+        continue;
+      }
       if (!p.endsWith('.md')) continue;
       const m = this.leer(p).replace(/\r\n/g, '\n').match(/^#\s+(.+?)\s*#*\s*$/m);
       if (m) t[p] = m[1].replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, '$2').trim();
@@ -69,7 +80,7 @@ class Cuaderno {
       const abs = path.join(dir, e.name);
       if (this.ignorado(abs, e.isDirectory())) continue;
       if (e.isDirectory()) this.recorrer(abs, acc);
-      else if (/\.(md|html)$/.test(e.name)) acc.push(this.relativa(abs));
+      else if (RE_LISTADO.test(e.name)) acc.push(this.relativa(abs));
     }
     return acc;
   }
@@ -82,11 +93,12 @@ class Cuaderno {
   }
   resolverWiki(destino) {
     const limpio = destino.replace(/\.md$/, '').replace(/#.*$/, '').replace(/^\//, '');
-    const todos = this.listar();
-    const exacto = todos.find(p => p.replace(/\.md$/, '') === limpio);
+    // Una nota se enlaza con o sin .md; cualquier otro fichero, con su extensión ([[datos.json]], [[pagina.html]]).
+    const todos = this.listar(), clave = p => p.replace(/\.md$/, '');
+    const exacto = todos.find(p => clave(p) === limpio);
     if (exacto) return exacto;
     const nombre = limpio.split('/').pop();
-    return todos.find(p => p.replace(/\.md$/, '').split('/').pop() === nombre) || null;
+    return todos.find(p => clave(p).split('/').pop() === nombre) || null;
   }
   // La portada: la de cuaderno.json si existe; si no, inicio.md; si no, la primera nota de la raíz; si no hay, null (la app enseña el árbol).
   portada() {
@@ -98,10 +110,17 @@ class Cuaderno {
 
   // ---------- lectura
   leer(rel) { return fs.readFileSync(this.dentro(rel), 'utf8'); }
+  // Los primeros bytes de un fichero, como texto (para el <title> de una página sin leerla entera).
+  principio(rel, bytes) {
+    const fd = fs.openSync(this.dentro(rel), 'r');
+    try { const b = Buffer.alloc(bytes); return b.toString('utf8', 0, fs.readSync(fd, b, 0, bytes, 0)); } finally { fs.closeSync(fd); }
+  }
   lineas(src) { return src.split(/\r?\n/); }
   finDeLinea(src) { return src.includes('\r\n') ? '\r\n' : '\n'; }
 
   nota(rel) {
+    // Un fichero que no es nota (PDF, datos, texto) no se lee aquí: el navegador lo pide a /fichero según su tipo.
+    if (!esNota(rel)) { this.dentro(rel); return { ruta: rel, tipo: tipoDe(rel), esFichero: true }; }
     const src = this.leer(rel);
     if (rel.endsWith('.html')) return { ruta: rel, html: null, esHtml: true };
     const texto = src.replace(/\r\n/g, '\n');

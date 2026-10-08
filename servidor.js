@@ -19,7 +19,7 @@ const { leerTarjetas } = require('./tarjetas');
 const { leerFrontmatter } = require('./markdown');
 
 const COOKIE = 'cuaderno';
-const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' };
+const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' , '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8'};
 const PUBLICO = path.join(__dirname, 'public');
 const NODE_MODULES = path.join(__dirname, 'node_modules');
 // Ruta relativa a la raíz del cuaderno tal como se le pasa a una herramienta del kit: siempre con «/», también en
@@ -84,10 +84,21 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
   let ocupado = false;
   const accion = fn => { if (ocupado) throw Object.assign(new Error('hay otra operación en marcha; espera a que termine'), { status: 409 }); ocupado = true; try { return fn(conCuaderno().raiz, estado.kit); } finally { ocupado = false; } };
 
-  const servir = (res, abs) => {
+  const servir = (res, abs, cabeceras = {}) => {
     if (!fs.existsSync(abs) || fs.statSync(abs).isDirectory()) { res.writeHead(404); return res.end('no existe'); }
-    res.writeHead(200, { 'content-type': TIPOS[path.extname(abs).toLowerCase()] || 'application/octet-stream' });
+    res.writeHead(200, { 'content-type': TIPOS[path.extname(abs).toLowerCase()] || 'application/octet-stream', 'x-content-type-options': 'nosniff', ...cabeceras });
     fs.createReadStream(abs).pipe(res);
+  };
+  // Un fichero del cuaderno: dentro de la carpeta también por su ruta real (un enlace simbólico no saca nada de ella).
+  // Una página .html o un .svg corre aislada (origen opaco: sin la cookie ni la API de la app), también si alguien la
+  // abre en una pestaña y no en el iframe de la app.
+  const servirDelCuaderno = (res, rel) => {
+    const cu = conCuaderno(), abs = cu.dentro(rel);
+    let real, base;
+    try { real = fs.realpathSync(abs); base = fs.realpathSync(cu.base); } catch { res.writeHead(404); return res.end('no existe'); }
+    if (real !== base && !real.startsWith(base + path.sep)) throw new ErrorPeticion('ruta fuera del cuaderno');
+    const activo = /\.(html?|svg)$/i.test(abs);
+    return servir(res, real, activo ? { 'content-security-policy': 'sandbox allow-scripts allow-forms allow-modals' } : {});
   };
   const json = (res, obj, code = 200) => { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(obj)); };
   const leerCuerpo = req => new Promise((ok, mal) => {
@@ -142,12 +153,19 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
         return json(res, { ruta: rel, titulo, tarjetas: t.map(x => ({ ...x, pregunta: cu.md.renderInline(x.pregunta, {}), respuesta: cu.md.render(x.respuesta, {}) })) });
       }
       if (p === '/api/guardar/propuesta') { const raiz = conCuaderno().raiz; return json(res, { mensaje: acciones.proponerMensaje(raiz), cambios: acciones.cambios(raiz), repo: acciones.esRepo(raiz), kit: estado.kit.tipo }); }
-      if (p.startsWith('/fichero/')) return servir(res, conCuaderno().dentro(decodeURIComponent(p.slice(9))));
+      if (p.startsWith('/fichero/')) return servirDelCuaderno(res, decodeURIComponent(p.slice(9)));
       if (req.method === 'POST') {
         const b = await leerCuerpo(req);
         if (p === '/api/abrir') return json(res, abrir(b.ruta));
         if (p === '/api/olvidar') { config.olvidarReciente(String(b.ruta || '')); return json(res, { ok: true }); }
         if (p === '/api/configuracion') return json(res, config.apariencia(config.ajustar(b)));
+        // Mostrar una carpeta o un fichero del cuaderno en el gestor de archivos del sistema (Finder, Explorador…).
+        if (p === '/api/mostrar-en-carpeta') {
+          const cu = conCuaderno(), abs = b.ruta ? cu.dentro(String(b.ruta)) : cu.base;
+          if (!fs.existsSync(abs)) throw new ErrorPeticion('ese fichero ya no está');
+          terminal.mostrar({ abs, carpeta: fs.statSync(abs).isDirectory(), ...(lanzar ? { lanzar } : {}) });
+          return json(res, { ok: true });
+        }
         // La terminal es la del sistema: se abre en la carpeta del cuaderno, con el profesor lanzado si se pide.
         if (p === '/api/terminal') {
           if (!estado.cuaderno) throw new ErrorPeticion('no hay ningún cuaderno abierto');

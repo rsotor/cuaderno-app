@@ -77,4 +77,16 @@ function lanzarSuelto(cmd, args, opciones) {
   p.unref();
 }
 
-module.exports = { elegir, comandoDe, abrir, scriptMac, existeEnPath };
+// Mostrar una carpeta, o un fichero señalado dentro de su carpeta, en el gestor de archivos del sistema. No ejecuta el
+// fichero: macOS `open -R` lo señala en el Finder, Windows `explorer /select,` en el Explorador, Linux abre su carpeta.
+function comandoMostrar({ abs, carpeta, plataforma = process.platform }) {
+  if (plataforma === 'darwin') return carpeta ? { cmd: 'open', args: [abs] } : { cmd: 'open', args: ['-R', abs] };
+  if (plataforma === 'win32') return carpeta ? { cmd: 'explorer', args: [abs] } : { cmd: 'explorer', args: [`/select,${abs}`] };
+  return { cmd: 'xdg-open', args: [carpeta ? abs : path.dirname(abs)] };
+}
+function mostrar({ abs, carpeta, plataforma = process.platform, lanzar = lanzarSuelto }) {
+  const { cmd, args } = comandoMostrar({ abs, carpeta, plataforma });
+  lanzar(cmd, args, { cwd: carpeta ? abs : path.dirname(abs), env: process.env });
+}
+
+module.exports = { elegir, comandoDe, abrir, scriptMac, existeEnPath, comandoMostrar, mostrar };

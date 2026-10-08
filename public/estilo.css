@@ -86,6 +86,25 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 #arbol .hoja { display: flex; padding-left: 26px; }   /* el texto alineado con el nombre de la carpeta, tras el chevron */
 #arbol .hoja .nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }   /* un nombre largo se corta con puntos suspensivos, no a secas */
 #arbol .hoja small { flex: none; }
+/* «Mostrar en el Finder»: un botón al final de cada fila (carpeta o fichero); aparece al pasar el ratón o al llegar
+   con el teclado, y siempre en pantallas táctiles */
+#arbol .fila { position: relative; }
+#arbol .fila .hoja { padding-right: 34px; }
+#arbol summary .nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+button.mostrar { flex: none; display: inline-flex; align-items: center; justify-content: center; padding: 0; min-width: 26px; min-height: 26px; border: none; background: none; color: var(--tinta-suave); border-radius: var(--radio); opacity: 0; }
+button.mostrar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
+button.mostrar:focus-visible { opacity: 1; }
+#arbol .fila .mostrar { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
+#arbol summary .mostrar { margin-left: auto; }
+#arbol .fila:hover .mostrar, #arbol .fila:focus-within .mostrar, #arbol summary:hover .mostrar, #arbol summary:focus-within .mostrar, #miga .mostrar { opacity: 1; }
+@media (hover: none) { button.mostrar { opacity: 1; } }
+#miga .mostrar { vertical-align: middle; margin-left: 6px; min-width: 24px; min-height: 24px; }
+#miga .mostrar .icono { width: 15px; height: 15px; }
+/* ficheros que no son notas */
+#arbol .hoja.fichero .nombre { color: var(--tinta-suave); }
+#nota.ancha { max-width: none; }
+#nota .visor-pdf { width: 100%; height: calc(100vh - 70px); border: 1px solid var(--linea); border-radius: var(--radio-bloque); background: #fff; }
+#nota .fichero-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio-bloque); padding: 14px 16px; margin: 0; }
 #arbol .hoja small { color: var(--tinta-suave); font-size: 12px; margin-left: auto; padding-left: 8px; }   /* dos notas con el mismo título: el fichero las distingue */
 #lateral.buscando .paginas { display: none; }   /* buscando, los resultados necesitan el sitio */
 #arbol .tramo { margin: 10px 10px 2px; font-size: 12px; font-weight: 600; color: var(--tinta-suave); }   /* sin mayúsculas ni eyebrow (crítica del 2026-10-07) */
@@ -124,7 +143,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 #nota blockquote:not(.callout) { margin: 10px 0; padding: 2px 16px; border-left: 3px solid var(--linea); color: var(--tinta-suave); }
 #nota li.tarea { list-style: none; margin-left: -20px; }
 #nota li.tarea input { margin-right: 8px; transform: translateY(2px); }
-#nota .ejercicio { width: 100%; height: 75vh; border: 1px solid var(--linea); border-radius: var(--radio-bloque); background: #fff; }
+#nota .ejercicio { width: 100%; height: calc(100vh - 70px); border: 1px solid var(--linea); border-radius: var(--radio-bloque); background: #fff; }
 .math[data-display="1"] { text-align: center; margin: 12px 0; overflow-x: auto; }
 .cambiar-vista { display: flex; justify-content: flex-end; margin: 0 0 -6px; }
 
