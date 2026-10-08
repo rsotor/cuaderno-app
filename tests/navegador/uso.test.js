@@ -16,8 +16,9 @@ test.before(async () => {
   // Una nota larga de verdad y un repo debajo, como cualquier cuaderno real: cada `git status` del servidor crea .git/index.lock.
   fs.writeFileSync(path.join(e.c.base, 'larga.md'), `# Larga\n\n${Array.from({ length: 120 }, (_, i) => `Párrafo ${i + 1} de una nota que no cabe en la pantalla.\n`).join('\n')}`);
   git('init', '-q'); git('add', '-A'); git('commit', '-q', '-m', 'base');
-  // El vigilante de ficheros tarda en avisar (FSEvents en macOS, hasta 1 s): se espera a que la nota nueva esté en el índice.
-  await hasta(() => e.pagina.evaluate(() => fetch('/api/arbol').then(r => r.json()).then(a => JSON.stringify(a).includes('larga.md'))), 'arranque', 'larga.md no llega al índice');
+  // El vigilante de ficheros tarda en avisar (FSEvents en macOS, hasta 1 s). Se espera a que la recarga en vivo pinte
+  // «Larga» en el árbol: así todos los avisos de estas escrituras ya han pasado y no se cuelan en el primer recorrido.
+  await visible(e.pagina.locator('#arbol a.hoja', { hasText: 'Larga' }), 'arranque', 'la nota larga en el árbol por la recarga en vivo');
 });
 test.after(async () => { if (e) await e.cerrar(); });
 
@@ -99,4 +100,21 @@ test('nota nueva desde el buscador: sin resultados, Enter propone crearla con es
   await e.pagina.keyboard.press('Enter');
   await hashCumple(e.pagina, /^#\/n\/Pendientes%20de%20hoy\.md$/, 'buscador');
   await hasta(() => fs.existsSync(path.join(e.c.base, 'Pendientes de hoy.md')), 'buscador', 'el fichero no está en el cuaderno');
+});
+
+test('otra pestaña abre otro cuaderno: esta se entera, lo dice y pasa al nuevo (un servidor, un cuaderno)', async () => {
+  const { crearCuaderno } = require('../ayuda');
+  const otro = crearCuaderno({ kit: 'carpeta' });
+  try {
+    await e.ir('#/n/larga.md');
+    await conTexto(e.pagina.locator('#nota h1'), /^Larga$/, 'nota larga', 'el título');
+    // «Otra pestaña»: una petición con la misma cookie, fuera de la página; lo que se prueba es cómo reacciona esta.
+    const abrir = ruta => e.pagina.request.post(`${e.base}/api/abrir`, { data: { ruta }, headers: { origin: e.base } });
+    await abrir(otro.raiz);
+    await conTexto(e.pagina.locator('.aviso-flotante'), /ha abierto otro cuaderno/, 'pestaña vieja', 'el aviso de que el servidor cambió de cuaderno');
+    await hasta(() => e.pagina.evaluate(() => !location.hash.includes('larga.md')), 'pestaña vieja', 'sigue en la nota del cuaderno anterior');
+    await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(path.basename(otro.raiz)), 'pestaña vieja', 'el nombre del cuaderno nuevo en la barra');
+    await abrir(e.c.raiz);
+    await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(path.basename(e.c.raiz)), 'pestaña vieja', 'de vuelta al cuaderno de las pruebas');
+  } finally { otro.borrar(); }
 });

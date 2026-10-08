@@ -64,6 +64,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
     if (estado.cuaderno) estado.cuaderno.cerrar();
     estado.kit = k; estado.cuaderno = new Cuaderno(raiz, k.base);
     estado.cuaderno.vigilar(avisarCambio);
+    avisarCambio('');   // las demás pestañas abiertas se enteran de que el cuaderno es otro
     config.registrarReciente(raiz, estado.cuaderno.nombre());
     return info();
   };

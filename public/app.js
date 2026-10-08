@@ -10,7 +10,7 @@ async function api(p, body) {
   const r = await fetch(p, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : undefined);
   const d = await r.json().catch(() => ({ error: `respuesta ${r.status}` }));
   if (!r.ok) {
-    if (r.status === 409 && rutaActual) { avisar(d.error || 'La nota cambió; recargada'); abrirNota(rutaActual); }
+    if (r.status === 409 && rutaActual) { avisar('Esta nota cambió en el disco mientras la tenías abierta. La he vuelto a cargar: repite el cambio.'); abrirNota(rutaActual); }
     throw Object.assign(new Error(d.error || `error ${r.status}`), { status: r.status });
   }
   return d;
@@ -475,7 +475,7 @@ function enrutar() {
 window.addEventListener('hashchange', enrutar);
 
 // ---------- recarga en vivo
-try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; info = await api('/api/info'); pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
+try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
 
 (async () => {
   info = await api('/api/info');
