@@ -31,8 +31,8 @@ function pintarArbol(lista) {
   lista = lista.filter(p => p !== 'tareas.md');   // tareas.md se ve en el panel Tareas, no dos veces
   const raiz = {};
   for (const p of lista) { let n = raiz; const partes = p.split('/'); partes.forEach((s, i) => { if (i === partes.length - 1) (n.__f ??= []).push(p); else n = (n[s] ??= {}); }); }
-  const pintar = (n, abierto, prefijo = '') => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details${abierto ? ' open' : ''}><summary title="${esc(k)}"><span class="nombre">${nombreCarpeta(k)}</span>${botonMostrar(prefijo + k, k)}</summary>${pintar(n[k], false, `${prefijo}${k}/`)}</details>`).join('')
-    + (n.__f || []).map(p => { const t = tituloDe(p), repetido = (n.__f || []).some(q => q !== p && tituloDe(q) === t); return `<div class="fila"><a class="hoja${p.endsWith('.md') ? '' : ' fichero'}" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}"><span class="nombre">${esc(t)}</span>${repetido ? `<small>${esc(p.split('/').pop())}</small>` : ''}</a>${botonMostrar(p, t)}</div>`; }).join('');
+  const pintar = (n, abierto, prefijo = '') => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details${abierto ? ' open' : ''}><summary title="${esc(k)}"><span class="nombre">${nombreCarpeta(k)}</span>${botonesFila(prefijo + k, k)}</summary>${pintar(n[k], false, `${prefijo}${k}/`)}</details>`).join('')
+    + (n.__f || []).map(p => { const t = tituloDe(p), repetido = (n.__f || []).some(q => q !== p && tituloDe(q) === t); return `<div class="fila"><a class="hoja${p.endsWith('.md') ? '' : ' fichero'}" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}"><span class="nombre">${esc(t)}</span>${repetido ? `<small>${esc(p.split('/').pop())}</small>` : ''}</a>${botonesFila(p, t)}</div>`; }).join('');
   $('#arbol').innerHTML = lista.length ? pintar(raiz, true) : '<p class="vacio">No hay notas en esta carpeta.</p>';
   pintarCarpetas(lista);
   marcarActiva();
@@ -128,6 +128,29 @@ document.addEventListener('keydown', e => {
 // ---------- mostrar en el gestor de archivos del sistema (Finder, Explorador…)
 const GESTOR = /Mac/i.test(navigator.platform) ? 'el Finder' : /Win/i.test(navigator.platform) ? 'el Explorador' : 'la carpeta';
 const botonMostrar = (ruta, nombre) => `<button type="button" class="mostrar" data-mostrar="${esc(ruta)}" title="Mostrar en ${GESTOR}" aria-label="Mostrar ${esc(String(nombre).replace(/<[^>]*>/g, ''))} en ${GESTOR}">${icono('carpeta')}</button>`;
+const botonOcultar = (ruta, nombre) => `<button type="button" class="ocultar" data-ocultar="${esc(ruta)}" title="Ocultar aquí (solo en la app; se recupera en Ajustes)" aria-label="Ocultar ${esc(String(nombre).replace(/<[^>]*>/g, ''))}">${icono('ojo-tachado')}</button>`;
+const botonesFila = (ruta, nombre) => `<span class="acciones-fila">${botonOcultar(ruta, nombre)}${botonMostrar(ruta, nombre)}</span>`;
+// Ocultar (o volver a mostrar) una carpeta o un fichero del árbol y del buscador; solo en la app, por cuaderno.
+async function ocultar(ruta, si) {
+  try { await api('/api/ocultar', { ruta, ocultar: si }); } catch (e) { return avisar(e.message); }
+  arbol = await api('/api/arbol');
+  if (!$('#buscador').value.trim()) pintarArbol(arbol); else buscar($('#buscador').value);
+  if (si) avisar(`«${ruta.split('/').pop()}» oculto aquí. Para verlo otra vez: Ajustes.`);
+  if (!$('#ajustes').hidden) pintarOcultas();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-ocultar]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  ocultar(b.dataset.ocultar, true);
+});
+async function pintarOcultas() {
+  const sec = $('#ajustes-ocultas');
+  if (!cuaderno()) { sec.hidden = true; return; }
+  const l = await api('/api/ocultas');
+  sec.hidden = !l.length;
+  $('#lista-ocultas').innerHTML = l.map(r => `<li><code>${esc(r)}</code><button type="button" class="secundario pequeno" data-mostrar-de-nuevo="${esc(r)}">Mostrar</button></li>`).join('');
+}
+$('#lista-ocultas').addEventListener('click', e => { const b = e.target.closest('button[data-mostrar-de-nuevo]'); if (b) ocultar(b.dataset.mostrarDeNuevo, false); });
 async function mostrarEnCarpeta(ruta) { try { await api('/api/mostrar-en-carpeta', { ruta }); } catch (e) { avisar(e.message); } }
 document.addEventListener('click', e => {
   const b = e.target.closest('button[data-mostrar]'); if (!b) return;
@@ -563,7 +586,7 @@ function aplicarApariencia(c) { const r = document.documentElement; r.dataset.te
 function abrirAjustes() {
   const c = info.configuracion;
   $('#ajustes-tema').value = c.tema; $('#ajustes-letra').value = c.letra; $('#ajustes-fuente').value = c.fuente; $('#ajustes-panel').value = posicionCajon(); $('#ajustes-comando').value = c.comando_agente || '';
-  foco = document.activeElement; $('#ajustes').hidden = false; $('#ajustes-tema').focus();
+  foco = document.activeElement; $('#ajustes').hidden = false; $('#ajustes-tema').focus(); pintarOcultas();
 }
 function cerrarAjustes() { $('#ajustes').hidden = true; if (foco) foco.focus(); }
 $('#btn-ajustes').onclick = abrirAjustes;
