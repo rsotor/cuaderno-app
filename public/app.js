@@ -481,7 +481,8 @@ $('.sesiones').addEventListener('click', e => {
   if (b.dataset.cerrar) cerrarSesion(s); else activarSesion(s);
 });
 new ResizeObserver(() => { if (sesionActiva) redimensionar(sesionActiva); }).observe($('#terminal'));
-// Abrir la terminal: el cajón y la sesión que toque. «Profesor» reutiliza la suya si sigue viva; nunca mata un shell.
+// Abrir la terminal: el cajón y la sesión que toque. Un solo botón, Terminal (Roberto, 2026-10-08); al profesor se llega
+// desde «Abrir con el profesor» cuando falla Guardar o Traer, que reutiliza su sesión si sigue viva y nunca mata un shell.
 function abrirTerminal(modo) {
   abrirCajon();
   let s = modo === 'profesor' ? sesiones.find(o => o.modo === 'profesor' && !o.cerrada) : (sesionActiva || sesiones[0]);
@@ -492,7 +493,6 @@ function alternarTerminal() { if ($('#cajon').hidden) abrirTerminal('shell'); el
 $('#btn-terminal').onclick = () => alternarTerminal();
 $('#btn-cerrar-terminal').onclick = () => cerrarCajon();
 $('#btn-nueva-sesion').onclick = () => abrirTerminal('nueva');
-$('#btn-profesor').onclick = () => abrirTerminal('profesor');
 
 // ---------- cuadernos (pantalla de inicio)
 const hace = iso => { if (!iso) return 'nunca'; const d = (Date.now() - new Date(iso)) / 864e5; if (d < 1 / 24) return 'hace un momento'; if (d < 1) return `hace ${Math.round(d * 24)} h`; if (d < 30) return `hace ${Math.round(d)} día${Math.round(d) === 1 ? '' : 's'}`; return `el ${new Date(iso).toLocaleDateString('es')}`; };
@@ -587,7 +587,6 @@ function pintarEstado() {
   $('#lateral').classList.toggle('sin-repo', !!c && !c.git && c.kit !== 'kit');
   $('#btn-guardar').disabled = $('#btn-traer').disabled = $('#btn-deshacer').disabled = !!c && c.kit === 'salida-sin-motor';
   $('#btn-guardar').title = c && c.kit === 'salida-sin-motor' ? 'Este cuaderno es una salida del kit sin motor: no se puede guardar desde aquí' : 'Guardar en el repositorio del cuaderno';
-  $('#btn-profesor').hidden = !(c && c.profesor);
   $('#link-inicio').href = c && c.portada ? `#/n/${encodeURI(c.portada)}` : '#/';
 }
 async function cargarCuaderno() {

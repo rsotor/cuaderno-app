@@ -105,15 +105,18 @@ const filas = () => e.pagina.locator('#terminal .sesion:not([hidden]) .xterm-row
 const pestanas = () => e.pagina.locator('.sesion-pestana');
 const recargar = async () => { await e.pagina.reload(); await e.pagina.locator('#miga strong').waitFor(); };
 
-test('Terminal y Profesor conviven: abrir al profesor no mata el shell, y volver a él conserva lo escrito', async () => {
+test('un solo botón, Terminal; el profesor (desde un Guardar que falla) convive con el shell sin matarlo, y volver a él conserva lo escrito', async () => {
   await e.ir('#/'); const base = pty.procesos.length;
+  assert.equal(await e.pagina.locator('#btn-profesor').count(), 0, 'terminal: sigue habiendo un botón Profesor junto a Terminal');
   await abrirPanel();
   await hasta(() => pty.procesos.length === base + 1, 'terminal', 'abrir el panel no abre una pty');
   await hasta(() => e.pagina.evaluate(() => document.activeElement.classList.contains('xterm-helper-textarea')), 'terminal', 'al abrir, el foco no está en la terminal');
   await e.pagina.keyboard.type('hola');
   await hasta(() => pty.procesos[base].escrito.includes('hola'), 'terminal', `lo tecleado no llega a la pty (llegó «${pty.procesos[base].escrito}»)`);
   await conTexto(filas(), /hola/, 'terminal', 'el eco en la pantalla');
-  await e.pagina.click('#btn-profesor');
+  // Un Guardar que falla ofrece «Abrir con el profesor»: la única puerta al profesor que queda fuera del botón Terminal.
+  await e.pagina.evaluate(() => mostrarResultado('Guardar', { codigo: 1, salida: 'conflicto' }));
+  await e.pagina.click('#resultado-profesor');
   await hasta(() => pty.procesos.length === base + 2, 'terminal', 'Profesor no abre su propia pty');
   assert.equal(pty.procesos[base + 1].cmd, 'claude', `terminal: Profesor lanza «${pty.procesos[base + 1].cmd}», no el comando del adaptador`);
   await conTexto(e.pagina.locator('.sesion-pestana.activa'), /Profesor/, 'terminal', 'la pestaña activa');
