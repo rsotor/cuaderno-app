@@ -39,6 +39,21 @@ test('buscar: Ctrl K enfoca el buscador, «interes» enseña resultados y el pri
   await visible(e.pagina.locator('#nota .backlinks a', { hasText: 'Capital' }), 'nota', 'quién enlaza aquí');
 });
 
+test('editar una lista: el bloque es solo la lista y guardar no da conflicto (bug del 2026-10-08)', async () => {
+  await e.ir('#/n/conceptos/interes.md');
+  const bloque = await visible(e.pagina.locator('#nota .bloque', { hasText: 'Repasar con' }), 'nota Interés', 'la lista de casillas');
+  await bloque.hover();
+  await (await visible(bloque.locator('button[data-accion="editar"]'), 'nota Interés', 'el botón «editar» en la lista')).click();
+  await visible(e.pagina.locator('#editor'), 'editor', 'el diálogo de edición');
+  const texto = await e.pagina.locator('#editor-texto').inputValue();
+  assert.ok(!texto.endsWith('\n'), 'editor: el bloque de la lista no debería traer la línea en blanco que la sigue');
+  await e.pagina.locator('#editor-texto').fill(texto + '\n- [ ] Una casilla más');
+  await e.pagina.locator('#editor-guardar').click();
+  await ficheroCumple(e.c, 'conceptos/interes.md', /- \[ \] Una casilla más\n/, 'editor');
+  await oculto(e.pagina.locator('#editor'), 'editor', 'el diálogo de edición tras guardar');
+  await conTexto(e.pagina.locator('#nota'), /Una casilla más/, 'nota Interés', 'la casilla nueva tras guardar');
+});
+
 test('buscar con teclado: por título («módulo» abre el examen), flecha abajo y Enter; Escape vuelve al árbol', async () => {
   await e.ir('#/');
   await e.pagina.keyboard.press('Control+k');

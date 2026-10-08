@@ -131,13 +131,15 @@ function crearRender(resolverWiki) {
   // --- Bloques editables: cada bloque de nivel 0 se envuelve con sus líneas de origen.
   md.core.ruler.push('bloques', (state) => {
     if (state.inlineMode) return;   // renderInline: sin envoltorios de bloque
-    const ts = state.tokens, salida = [];
+    const ts = state.tokens, salida = [], lineas = state.src.split('\n');
     for (let i = 0; i < ts.length; i++) {
       const t = ts[i];
       if (t.level === 0 && t.map && (t.nesting === 1 || t.nesting === 0)) {
+        // markdown-it da a las listas la línea en blanco que las sigue: fuera, que el bloque sea solo la lista.
+        let hasta = t.map[1]; while (hasta > t.map[0] + 1 && !(lineas[hasta - 1] || '').trim()) hasta--;
         let j = i;
         if (t.nesting === 1) { let prof = 0; for (j = i; j < ts.length; j++) { prof += ts[j].nesting; if (prof === 0) break; } }
-        const abre = new state.Token('bloque_open', '', 0); abre.meta = { desde: t.map[0], hasta: t.map[1] };
+        const abre = new state.Token('bloque_open', '', 0); abre.meta = { desde: t.map[0], hasta };
         const cierra = new state.Token('bloque_close', '', 0);
         salida.push(abre, ...ts.slice(i, j + 1), cierra);
         i = j;

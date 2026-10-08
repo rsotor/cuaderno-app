@@ -151,3 +151,11 @@ test('nueva nota: el título es el nombre del fichero, en la carpeta que se diga
   assert.throws(() => cu.nuevaNota('x', 'no-existe'), /no existe la carpeta/);
   assert.throws(() => cu.nuevaNota('x', '..'), /fuera del cuaderno/);
 }));
+
+test('editar y comentar una lista: el original con línea en blanco final no es un conflicto (bug del 2026-10-08)', con({}, (c, cu) => {
+  const ls = cu.lineas(c.leer('sesiones/01-01-01-sesion.md'));
+  // La lista final («- [ ] Leer…», «- [x] Hecho ya») va de la línea 10 a la 12; el cliente antiguo mandaba también la 12 en blanco.
+  assert.doesNotThrow(() => cu.comprobarOriginal(ls, 10, 12, ls.slice(10, 12).join('\n') + '\n'));
+  cu.escribirBloque('sesiones/01-01-01-sesion.md', 10, 12, '- [ ] Leer [[interes]]\n- [x] Hecho ya\n- [ ] Otra', ls.slice(10, 12).join('\n') + '\n');
+  assert.match(c.leer('sesiones/01-01-01-sesion.md'), /- \[x\] Hecho ya\n- \[ \] Otra\n$/);
+}));

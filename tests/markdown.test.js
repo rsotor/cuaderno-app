@@ -62,3 +62,10 @@ test('imágenes: la ruta relativa se resuelve desde la carpeta de la nota y se s
   assert.match(html, /<img src="https:\/\/x\.org\/a\.png" alt="web">/);
   assert.match(html, /class="wiki roto"/, 'el wikilink normal sigue siendo un enlace');
 });
+
+test('bloques: una lista seguida de línea en blanco acaba donde acaba la lista, no en la línea en blanco', () => {
+  const md = crearRender(() => null);
+  const html = md.render('# T\n\n- uno\n- dos\n\nPárrafo.\n');
+  assert.match(html, /data-desde="2" data-hasta="4">\s*<ul/, 'la lista ocupa las líneas 2 y 3; markdown-it le daba también la 4 (en blanco)');
+  assert.match(html, /data-desde="5" data-hasta="6">\s*<p/);
+});

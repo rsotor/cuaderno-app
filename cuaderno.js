@@ -216,7 +216,8 @@ class Cuaderno {
   comprobarOriginal(ls, desde, hasta, original) {
     const actual = this.tramo(ls, desde, hasta);   // valida el rango aunque no venga el original
     if (original == null) return;
-    if (actual !== String(original).replace(/\r\n/g, '\n').replace(/\n$/, '')) throw new ErrorConflicto('la nota cambió desde que la abriste; vuelve a cargarla');
+    const norm = s => String(s).replace(/\r\n/g, '\n').replace(/\n+$/, '');   // los dos lados igual: un bloque que acababa en línea en blanco daba conflicto siempre (2026-10-08)
+    if (norm(actual) !== norm(original)) throw new ErrorConflicto('la nota cambió desde que la abriste; vuelve a cargarla');
   }
   escribirBloque(rel, desde, hasta, texto, original) {
     const abs = this.dentro(rel), src = fs.readFileSync(abs, 'utf8');
