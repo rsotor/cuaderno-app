@@ -18,15 +18,34 @@ const { crearCuaderno } = require('../ayuda');
 
 const ESPERA = 8000;   // ms: lo que se espera como mucho a que la pantalla o el fichero cambien
 
+// Una pty de mentira para los recorridos (sin node-pty): cada proceso guarda el comando, hace eco de lo que recibe,
+// anota cada `resize` y cada `kill`, y `salir()` dispara su `onExit` como si el programa hubiera terminado.
+function ptyFalso() {
+  const procesos = [];
+  return {
+    procesos,
+    spawn(cmd, args, opciones) {
+      const p = { cmd, args, opciones, escrito: '', redimensiones: [], muerto: false, salida: null, datos: null,
+        onData(f) { p.datos = f; }, onExit(f) { p.salida = f; },
+        write(s) { p.escrito += s; if (p.datos) p.datos(s); },
+        resize(cols, rows) { p.redimensiones.push({ cols, rows }); },
+        kill() { if (p.muerto) return; p.muerto = true; if (p.salida) p.salida({ exitCode: 0 }); },
+        salir() { if (p.salida) p.salida({ exitCode: 0 }); } };
+      procesos.push(p);
+      return p;
+    },
+  };
+}
+
 // Arranca servidor + navegador y abre la app con el token de la URL (fija la cookie y redirige a /).
-// La terminal del sistema no se abre en los tests: `lanzado` guarda lo que la app habría lanzado.
-async function arrancar(opciones = { kit: 'kit' }) {
+// `pty` (ptyFalso(), normalmente) da terminal a los recorridos que la necesitan; sin él, la pestaña dice que no hay.
+async function arrancar({ pty = null, ...opciones } = { kit: 'kit' }) {
   const c = crearCuaderno(opciones);
   const kit = detectar(c.raiz);
-  const lanzado = [], ejecutado = [];
-  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, kit.base), kit, lanzar: (cmd, args, o) => lanzado.push({ cmd, args, cwd: o.cwd }),
+  const lanzado = [], ejecutado = [];   // lo que la app habría lanzado en el sistema (el gestor de archivos); en los tests no se abre nada
+  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, kit.base), kit, pty, lanzar: (cmd, args, o) => lanzado.push({ cmd, args, cwd: o.cwd }),
     ejecutar: (cmd, args) => { ejecutado.push({ cmd, args }); fs.rmSync(args.at(-1)); },   // la papelera, simulada: el fichero desaparece
-    plataforma: 'darwin' });   // fija: el resultado no depende del sistema que corre los tests (cada uno, en terminal.test.js)
+    plataforma: 'darwin' });   // fija: el resultado no depende del sistema que corre los tests (cada uno, en sistema.test.js)
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;
   let navegador;
@@ -77,4 +96,4 @@ async function ficheroCumple(c, rel, re, pantalla) {
 // El hash de la página tiene que cumplir la expresión.
 async function hashCumple(pagina, re, pantalla) { await hasta(() => re.test(new URL(pagina.url()).hash), pantalla, `el hash no cumple ${re}; es ${new URL(pagina.url()).hash}`); }
 
-module.exports = { arrancar, hasta, visible, oculto, conTexto, ficheroCumple, hashCumple, fallo, ESPERA };
+module.exports = { arrancar, ptyFalso, hasta, visible, oculto, conTexto, ficheroCumple, hashCumple, fallo, ESPERA };

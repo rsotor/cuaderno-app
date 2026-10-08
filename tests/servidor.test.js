@@ -13,10 +13,10 @@ const { crearCuaderno } = require('./ayuda');
 async function arrancar(opciones = {}) {
   const c = crearCuaderno(opciones);
   const kit = detectar(c.raiz);
-  const lanzado = [], ejecutado = [];   // lo que la app habría abierto como terminal del sistema (no se abre nada en los tests)
+  const lanzado = [], ejecutado = [];   // lo que la app habría lanzado en el sistema (el gestor de archivos); en los tests no se abre nada
   const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, kit.base), kit, token: 'ab'.repeat(16), lanzar: (cmd, args, o) => lanzado.push({ cmd, args, cwd: o.cwd }),
     ejecutar: (cmd, args) => { ejecutado.push({ cmd, args }); fs.rmSync(args.at(-1)); },   // la papelera, simulada: el fichero desaparece
-    plataforma: 'darwin' });   // fija: el resultado no depende del sistema que corre los tests (cada uno, en terminal.test.js)
+    plataforma: 'darwin' });   // fija: el resultado no depende del sistema que corre los tests (cada uno, en sistema.test.js)
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const puerto = server.address().port;
   const base = `http://127.0.0.1:${puerto}`;
@@ -102,6 +102,7 @@ test('WebSocket: sin cookie o con Origin ajeno no hay terminal ni recarga', asyn
     assert.equal(await intentar('/cambios', { cookie: s.cookie, origin: 'http://evil.example' }), 'rechazado');
     assert.equal(await intentar('/cambios', { cookie: s.cookie }), 'rechazado');   // un WebSocket siempre trae Origin
     assert.equal(await intentar('/cambios', { cookie: s.cookie, origin: `http://127.0.0.1:${s.puerto}` }), 'abierto');
+    assert.equal(await intentar('/pty', { cookie: s.cookie, origin: `http://127.0.0.1:${s.puerto}` }), 'abierto');   // sin pty: avisa y cierra
   } finally { await s.cerrar(); }
 });
 
@@ -125,7 +126,10 @@ test('sin cuaderno abierto: la API lo dice; abrir una carpeta cambia el cuaderno
     const lista = await (await pedir('/api/cuadernos')).json();
     assert.deepEqual(lista.map(c => [c.nombre, c.existe, c.abiertoAhora]), [['Mi otro curso', true, true]]);
     // la configuración se guarda y vuelve en /api/info
-    assert.deepEqual(await (await post('/api/configuracion', { tema: 'oscuro', letra: 'grande' })).json(), { tema: 'oscuro', letra: 'grande', fuente: 'sistema', comando_agente: '' });
+    assert.deepEqual(await (await post('/api/configuracion', { tema: 'oscuro', letra: 'grande' })).json(), { tema: 'oscuro', letra: 'grande', fuente: 'sistema', comando_agente: '', panel: 'derecha', panel_ancho: 420, panel_alto: 320 });
+    // el panel: un tamaño fuera de rango no da error ni se guarda; vuelve el valor que había
+    assert.equal((await (await post('/api/configuracion', { panel: 'abajo', panel_ancho: 99999 })).json()).panel_ancho, 420);
+    assert.equal((await (await pedir('/api/info')).json()).configuracion.panel, 'abajo');
     assert.equal((await (await pedir('/api/info')).json()).configuracion.tema, 'oscuro');
     await post('/api/olvidar', { ruta: otro.raiz });
     assert.deepEqual(await (await pedir('/api/cuadernos')).json(), []);
@@ -184,23 +188,6 @@ test('la pestaña lleva icono: index.html lo enlaza y /public/icono.svg se sirve
   } finally { await s.cerrar(); }
 });
 
-test('terminal: la del sistema se abre en la carpeta del cuaderno; con profesor, con su comando; sin profesor configurado, lo dice', async () => {
-  const s = await arrancar({ kit: 'kit' });
-  const post = (ruta, body) => s.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  try {
-    const r = await (await post('/api/terminal', {})).json();
-    assert.ok(r.terminal, 'no dice qué terminal ha abierto');
-    assert.equal(s.lanzado.length, 1); assert.equal(s.lanzado[0].cwd, s.c.raiz);
-    await post('/api/terminal', { profesor: true });
-    assert.equal(s.lanzado.length, 2); assert.match(JSON.stringify(s.lanzado[1].args), /claude/, 'el profesor no lleva el comando del adaptador');
-  } finally { await s.cerrar(); }
-  const sin = await arrancar({ kit: 'carpeta' });
-  try {
-    const r = await sin.pedir('/api/terminal', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ profesor: true }) });
-    assert.equal(r.status, 400); assert.match((await r.json()).error, /no tiene profesor/);
-    assert.equal(sin.lanzado.length, 0);
-  } finally { await sin.cerrar(); }
-});
 
 test('ficheros: /fichero sirve el PDF con su tipo y nosniff, aísla un .svg y un .html, y no sigue un enlace simbólico que sale del cuaderno', async () => {
   const s = await arrancar();
