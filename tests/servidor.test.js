@@ -123,7 +123,10 @@ test('sin cuaderno abierto: la API lo dice; abrir una carpeta cambia el cuaderno
     const lista = await (await pedir('/api/cuadernos')).json();
     assert.deepEqual(lista.map(c => [c.nombre, c.existe, c.abiertoAhora]), [['Mi otro curso', true, true]]);
     // la configuración se guarda y vuelve en /api/info
-    assert.deepEqual(await (await post('/api/configuracion', { tema: 'oscuro', letra: 'grande' })).json(), { tema: 'oscuro', letra: 'grande', fuente: 'sistema', comando_agente: '' });
+    assert.deepEqual(await (await post('/api/configuracion', { tema: 'oscuro', letra: 'grande' })).json(), { tema: 'oscuro', letra: 'grande', fuente: 'sistema', comando_agente: '', panel: 'derecha', panel_ancho: 420, panel_alto: 320 });
+    // el panel: un tamaño fuera de rango no da error ni se guarda; vuelve el valor que había
+    assert.equal((await (await post('/api/configuracion', { panel: 'abajo', panel_ancho: 99999 })).json()).panel_ancho, 420);
+    assert.equal((await (await pedir('/api/info')).json()).configuracion.panel, 'abajo');
     assert.equal((await (await pedir('/api/info')).json()).configuracion.tema, 'oscuro');
     await post('/api/olvidar', { ruta: otro.raiz });
     assert.deepEqual(await (await pedir('/api/cuadernos')).json(), []);
