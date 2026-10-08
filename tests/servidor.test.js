@@ -283,3 +283,39 @@ test('desactualizada: si el código de la app cambia en el disco tras arrancar, 
     assert.equal((await pedir()).desactualizada, true, 'no avisa de que el código cambió');
   } finally { await new Promise(r => server.close(r)); c.borrar(); fs.rmSync(fuentes, { recursive: true, force: true }); }
 });
+
+test('rutas de lectura y de nota nueva: títulos, recorrido y crear una nota', async () => {
+  const s = await arrancar();
+  const post = (ruta, body) => s.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    const t = await (await s.pedir('/api/titulos')).json();
+    assert.equal(t['conceptos/capital.md'], 'Capital'); assert.equal(t['material/calculadora-50-30-20.html'], 'Calculadora 50/30/20');
+    const r = await (await s.pedir('/api/recorrido')).json();
+    assert.equal(r.notas, 16); assert.deepEqual(r.fallos, []);
+    const n = await (await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).json();
+    assert.equal(n.ruta, 'conceptos/Idea nueva.md'); assert.equal(s.c.leer('conceptos/Idea nueva.md'), '# Idea nueva\n\n');   // el título y una línea en blanco para escribir debajo
+    assert.equal((await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).status, 400, 'una nota repetida no da error');
+  } finally { await s.cerrar(); }
+});
+
+test('rutas de guardar sin kit: propuesta, guardar, traer y deshacer, por la API', async () => {
+  const { execFileSync } = require('node:child_process');
+  const s = await arrancar();
+  const git = (...a) => execFileSync('git', a, { cwd: s.c.raiz, encoding: 'utf8' }).trim();
+  const post = (ruta, body) => s.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+  try {
+    git('init', '-q', '-b', 'main'); git('config', 'user.name', 'Prueba'); git('config', 'user.email', 'prueba@example.com'); git('add', '-A'); git('commit', '-q', '-m', 'base');
+    fs.appendFileSync(path.join(s.c.base, 'tareas.md'), '- [ ] Por la API\n');
+    const p = await (await s.pedir('/api/guardar/propuesta')).json();
+    assert.equal(p.repo, true); assert.equal(p.kit, 'carpeta'); assert.deepEqual(p.cambios.map(c => c.ruta || c), ['tareas.md']); assert.ok(p.mensaje);
+    const g = await post('/api/guardar', { mensaje: 'Guardado por la API' });
+    assert.equal(git('log', '-1', '--format=%s'), 'Guardado por la API', `guardar no ha hecho commit: ${g.salida}`);
+    const t = await post('/api/traer', {});
+    assert.match(t.salida, /remoto/i, 'traer sin remoto no lo dice');
+    const ver = await post('/api/deshacer', { ver: true });
+    assert.equal(ver.codigo, 0); assert.match(ver.salida, /Guardado por la API/);
+    assert.equal(git('log', '-1', '--format=%s'), 'Guardado por la API', 'deshacer con ver: true ha revertido');
+    const d = await post('/api/deshacer', { ver: false });
+    assert.equal(d.codigo, 0); assert.doesNotMatch(s.c.leer('tareas.md'), /Por la API/, 'deshacer no ha revertido');
+  } finally { await s.cerrar(); }
+});

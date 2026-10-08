@@ -23,7 +23,13 @@ tocar nada y mantenlo al día mientras trabajas (su §0 es el fichero de estado 
 - **Español en todo:** código, comentarios, tests, docs, commits. Nombres de variables y funciones en español.
 - **Node sin build:** CommonJS, sin transpilar, sin bundler. El navegador carga `public/` y `node_modules/` tal cual.
 - **Tests con `node --test`** en `tests/*.test.js`; `npm test` los lanza. Un test que falla no se arregla tocando
-  el valor esperado.
+  el valor esperado. Dos tipos: de código (Node: piezas sueltas y la API) y de navegador (Playwright,
+  `tests/navegador/`: un flujo entero, lo que ves y lo que queda en el fichero).
+- **Toda la funcionalidad, probada** (Roberto, 2026-10-09): cada caso de uso con su recorrido de navegador (tabla de
+  `ejemplos/cuaderno-ejemplo.md`, vigilada por `tests/ejemplo.test.js`) y cada ruta de la API con su test de Node
+  (`tests/rutas.test.js`). Cobertura del código del servidor con **suelo del 85 %** de líneas, ramas y funciones en la
+  CI (`npm run test:cobertura`); la de la pantalla, como informe (`npm run cobertura:pantalla`). Sin perseguir el
+  número: el suelo avisa de lo que entra sin test.
 - **Node 24 o más reciente.** Dependencias: las menos posibles; cada una nueva se justifica en el plan vivo.
 - **Commits pequeños, y todo entra por PR** (squash con el título del PR, la CI en verde antes de mergear; §6 del
   plan vivo), con mensaje en castellano.
