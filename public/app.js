@@ -27,11 +27,13 @@ const nombreCarpeta = k => { const m = k.match(/^((?:modulo|m|bloque|semana|tema
 
 // ---------- árbol
 function pintarArbol(lista) {
+  lista = lista.filter(p => p !== 'tareas.md');   // tareas.md se ve en el panel Tareas, no dos veces
   const raiz = {};
   for (const p of lista) { let n = raiz; const partes = p.split('/'); partes.forEach((s, i) => { if (i === partes.length - 1) (n.__f ??= []).push(p); else n = (n[s] ??= {}); }); }
   const pintar = (n, abierto) => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details${abierto ? ' open' : ''}><summary title="${esc(k)}">${nombreCarpeta(k)}</summary>${pintar(n[k], false)}</details>`).join('')
     + (n.__f || []).map(p => { const t = tituloDe(p), repetido = (n.__f || []).some(q => q !== p && tituloDe(q) === t); return `<a class="hoja" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}">${esc(t)}${repetido ? `<small>${esc(p.split('/').pop())}</small>` : ''}</a>`; }).join('');
   $('#arbol').innerHTML = lista.length ? pintar(raiz, true) : '<p class="vacio">No hay notas en esta carpeta.</p>';
+  pintarCarpetas(lista);
   marcarActiva();
 }
 function marcarActiva() {
@@ -39,6 +41,27 @@ function marcarActiva() {
   document.querySelectorAll('#arbol a, .paginas a').forEach(a => { const activa = a.getAttribute('href') === actual; a.classList.toggle('activa', activa); if (activa) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   const a = document.querySelector('#arbol a.activa'); if (a) { let d = a.parentElement; while (d && d.id !== 'arbol') { if (d.tagName === 'DETAILS') d.open = true; d = d.parentElement; } }
 }
+
+// ---------- nota nueva: botón «Nueva nota» (título y carpeta) o, en el buscador, Enter cuando no hay resultados
+function pintarCarpetas(lista) {
+  const carpetas = [...new Set(lista.map(p => p.split('/').slice(0, -1).join('/')).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+  $('#nueva-nota-carpeta').innerHTML = `<option value="">(raíz del cuaderno)</option>` + carpetas.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+}
+function abrirNuevaNota(titulo = '') {
+  const carpeta = rutaActual ? rutaActual.split('/').slice(0, -1).join('/') : '';
+  $('#nueva-nota-nombre').value = titulo; $('#nueva-nota-carpeta').value = carpeta;
+  abrirModal('#nueva-nota', '#nueva-nota-nombre');
+}
+async function crearNota(titulo, carpeta) {
+  let r; try { r = await api('/api/nota/nueva', { titulo, carpeta }); } catch (e) { avisar(e.message); return false; }
+  cerrarModal('#nueva-nota'); $('#buscador').value = ''; buscar('');
+  location.hash = `#/n/${encodeURI(r.ruta)}`;
+  return true;
+}
+$('#btn-nueva-nota').onclick = () => abrirNuevaNota();
+$('#nueva-nota-cancelar').onclick = () => cerrarModal('#nueva-nota');
+$('#nueva-nota-form').addEventListener('submit', e => { e.preventDefault(); crearNota($('#nueva-nota-nombre').value, $('#nueva-nota-carpeta').value); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#nueva-nota').hidden) cerrarModal('#nueva-nota'); });
 
 // ---------- buscador
 let tBusqueda;
@@ -75,18 +98,20 @@ async function buscar(q) {
   const lineas = r.lineas.map(l => `<a class="resultado" href="#/n/${encodeURI(l.ruta)}?l=${l.linea}">${esc(tituloDe(l.ruta))}<small>${marcar(l.texto)}</small></a>`).join('');
   const nada = !r.ficheros.length && !r.lineas.length;
   $('#arbol').innerHTML = `<div class="oculto" role="status">${nada ? `nada con «${esc(q.trim())}»` : `${plural(r.ficheros.length, 'nota', 'notas')} y ${plural(r.lineas.length, 'línea', 'líneas')}`}</div>`
-    + (nada ? `<p class="vacio">Nada con «${esc(q.trim())}».</p>` : '')
+    + (nada ? `<p class="vacio">Nada con «${esc(q.trim())}».</p><button type="button" class="resultado crear" data-crear="${esc(q.trim())}"><kbd>Enter</kbd> crea la nota <b>${esc(q.trim())}</b></button>` : '')
     + (r.ficheros.length ? `<h3 class="tramo">${plural(r.ficheros.length, 'nota', 'notas')}</h3>${notas}` : '')
     + (r.lineas.length ? `<h3 class="tramo">En el texto <small>${plural(r.lineas.length, 'línea', 'líneas')}</small></h3>${lineas}` : '');
 }
 // Teclado en el buscador: flecha abajo o Enter van al primer resultado (Enter lo abre); Escape vacía y vuelve al árbol.
 $('#buscador').addEventListener('keydown', e => {
   if (comandoTarea(e.target.value) != null || !e.target.value.trim()) return;
-  const primero = $('#arbol a.resultado');
+  const primero = $('#arbol a.resultado'), crear = $('#arbol button.crear');
   if (e.key === 'ArrowDown' && primero) { e.preventDefault(); primero.focus(); }
   if (e.key === 'Enter' && primero) { e.preventDefault(); primero.click(); }
+  else if (e.key === 'Enter' && crear) { e.preventDefault(); abrirNuevaNota(crear.dataset.crear); }
   if (e.key === 'Escape') { e.preventDefault(); e.target.value = ''; buscar(''); }
 });
+$('#arbol').addEventListener('click', e => { const b = e.target.closest('button.crear'); if (b) abrirNuevaNota(b.dataset.crear); });
 $('#arbol').addEventListener('keydown', e => {
   const a = e.target.closest('a.resultado'); if (!a || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
   e.preventDefault();
@@ -254,7 +279,7 @@ async function abrirTareas() {
   const activo = document.activeElement && $('#panel').contains(document.activeElement) ? document.activeElement.id : null;
   const borrador = $('#tarea-nueva') ? $('#tarea-nueva').value : '';
   const total = g.reduce((a, x) => a + x.items.length, 0), hechas = g.reduce((a, x) => a + x.items.filter(i => i.hecha).length, 0);
-  const nota = cuaderno().kit !== 'carpeta' ? 'Lo que marcas aquí se escribe en su nota. Los exámenes y las flashcards se contestan en la suya.' : 'Tu lista propia, en <code>tareas.md</code>.';
+  const nota = cuaderno().kit !== 'carpeta' ? 'Lo que marcas aquí se escribe en su nota. Los exámenes y las flashcards se contestan en la suya.' : 'Tu lista propia, en <a href="#/n/tareas.md">tareas.md</a>.';
   const f = filtrosTareas();
   const notas = [...new Set(g.flatMap(x => x.items.flatMap(i => i.enlaces || [])))].sort((a, b) => a.localeCompare(b, 'es'));
   const etiquetas = [...new Set(g.flatMap(x => x.items.flatMap(i => i.etiquetas || [])))].sort((a, b) => a.localeCompare(b, 'es'));

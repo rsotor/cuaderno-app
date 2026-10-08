@@ -68,8 +68,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 #lateral.sin-cuaderno #buscador, #lateral.sin-cuaderno .paginas, #lateral.sin-cuaderno #btn-terminal, #lateral.sin-cuaderno .guardar-barra, #lateral.sin-repo .guardar-barra { display: none; }
 #buscador { margin: 8px 12px; padding: 8px 10px; }
 .paginas { display: flex; flex-direction: column; padding: 4px 8px; }
-.paginas a, #arbol a { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radio); color: var(--tinta); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.paginas a:hover, #arbol a:hover, #arbol summary:hover { background: rgba(127,127,127,.12); }
+.paginas a, .paginas button, #arbol a { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radio); color: var(--tinta); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.paginas a:hover, .paginas button:hover, #arbol a:hover, #arbol summary:hover { background: rgba(127,127,127,.12); }
 .paginas a.activa, #arbol a.activa { background: var(--acento-suave); color: var(--acento); }
 .paginas .icono { color: var(--tinta-suave); } .paginas a.activa .icono { color: var(--acento); }
 .contador { font-size: 12px; color: var(--tinta-suave); margin-left: auto; }
@@ -89,6 +89,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 #arbol .tramo { margin: 10px 10px 2px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--tinta-suave); }
 #arbol .tramo small { font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 6px; }
 #arbol .resultado { padding: 6px 10px; display: block; }
+.paginas button { background: none; border: 0; font: inherit; cursor: pointer; width: 100%; text-align: left; }
+#arbol button.crear { width: 100%; text-align: left; background: none; border: 1px dashed var(--linea); font: inherit; color: var(--tinta-suave); cursor: pointer; white-space: normal; line-height: 1.45; }
+#arbol button.crear b { color: var(--tinta); }
+#nueva-nota input, #nueva-nota select { width: 100%; }
 #arbol .resultado small { display: block; color: var(--tinta-suave); white-space: normal; font-size: 12px; line-height: 1.35; }
 #arbol .comando { white-space: normal; color: var(--tinta-suave); line-height: 1.45; }   /* la pista del «+»: Enter añade la tarea */
 #arbol .comando b { color: var(--tinta); font-weight: 600; overflow-wrap: anywhere; }
@@ -100,7 +104,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 .miga-barra { position: sticky; top: 0; background: var(--fondo); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px 40px; }
 #miga { font-size: 13px; color: var(--tinta-suave); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #btn-menu { display: none; padding: 6px 8px; }
-#nota, #panel { max-width: calc(62ch + 80px); margin: 0 auto; padding: 8px 40px 40px; }   /* 62 ch ≈ 75 caracteres reales por línea */
+#nota, #panel { max-width: calc(76ch + 80px); margin: 0 auto; padding: 8px 40px 40px; }   /* 76 ch ≈ 90 caracteres por línea: en pantalla grande la columna no se queda estrecha (Roberto, 2026-10-08) */
 #nota h1, #panel h1 { font-size: 28px; line-height: 1.15; margin: 6px 0 18px; font-weight: 700; letter-spacing: -.01em; }
 #nota h2 { font-size: 21px; margin: 32px 0 10px; border-bottom: 1px solid var(--linea); padding-bottom: 4px; }
 #nota h3 { font-size: 17px; margin: 24px 0 8px; }

@@ -167,6 +167,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
         if (p === '/api/casilla') { cu.marcarCasilla(b.ruta, b.linea, !!b.marcada, b.original); return json(res, { ok: true }); }
         if (p === '/api/comentario') { cu.comentar(b.ruta, b.desde, b.hasta, b.texto, b.original); return json(res, { ok: true }); }
         if (p === '/api/tarea') { cu.nuevaTarea(b.texto); return json(res, { ok: true }); }
+        if (p === '/api/nota/nueva') return json(res, { ruta: cu.nuevaNota(b.titulo, b.carpeta) });
       }
       res.writeHead(404); res.end('no existe');
     } catch (e) {

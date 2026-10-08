@@ -7,6 +7,13 @@ esfuerzo. Termina con una recomendación. La decisión es de Roberto; hasta ento
 Aclaración de Roberto (2026-10-08): el objetivo es **un chat conectado al profesor dentro de la app**, no
 necesariamente una interfaz nuestra; un Discord o parecido también sirve. Eso abre las vías de §2.
 
+> [!comment] Alumno (2026-10-08)
+> eso es la idea es poder meter la iteraccion con el profesor/asistente loq ue tenemos en obsidian con claudian o en terminal pues aqui. debemos
+> * poder darle un pcoo de formato peude ser simple pero que enteinda si le paso lsitados o enalces
+> * poder adjutnar imagenes
+> * debe poder tener permisos apra crear nuevas carpeta, ficheros etc
+> * estaria bien poder relacioanr que página estabmos viendo
+
 Todo lo que sigue sale de la documentación y el código oficiales leídos hoy (enlaces al final), no de memoria.
 Lo que no está documentado se marca como **por comprobar**.
 

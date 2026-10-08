@@ -247,6 +247,22 @@ class Cuaderno {
     ls.splice(hasta, 0, ...nuevas);
     this.escribir(abs, ls, this.finDeLinea(src));
   }
+  // Nota nueva: el título es el nombre del fichero (sin los caracteres que un sistema de ficheros no admite), en la
+  // carpeta que se diga (tiene que existir). Solo `# Título` y una línea en blanco: el resto se escribe por bloques.
+  nuevaNota(titulo, carpeta = '') {
+    const t = String(titulo || '').trim();
+    if (!t) throw new ErrorPeticion('la nota necesita un título');
+    const nombre = t.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
+    if (!nombre || nombre.startsWith('.')) throw new ErrorPeticion('ese título no vale como nombre de fichero');
+    const dir = String(carpeta || '').replace(/^\/+|\/+$/g, '');
+    const rel = (dir ? dir + '/' : '') + nombre + '.md';
+    const abs = this.dentro(rel);
+    if (dir && !fs.existsSync(path.dirname(abs))) throw new ErrorPeticion(`no existe la carpeta ${dir}`);
+    if (fs.existsSync(abs)) throw new ErrorPeticion(`ya hay una nota llamada ${rel}`);
+    fs.writeFileSync(abs, `# ${t}\n\n`);
+    this.invalidar();
+    return rel;
+  }
   nuevaTarea(texto) {
     if (!String(texto || '').trim()) throw new ErrorPeticion('tarea vacía');
     const abs = path.join(this.base, 'tareas.md');

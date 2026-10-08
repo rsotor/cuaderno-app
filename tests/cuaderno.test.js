@@ -140,3 +140,14 @@ test('recorrido: cuenta notas, enlaces rotos y fallos', con({}, (c, cu) => {
   assert.deepEqual(r.rotos, [{ ruta: 'conceptos/interes.md', destino: 'no-existe' }]);
   assert.deepEqual(r.fallos, []);
 }));
+
+test('nueva nota: el título es el nombre del fichero, en la carpeta que se diga; ni repetida ni fuera del cuaderno', con({}, (c, cu) => {
+  assert.equal(cu.nuevaNota('Idea rápida: ¿qué es el interés?'), 'Idea rápida ¿qué es el interés.md', 'sin : ni ?, que Windows no admite en un nombre');
+  assert.equal(c.leer('Idea rápida ¿qué es el interés.md'), '# Idea rápida: ¿qué es el interés?\n\n', 'el título se queda entero dentro');
+  assert.equal(cu.nuevaNota('Dudas', 'conceptos'), 'conceptos/Dudas.md');
+  assert.ok(cu.listar().includes('conceptos/Dudas.md'), 'el índice se invalida: la nota nueva aparece');
+  assert.throws(() => cu.nuevaNota('Dudas', 'conceptos'), /ya hay una nota/);
+  assert.throws(() => cu.nuevaNota('   '), /título/);
+  assert.throws(() => cu.nuevaNota('x', 'no-existe'), /no existe la carpeta/);
+  assert.throws(() => cu.nuevaNota('x', '..'), /fuera del cuaderno/);
+}));

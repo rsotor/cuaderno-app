@@ -36,6 +36,7 @@
       <a id="link-inicio" href="#/" data-pagina="inicio"><svg class="icono" aria-hidden="true"><use href="#i-casa"/></svg>Inicio</a>
       <a href="#/tareas" data-pagina="tareas"><svg class="icono" aria-hidden="true"><use href="#i-casillas"/></svg>Tareas <span class="contador" id="n-tareas"></span></a>
       <a href="#/comentarios" data-pagina="comentarios"><svg class="icono" aria-hidden="true"><use href="#i-bocadillo"/></svg>Comentarios <span class="contador" id="n-comentarios"></span></a>
+      <button type="button" id="btn-nueva-nota" title="Crear una nota nueva"><svg class="icono" aria-hidden="true"><use href="#i-lapiz"/></svg>Nueva nota</button>
     </nav>
     <nav id="arbol" aria-label="Notas"></nav>
     <footer class="pie-lateral">
@@ -61,6 +62,14 @@
     <textarea id="editor-texto" spellcheck="false"></textarea>
     <div class="pie"><span class="pista">Ctrl Enter guarda · Esc cancela</span><button type="button" id="editor-cancelar" class="secundario">Cancelar</button><button type="button" id="editor-guardar">Guardar</button></div>
   </div>
+</div>
+<div id="nueva-nota" class="modal" role="dialog" aria-modal="true" aria-labelledby="nueva-nota-titulo" hidden>
+  <form class="editor-caja ajustes" id="nueva-nota-form">
+    <div class="cabecera"><span id="nueva-nota-titulo">Nueva nota</span><span class="editor-lineas">el título es el nombre del fichero</span></div>
+    <label>Título <input id="nueva-nota-nombre" autocomplete="off" required placeholder="Idea rápida"></label>
+    <label>Carpeta <select id="nueva-nota-carpeta"></select></label>
+    <div class="pie"><button type="button" id="nueva-nota-cancelar" class="secundario">Cancelar</button><button type="submit">Crear</button></div>
+  </form>
 </div>
 <div id="guardar" class="modal" role="dialog" aria-modal="true" aria-labelledby="guardar-titulo" hidden>
   <div class="editor-caja estrecha">

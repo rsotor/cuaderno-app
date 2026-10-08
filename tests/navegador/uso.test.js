@@ -72,3 +72,31 @@ test('árbol: las carpetas se pliegan y despliegan, y una nota dentro cambia de 
   const scroll = await e.pagina.evaluate(() => document.querySelector('#centro').scrollTop);
   assert.equal(scroll, 0, `nota: una nota nueva debería empezar arriba y está en ${scroll}`);
 });
+
+test('nota nueva: el botón abre el modal, Enter la crea en la carpeta de la nota abierta y la abre; tareas.md no sale en el árbol', async () => {
+  await e.ir('#/n/conceptos/capital.md');
+  assert.equal(await e.pagina.locator('#arbol a.hoja[data-ruta="tareas.md"]').count(), 0, 'árbol: tareas.md se ve en el panel Tareas, no dos veces');
+  await e.pagina.click('#btn-nueva-nota');
+  await visible(e.pagina.locator('#nueva-nota-nombre'), 'nueva nota', 'el campo del título');
+  assert.equal(await e.pagina.inputValue('#nueva-nota-carpeta'), 'conceptos', 'nueva nota: la carpeta por defecto es la de la nota abierta');
+  await e.pagina.keyboard.type('Idea rápida');
+  await e.pagina.keyboard.press('Enter');
+  await hashCumple(e.pagina, /^#\/n\/conceptos\/Idea%20r%C3%A1pida\.md$/, 'nueva nota');
+  await conTexto(e.pagina.locator('#nota h1'), /^Idea rápida$/, 'nueva nota', 'el título de la nota recién creada');
+  await hasta(() => fs.existsSync(path.join(e.c.base, 'conceptos/Idea rápida.md')), 'nueva nota', 'el fichero no está en el cuaderno');
+  await visible(e.pagina.locator('#arbol a.hoja', { hasText: 'Idea rápida' }), 'nueva nota', 'la nota nueva en el árbol');
+});
+
+test('nota nueva desde el buscador: sin resultados, Enter propone crearla con ese título', async () => {
+  await e.ir('#/n/larga.md');
+  await e.pagina.keyboard.press('Control+k');
+  await e.pagina.keyboard.type('Pendientes de hoy');
+  await visible(e.pagina.locator('#arbol button.crear'), 'buscador', 'la propuesta de crear la nota cuando no hay resultados');
+  await e.pagina.keyboard.press('Enter');
+  await visible(e.pagina.locator('#nueva-nota-nombre'), 'buscador', 'el modal de nota nueva');
+  assert.equal(await e.pagina.inputValue('#nueva-nota-nombre'), 'Pendientes de hoy');
+  await e.pagina.selectOption('#nueva-nota-carpeta', '');
+  await e.pagina.keyboard.press('Enter');
+  await hashCumple(e.pagina, /^#\/n\/Pendientes%20de%20hoy\.md$/, 'buscador');
+  await hasta(() => fs.existsSync(path.join(e.c.base, 'Pendientes de hoy.md')), 'buscador', 'el fichero no está en el cuaderno');
+});
