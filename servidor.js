@@ -50,7 +50,7 @@ function estadoGit(raiz) {
   } catch { return null; }
 }
 
-function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), lanzar = null }) {
+function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), lanzar = null, plataforma = process.platform }) {
   const estado = { cuaderno, kit };
   const oyentes = new Set();   // pestañas que escuchan cambios
   const avisarCambio = f => { for (const ws of oyentes) ws.send(JSON.stringify({ fichero: f })); };
@@ -163,7 +163,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
         if (p === '/api/mostrar-en-carpeta') {
           const cu = conCuaderno(), abs = b.ruta ? cu.dentro(String(b.ruta)) : cu.base;
           if (!fs.existsSync(abs)) throw new ErrorPeticion('ese fichero ya no está');
-          terminal.mostrar({ abs, carpeta: fs.statSync(abs).isDirectory(), ...(lanzar ? { lanzar } : {}) });
+          terminal.mostrar({ abs, carpeta: fs.statSync(abs).isDirectory(), plataforma, ...(lanzar ? { lanzar } : {}) });
           return json(res, { ok: true });
         }
         // La terminal es la del sistema: se abre en la carpeta del cuaderno, con el profesor lanzado si se pide.
@@ -171,7 +171,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
           if (!estado.cuaderno) throw new ErrorPeticion('no hay ningún cuaderno abierto');
           const comando = b.profesor ? comandoProfesor() : null;
           if (b.profesor && !comando) throw new ErrorPeticion('este cuaderno no tiene profesor configurado');
-          try { return json(res, { terminal: terminal.abrir({ carpeta: estado.cuaderno.raiz, comando, ...(lanzar ? { lanzar } : {}) }) }); } catch (e) { throw new ErrorPeticion(e.message); }
+          try { return json(res, { terminal: terminal.abrir({ carpeta: estado.cuaderno.raiz, comando, plataforma, ...(lanzar ? { lanzar } : {}) }) }); } catch (e) { throw new ErrorPeticion(e.message); }
         }
         if (p === '/api/guardar') return json(res, accion((raiz, k) => acciones.guardar(raiz, k, b.mensaje)));
         if (p === '/api/traer') return json(res, accion((raiz, k) => acciones.traer(raiz, k)));

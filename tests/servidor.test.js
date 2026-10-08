@@ -14,7 +14,8 @@ async function arrancar(opciones = {}) {
   const c = crearCuaderno(opciones);
   const kit = detectar(c.raiz);
   const lanzado = [];   // lo que la app habría abierto como terminal del sistema (no se abre nada en los tests)
-  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, kit.base), kit, token: 'ab'.repeat(16), lanzar: (cmd, args, o) => lanzado.push({ cmd, args, cwd: o.cwd }) });
+  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, kit.base), kit, token: 'ab'.repeat(16), lanzar: (cmd, args, o) => lanzado.push({ cmd, args, cwd: o.cwd }),
+    plataforma: 'darwin' });   // fija: el resultado no depende del sistema que corre los tests (cada uno, en terminal.test.js)
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const puerto = server.address().port;
   const base = `http://127.0.0.1:${puerto}`;
