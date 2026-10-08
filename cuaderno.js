@@ -133,7 +133,8 @@ class Cuaderno {
     const cuerpo = texto.split('\n').slice(lineas).join('\n');
     let html = this.md.render(cuerpo, { ruta: rel });
     if (lineas) html = html.replace(/data-(desde|hasta|linea)="(\d+)"/g, (_, k, n) => `data-${k}="${Number(n) + lineas}"`);
-    return { ruta: rel, frontmatter: datos, html, backlinks: this.backlinks(rel), lineas: texto.split('\n').length };
+    // generado: la nota la regenera el profesor del kit cada vez que guarda (inicio.md, progreso): no se borra a mano.
+    return { ruta: rel, frontmatter: datos, html, backlinks: this.backlinks(rel), lineas: texto.split('\n').length, generado: /^> Lo genera tu profesor/m.test(texto.split('\n').slice(0, 6).join('\n')) };
   }
   backlinks(rel) {
     const nombre = escaparRegex(rel.replace(/\.md$/, '').split('/').pop());

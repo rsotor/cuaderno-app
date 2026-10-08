@@ -56,6 +56,10 @@ button.pequeno { padding: 2px 8px; font-size: 12.5px; min-height: 26px; }
 input, select, textarea { font: inherit; color: var(--tinta); background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio); }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width: 16px; height: 16px; }
 
+/* aviso fijo: la app cambió en el disco y este servidor es el de antes */
+#aviso-reinicio { position: fixed; top: 0; left: 0; right: 0; z-index: 40; background: var(--aviso); color: #fff; padding: 8px 16px; font-size: 14px; text-align: center; }
+#aviso-reinicio code, #aviso-reinicio kbd { background: rgba(0,0,0,.2); padding: 0 4px; border-radius: 3px; }
+
 /* ---------- disposición */
 #app { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-rows: 1fr auto; height: 100vh; }
 #lateral { grid-row: 1 / 3; background: var(--lateral); border-right: 1px solid var(--linea); display: flex; flex-direction: column; min-height: 0; }
@@ -102,10 +106,10 @@ button.mostrar:focus-visible, button.ocultar:focus-visible, button.papelera:focu
 #arbol .acciones-fila .papelera { margin-left: 4px; }   /* sin confirmar, la separación es lo que evita mandar a la papelera por un píxel */
 #arbol .fila:hover :is(.mostrar, .ocultar, .papelera), #arbol .fila:focus-within :is(.mostrar, .ocultar, .papelera), #arbol summary:hover :is(.mostrar, .ocultar), #arbol summary:focus-within :is(.mostrar, .ocultar), #miga :is(.mostrar, .papelera) { opacity: 1; }
 @media (hover: none) { button.mostrar, button.ocultar, button.papelera { opacity: 1; } }
-#miga :is(.mostrar, .copiar, .papelera) { vertical-align: middle; margin-left: 6px; min-width: 24px; min-height: 24px; }
+#miga :is(.mostrar, .copiar, .papelera) { vertical-align: middle; margin-left: 4px; min-width: 28px; min-height: 28px; }
 button.copiar { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: none; background: none; color: var(--tinta-suave); border-radius: var(--radio); }
 button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
-#miga .papelera { margin-left: 10px; }
+#miga .papelera { margin-left: 18px; }   /* lejos de copiar: un clic de más no manda nada a la papelera */
 #miga :is(.mostrar, .copiar, .papelera) .icono { width: 15px; height: 15px; }
 /* ficheros que no son notas */
 #nota.ancha { max-width: none; }

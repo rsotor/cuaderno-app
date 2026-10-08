@@ -50,7 +50,7 @@ function estadoGit(raiz) {
   } catch { return null; }
 }
 
-function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null, ejecutar = null, plataforma = process.platform }) {
+function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null, ejecutar = null, plataforma = process.platform, fuentes = [__dirname, PUBLICO] }) {
   const estado = { cuaderno, kit };
   const oyentes = new Set(), terminales = new Set();   // pestañas que escuchan cambios; conexiones de terminal abiertas
   const avisarCambio = f => { for (const ws of oyentes) ws.send(JSON.stringify({ fichero: f })); };
@@ -70,9 +70,14 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
     config.registrarReciente(raiz, estado.cuaderno.nombre());
     return info();
   };
+  // ¿Ha cambiado el código de la app en el disco desde que arrancó? (una actualización con git pull y la app sin
+  // reiniciar: el navegador carga la página nueva y el servidor viejo no conoce sus rutas; Roberto, 2026-10-09).
+  // La firma es la fecha más reciente de los .js y la página de la app; el navegador lo dice con un aviso fijo.
+  const firma = () => Math.max(0, ...fuentes.flatMap(d => { try { return fs.readdirSync(d).filter(n => /\.(js|html|css)$/.test(n)).map(n => fs.statSync(path.join(d, n)).mtimeMs); } catch { return []; } }));
+  const firmaAlArrancar = firma();
   const info = () => {
     const c = config.leer();
-    const base = { configuracion: config.apariencia(c), cuaderno: null };
+    const base = { configuracion: config.apariencia(c), cuaderno: null, desactualizada: firma() > firmaAlArrancar };
     if (!estado.cuaderno) return base;
     const { cuaderno: cu, kit: k } = estado;
     const comando = k.tipo === 'kit' ? k.comando : (k.tipo === 'carpeta' ? c.comando_agente : null);
