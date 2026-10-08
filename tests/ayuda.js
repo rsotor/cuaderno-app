@@ -1,11 +1,11 @@
 'use strict';
-// Cuadernos de mentira para los tests: el curso de ejemplo de ejemplos/curso-demo copiado a una carpeta temporal que se borra,
+// Cuadernos de mentira para los tests: el cuaderno de ejemplo (ejemplos/cuaderno-ejemplo) copiado a una carpeta temporal que se borra,
 // con el andamiaje del kit si se pide.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-// Las notas del curso de ejemplo (ejemplos/curso-demo), ruta → texto. Es el mismo cuaderno que se puede abrir con la app
+// Las notas del cuaderno de ejemplo (ejemplos/cuaderno-ejemplo), ruta → texto. Es el mismo cuaderno que se puede abrir con la app
 // y el que ven los recorridos de navegador: una sola referencia, en el repo.
 const EJEMPLOS = path.join(__dirname, '..', 'ejemplos');
 function leerCarpeta(base, dir = '') {

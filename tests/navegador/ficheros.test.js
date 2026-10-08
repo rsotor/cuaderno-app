@@ -1,6 +1,6 @@
 'use strict';
 // Ver cualquier fichero del cuaderno (fase 10): cada tipo se pinta bien al pulsarlo en el árbol, y un botón lo
-// muestra en el Finder (o el Explorador). Ejemplos de cada tipo en ejemplos/curso-demo/material/.
+// muestra en el Finder (o el Explorador). Ejemplos de cada tipo en ejemplos/cuaderno-ejemplo/material/.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
