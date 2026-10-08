@@ -43,7 +43,8 @@ async function arrancar({ pty = null, ...opciones } = { kit: 'kit' }) {
   const c = crearCuaderno(opciones);
   const kit = detectar(c.raiz);
   const lanzado = [];   // lo que la app habría lanzado en el sistema (el gestor de archivos); en los tests no se abre nada
-  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, kit.base), kit, pty, lanzar: (cmd, args, o) => lanzado.push({ cmd, args, cwd: o.cwd }) });
+  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, kit.base), kit, pty, lanzar: (cmd, args, o) => lanzado.push({ cmd, args, cwd: o.cwd }),
+    plataforma: 'darwin' });   // fija: el resultado no depende del sistema que corre los tests (cada uno, en sistema.test.js)
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;
   let navegador;

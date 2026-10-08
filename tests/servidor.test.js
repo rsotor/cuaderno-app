@@ -14,7 +14,8 @@ async function arrancar(opciones = {}) {
   const c = crearCuaderno(opciones);
   const kit = detectar(c.raiz);
   const lanzado = [];   // lo que la app habría lanzado en el sistema (el gestor de archivos); en los tests no se abre nada
-  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, kit.base), kit, token: 'ab'.repeat(16), lanzar: (cmd, args, o) => lanzado.push({ cmd, args, cwd: o.cwd }) });
+  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, kit.base), kit, token: 'ab'.repeat(16), lanzar: (cmd, args, o) => lanzado.push({ cmd, args, cwd: o.cwd }),
+    plataforma: 'darwin' });   // fija: el resultado no depende del sistema que corre los tests (cada uno, en sistema.test.js)
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const puerto = server.address().port;
   const base = `http://127.0.0.1:${puerto}`;
@@ -211,8 +212,7 @@ test('mostrar en carpeta: lanza el gestor de archivos con la ruta del fichero o 
   try {
     assert.equal((await post({ ruta: 'material/extracto-octubre.pdf' })).status, 200);
     assert.equal(s.lanzado.at(-1).cwd, path.join(s.c.base, 'material'));
-    // En Linux no hay «señalar»: xdg-open abre la carpeta (sistema.js); en macOS y Windows, la ruta va en los argumentos.
-    if (process.platform !== 'linux') assert.ok(s.lanzado.at(-1).args.some(a => a.includes('extracto-octubre.pdf')), 'no señala el fichero');
+    assert.ok(s.lanzado.at(-1).args.some(a => a.includes('extracto-octubre.pdf')), 'no señala el fichero');
     assert.equal((await post({ ruta: 'material' })).status, 200);
     assert.equal(s.lanzado.at(-1).cwd, path.join(s.c.base, 'material'));
     assert.equal((await post({ ruta: '../../etc' })).status, 400);

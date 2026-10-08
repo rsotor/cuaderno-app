@@ -50,7 +50,7 @@ function estadoGit(raiz) {
   } catch { return null; }
 }
 
-function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null }) {
+function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null, plataforma = process.platform }) {
   const estado = { cuaderno, kit };
   const oyentes = new Set(), terminales = new Set();   // pestañas que escuchan cambios; conexiones de terminal abiertas
   const avisarCambio = f => { for (const ws of oyentes) ws.send(JSON.stringify({ fichero: f })); };
@@ -164,7 +164,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
         if (p === '/api/mostrar-en-carpeta') {
           const cu = conCuaderno(), abs = b.ruta ? cu.dentro(String(b.ruta)) : cu.base;
           if (!fs.existsSync(abs)) throw new ErrorPeticion('ese fichero ya no está');
-          sistema.mostrar({ abs, carpeta: fs.statSync(abs).isDirectory(), ...(lanzar ? { lanzar } : {}) });
+          sistema.mostrar({ abs, carpeta: fs.statSync(abs).isDirectory(), plataforma, ...(lanzar ? { lanzar } : {}) });
           return json(res, { ok: true });
         }
         if (p === '/api/guardar') return json(res, accion((raiz, k) => acciones.guardar(raiz, k, b.mensaje)));

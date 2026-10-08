@@ -12,8 +12,9 @@ function leerCarpeta(base, dir = '') {
   const out = {};
   for (const e of fs.readdirSync(path.join(base, dir), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
     const rel = dir ? `${dir}/${e.name}` : e.name;
-    // Los binarios (un PDF) se copian tal cual; el resto como texto, para poder pasarlo a CRLF.
-    if (e.isDirectory()) Object.assign(out, leerCarpeta(base, rel)); else out[rel] = /\.(pdf|png|jpe?g)$/i.test(e.name) ? fs.readFileSync(path.join(base, rel)) : fs.readFileSync(path.join(base, rel), 'utf8');
+    // Los binarios (un PDF) se copian tal cual; el resto como texto, para poder pasarlo a CRLF. El texto se lee siempre
+    // con LF: git en Windows lo saca con CRLF y el cuaderno de prueba no puede depender del checkout (CRLF solo con `crlf`).
+    if (e.isDirectory()) Object.assign(out, leerCarpeta(base, rel)); else out[rel] = /\.(pdf|png|jpe?g)$/i.test(e.name) ? fs.readFileSync(path.join(base, rel)) : fs.readFileSync(path.join(base, rel), 'utf8').replace(/\r\n/g, '\n');
   }
   return out;
 }
