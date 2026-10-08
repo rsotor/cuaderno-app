@@ -140,3 +140,11 @@ test('copiar la ruta: el botón de la miga copia la ruta completa del fichero ab
   const copiado = await e.pagina.evaluate(() => navigator.clipboard.readText());
   assert.equal(copiado, path.join(e.c.base, 'material', 'extracto-octubre.pdf'), 'miga: no copia la ruta completa del fichero');
 });
+
+test('la miga de una nota que regenera el profesor (inicio.md) no ofrece la papelera; la de una nota normal, sí', async () => {
+  await e.ir('#/n/inicio.md');
+  await visible(e.pagina.locator('#miga button.copiar'), 'miga', 'el botón de copiar en inicio.md');
+  assert.equal(await e.pagina.locator('#miga button.papelera').count(), 0, 'miga: inicio.md (lo genera el profesor) ofrece la papelera');
+  await e.ir('#/n/material/material.md');
+  await visible(e.pagina.locator('#miga button.papelera'), 'miga', 'la papelera en una nota normal');
+});
