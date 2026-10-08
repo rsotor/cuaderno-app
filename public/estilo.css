@@ -84,11 +84,15 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 #arbol details[open] > summary::before { transform: rotate(90deg); }
 @media (prefers-reduced-motion: no-preference) { #arbol summary::before { transition: transform .15s ease; } }
 #arbol .hoja { display: flex; padding-left: 26px; }   /* el texto alineado con el nombre de la carpeta, tras el chevron */
+#arbol .hoja .nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }   /* un nombre largo se corta con puntos suspensivos, no a secas */
+#arbol .hoja small { flex: none; }
 #arbol .hoja small { color: var(--tinta-suave); font-size: 12px; margin-left: auto; padding-left: 8px; }   /* dos notas con el mismo título: el fichero las distingue */
 #lateral.buscando .paginas { display: none; }   /* buscando, los resultados necesitan el sitio */
-#arbol .tramo { margin: 10px 10px 2px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--tinta-suave); }
-#arbol .tramo small { font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 6px; }
+#arbol .tramo { margin: 10px 10px 2px; font-size: 12px; font-weight: 600; color: var(--tinta-suave); }   /* sin mayúsculas ni eyebrow (crítica del 2026-10-07) */
+#arbol .tramo small { font-weight: 400; margin-left: 6px; }
 #arbol .resultado { padding: 6px 10px; display: block; }
+#arbol .resultado.linea { padding: 4px 10px 4px 20px; font-size: 13px; line-height: 1.35; color: var(--tinta-suave); white-space: normal; }   /* las líneas, bajo el título de su nota */
+#arbol .grupo { margin-bottom: 6px; }
 .paginas button { background: none; border: 0; font: inherit; cursor: pointer; width: 100%; justify-content: flex-start; text-align: left; margin: 0; color: var(--tinta); }   /* como los enlaces de encima: alineado a la izquierda, sin borde */
 #arbol button.crear { width: 100%; text-align: left; background: none; border: 1px dashed var(--linea); font: inherit; color: var(--tinta-suave); cursor: pointer; white-space: normal; line-height: 1.45; }
 #arbol button.crear b { color: var(--tinta); }
@@ -101,12 +105,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 .pie-lateral #btn-ajustes { flex: 0 0 auto; padding: 6px 9px; }
 
 #centro { overflow: auto; min-height: 0; min-width: 0; padding: 0 0 40px; }
-.miga-barra { position: sticky; top: 0; background: var(--fondo); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px 40px; }
+.miga-barra { position: sticky; top: 0; background: var(--fondo); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px max(40px, calc((100% - 76ch - 80px) / 2 + 40px)); }   /* empieza donde empieza la columna de #nota */
 #miga { font-size: 13px; color: var(--tinta-suave); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #btn-menu { display: none; padding: 6px 8px; }
 #nota, #panel { max-width: calc(76ch + 80px); margin: 0 auto; padding: 8px 40px 40px; }   /* 76 ch ≈ 90 caracteres por línea: en pantalla grande la columna no se queda estrecha (Roberto, 2026-10-08) */
 #nota h1, #panel h1 { font-size: 28px; line-height: 1.15; margin: 6px 0 18px; font-weight: 700; letter-spacing: -.01em; }
-#nota h2 { font-size: 21px; margin: 32px 0 10px; border-bottom: 1px solid var(--linea); padding-bottom: 4px; }
+#nota h2 { font-size: 21px; margin: 40px 0 8px; border-bottom: 1px solid var(--linea); padding-bottom: 4px; }
+#nota .bloque:has(> h2) + .bloque > :nth-child(2) { margin-top: 0; }   /* el bloque que sigue a un título se pega a él (el primer hijo es .acciones) */
 #nota h3 { font-size: 17px; margin: 24px 0 8px; }
 #nota a { color: var(--acento); padding: 3px 0; }   /* objetivo ≥ 24 px de alto sin cambiar la línea */
 #nota a.wiki { text-decoration: none; border-bottom: 1px dotted var(--acento); }
