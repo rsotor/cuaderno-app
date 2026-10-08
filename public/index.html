@@ -52,8 +52,8 @@
   </main>
   <section id="cajon" aria-label="Panel" hidden>
     <div class="cajon-asa" role="separator" tabindex="0" aria-label="Tamaño del panel" title="Arrastra para cambiar el tamaño; con las flechas también; doble clic vuelve al de siempre"></div>
-    <div class="cajon-barra"><span id="terminal-titulo">Terminal</span><button type="button" id="btn-cerrar-terminal" aria-label="Cerrar el panel">✕</button></div>
-    <div id="terminal"></div>
+    <div class="cajon-barra"><div class="sesiones" role="tablist" aria-label="Sesiones de terminal"></div><button type="button" id="btn-nueva-sesion" title="Abrir otra terminal" aria-label="Abrir otra terminal">+</button><span class="crece"></span><button type="button" id="btn-cerrar-terminal" aria-label="Cerrar el panel">✕</button></div>
+    <div id="terminal"><p class="sin-sesiones" hidden>Sin terminales abiertas: <b>+</b> abre una.</p></div>
   </section>
 </div>
 <div id="editor" role="dialog" aria-modal="true" aria-labelledby="editor-titulo" hidden>

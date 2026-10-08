@@ -238,6 +238,16 @@ body.redimensionando[data-panel="derecha"] { cursor: col-resize; }
 body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 .cajon-barra { display: flex; justify-content: space-between; align-items: center; color: #b4b9c2; font-size: 12.5px; padding: 4px 14px; background: #0b0c10; }
 .cajon-barra button { background: none; border: none; color: #b4b9c2; padding: 2px 8px; min-width: 32px; min-height: 28px; }
+.cajon-barra .crece { flex: 1; }
+/* las sesiones de terminal, como pestañas: la activa más clara, una cerrada apagada */
+.sesiones { display: flex; gap: 2px; min-width: 0; overflow-x: auto; }
+.sesion-pestana { display: flex; align-items: center; border-radius: var(--radio); }
+.sesion-pestana.activa { background: var(--terminal-fondo); color: #e6e9ef; }
+.sesion-pestana.activa button { color: inherit; }
+.sesion-pestana.cerrada [data-activar] { opacity: .55; text-decoration: line-through; }
+.sesion-pestana [data-cerrar] { min-width: 24px; padding: 2px 4px; }
+#terminal .sesion { height: 100%; }
+.sin-sesiones { color: #b4b9c2; font-size: 13.5px; padding: 18px 4px; margin: 0; }
 #terminal { flex: 1; padding: 10px 14px 6px; min-height: 0; }
 .xterm { height: 100%; }
 

@@ -3,7 +3,8 @@
 // Corre con una pty de mentira (tests/navegador/ayuda.js) para que la terminal abra de verdad sin node-pty.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { arrancar, ptyFalso, hasta, visible, oculto } = require('./ayuda');
+const { arrancar, ptyFalso, hasta, visible, oculto, conTexto } = require('./ayuda');
+const { crearCuaderno } = require('../ayuda');
 
 let e, pty;
 const caja = sel => e.pagina.locator(sel).boundingBox();
@@ -97,4 +98,73 @@ test('un ancho guardado que no cabe (3000 px) se acota al abrir, no se aplica ta
   await e.pagina.dblclick('.cajon-asa');
   await hasta(async () => (await anchoGuardado()) === 420, 'panel', 'el doble clic no deja el ancho en 420');
   await cerrarPanel();
+});
+
+// ---------- sesiones de terminal
+const filas = () => e.pagina.locator('#terminal .sesion:not([hidden]) .xterm-rows');
+const pestanas = () => e.pagina.locator('.sesion-pestana');
+const recargar = async () => { await e.pagina.reload(); await e.pagina.locator('#miga strong').waitFor(); };
+
+test('Terminal y Profesor conviven: abrir al profesor no mata el shell, y volver a él conserva lo escrito', async () => {
+  await e.ir('#/'); const base = pty.procesos.length;
+  await abrirPanel();
+  await hasta(() => pty.procesos.length === base + 1, 'terminal', 'abrir el panel no abre una pty');
+  await hasta(() => e.pagina.evaluate(() => document.activeElement.classList.contains('xterm-helper-textarea')), 'terminal', 'al abrir, el foco no está en la terminal');
+  await e.pagina.keyboard.type('hola');
+  await hasta(() => pty.procesos[base].escrito.includes('hola'), 'terminal', `lo tecleado no llega a la pty (llegó «${pty.procesos[base].escrito}»)`);
+  await conTexto(filas(), /hola/, 'terminal', 'el eco en la pantalla');
+  await e.pagina.click('#btn-profesor');
+  await hasta(() => pty.procesos.length === base + 2, 'terminal', 'Profesor no abre su propia pty');
+  assert.equal(pty.procesos[base + 1].cmd, 'claude', `terminal: Profesor lanza «${pty.procesos[base + 1].cmd}», no el comando del adaptador`);
+  await conTexto(e.pagina.locator('.sesion-pestana.activa'), /Profesor/, 'terminal', 'la pestaña activa');
+  assert.equal(pty.procesos[base].muerto, false, 'terminal: abrir al profesor ha matado el shell');
+  await e.pagina.click('.sesion-pestana:not(.activa) [data-activar]');
+  await conTexto(e.pagina.locator('.sesion-pestana.activa'), /^Terminal/, 'terminal', 'volver a la pestaña del shell');
+  await conTexto(filas(), /hola/, 'terminal', 'lo escrito en el shell tras volver a él');
+  // Ninguna sesión ha mandado nunca un tamaño de 0 columnas o filas (la pestaña oculta mide 0).
+  const ceros = pty.procesos.slice(base).flatMap(p => p.redimensiones).filter(r => !(r.cols > 0 && r.rows > 0));
+  assert.deepEqual(ceros, [], `terminal: se han mandado tamaños a 0 a la pty: ${JSON.stringify(ceros)}`);
+  assert.ok(pty.procesos.slice(base).every(p => p.redimensiones.length > 0), 'terminal: alguna sesión no ha recibido ningún tamaño');
+});
+
+test('si el programa termina, la pestaña lo dice y Enter abre otra igual; cerrar la última deja el aviso y + abre una', async () => {
+  await e.ir('#/'); await recargar(); const base = pty.procesos.length;
+  await abrirPanel();
+  await hasta(() => pty.procesos.length === base + 1, 'terminal', 'abrir el panel no abre una pty');
+  pty.procesos[base].salir();
+  await visible(e.pagina.locator('.sesion-pestana.cerrada'), 'terminal', 'la pestaña marcada como cerrada');
+  await conTexto(filas(), /terminal cerrada/, 'terminal', 'el aviso de terminal cerrada');
+  await e.pagina.click('#terminal .sesion:not([hidden])'); await e.pagina.keyboard.press('Enter');
+  await hasta(() => pty.procesos.length === base + 2, 'terminal', 'Enter en una terminal cerrada no abre otra');
+  await oculto(e.pagina.locator('.sesion-pestana.cerrada'), 'terminal', 'la marca de cerrada tras reabrir');
+  await e.pagina.click('.sesion-pestana [data-cerrar]');
+  await visible(e.pagina.locator('.sin-sesiones'), 'terminal', 'el aviso de que no hay terminales');
+  assert.equal(await pestanas().count(), 0, 'terminal: quedan pestañas tras cerrar la única');
+  await hasta(() => pty.procesos[base + 1].muerto, 'terminal', 'cerrar la pestaña no mata su pty');
+  await e.pagina.click('#btn-nueva-sesion');
+  await hasta(() => pty.procesos.length === base + 3, 'terminal', '+ no abre otra terminal');
+  await oculto(e.pagina.locator('.sin-sesiones'), 'terminal', 'el aviso con una terminal abierta');
+});
+
+test('Ctrl ` con el foco en la terminal cierra el cajón y devuelve el foco al botón Terminal', async () => {
+  await e.ir('#/'); await recargar();
+  await abrirPanel();
+  await e.pagina.click('#terminal .sesion:not([hidden])');
+  await e.pagina.keyboard.press('Control+Backquote');
+  await oculto(e.pagina.locator('#cajon'), 'terminal', 'el cajón tras Ctrl `');
+  assert.equal(await e.pagina.evaluate(() => document.activeElement.id), 'btn-terminal', 'terminal: el foco no vuelve al botón Terminal');
+});
+
+test('cambiar de cuaderno cierra las terminales: la pty muere y no queda ninguna pestaña', async () => {
+  await e.ir('#/'); await recargar(); const base = pty.procesos.length;
+  await abrirPanel();
+  await hasta(() => pty.procesos.length === base + 1, 'terminal', 'abrir el panel no abre una pty');
+  const otro = crearCuaderno({ kit: 'carpeta' });
+  try {
+    await e.ir('#/cuadernos');
+    await e.pagina.fill('#ruta-carpeta', otro.raiz); await e.pagina.press('#ruta-carpeta', 'Enter');
+    await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(otro.nombre || '.'), 'cuadernos', 'el nombre del cuaderno nuevo');
+    await hasta(() => pty.procesos[base].muerto, 'cuadernos', 'cambiar de cuaderno no mata la pty del anterior');
+    await hasta(async () => (await pestanas().count()) === 0, 'cuadernos', 'siguen las pestañas de terminal del cuaderno anterior');
+  } finally { otro.borrar(); }
 });

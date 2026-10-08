@@ -51,7 +51,7 @@ function estadoGit(raiz) {
 
 function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null }) {
   const estado = { cuaderno, kit };
-  const oyentes = new Set();
+  const oyentes = new Set(), terminales = new Set();   // pestañas que escuchan cambios; conexiones de terminal abiertas
   const avisarCambio = f => { for (const ws of oyentes) ws.send(JSON.stringify({ fichero: f })); };
   if (cuaderno) cuaderno.vigilar(avisarCambio);
 
@@ -62,6 +62,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
     const k = detectar(raiz);
     if (!fs.existsSync(k.base)) throw new ErrorPeticion('esa carpeta no tiene notas');
     if (estado.cuaderno) estado.cuaderno.cerrar();
+    for (const ws of terminales) ws.close();   // las terminales eran del cuaderno anterior: al cerrar el ws muere su pty
     estado.kit = k; estado.cuaderno = new Cuaderno(raiz, k.base);
     estado.cuaderno.vigilar(avisarCambio);
     avisarCambio('');   // las demás pestañas abiertas se enteran de que el cuaderno es otro
@@ -198,10 +199,11 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
     } catch (e) {
       ws.send(`\r\n[no se ha podido abrir ${profesor ? comando : shell}: ${e.message}]\r\n`); return ws.close();
     }
+    terminales.add(ws);
     term.onData(d => ws.readyState === 1 && ws.send(d));
     term.onExit(() => ws.close());
     ws.on('message', m => { const s = m.toString(); if (s.startsWith('\u0001')) { try { const { cols, rows } = JSON.parse(s.slice(1)); term.resize(cols, rows); } catch { /* ignorado */ } } else term.write(s); });
-    ws.on('close', () => term.kill());
+    ws.on('close', () => { terminales.delete(ws); term.kill(); });
   });
 
   // ---------- recarga en vivo

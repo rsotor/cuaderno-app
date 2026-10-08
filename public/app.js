@@ -387,30 +387,71 @@ async function guardarTamanoCajon(pos, v) {
   });
 }
 
-// ---------- terminal
-let term, fit, ws, modoTerminal = null;
+// ---------- terminal: varias sesiones (shell y Profesor) que conviven en el cajón; cada una es su xterm y su /pty
+let sesiones = [], sesionActiva = null, numSesion = 0;
 const wsUrl = ruta => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${ruta}`;
-function abrirTerminal(modo) {
-  if (term && modoTerminal !== modo) { ws && ws.close(); term.dispose(); term = null; }
-  abrirCajon();
-  if (!term) {
-    modoTerminal = modo;
-    term = new Terminal({ fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--mono'), fontSize: 13.5, lineHeight: 1.25, cursorBlink: true, cursorStyle: 'bar', scrollback: 5000, allowProposedApi: true,
-      theme: { background: getComputedStyle(document.documentElement).getPropertyValue('--terminal-fondo').trim(), foreground: '#d7dae0', cursor: '#7aa2f7', selectionBackground: '#3b4261', black: '#15161e', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68', blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6', brightBlack: '#414868', brightRed: '#f7768e', brightGreen: '#9ece6a', brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7', brightCyan: '#7dcfff', brightWhite: '#c0caf5' } });
-    fit = new FitAddon.FitAddon(); term.loadAddon(fit); term.open($('#terminal'));
-    ws = new WebSocket(wsUrl(modo === 'profesor' ? '/pty?profesor=1' : '/pty'));
-    ws.onmessage = e => term.write(e.data);
-    ws.onclose = () => term && term.write('\r\n[terminal cerrada]\r\n');
-    term.onData(d => ws.readyState === 1 && ws.send(d));
-    const redim = () => { fit.fit(); ws.readyState === 1 && ws.send('\u0001' + JSON.stringify({ cols: term.cols, rows: term.rows })); };
-    ws.onopen = redim; new ResizeObserver(redim).observe($('#terminal'));
-    $('#terminal-titulo').textContent = modo === 'profesor' ? 'Profesor' : 'Terminal';
-  }
-  setTimeout(() => { fit && fit.fit(); term && term.focus(); }, 30);
+const variable = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const temaTerminal = () => ({ background: variable('--terminal-fondo'), foreground: '#d7dae0', cursor: '#7aa2f7', selectionBackground: '#3b4261', black: '#15161e', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68', blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6', brightBlack: '#414868', brightRed: '#f7768e', brightGreen: '#9ece6a', brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7', brightCyan: '#7dcfff', brightWhite: '#c0caf5' });
+// Una pestaña oculta mide 0: ni se ajusta ni se manda un tamaño de 0 columnas a la pty.
+function redimensionar(s) {
+  if (s.elemento.hidden || !s.elemento.clientWidth || !s.elemento.clientHeight) return;
+  s.fit.fit();
+  if (s.term.cols > 0 && s.term.rows > 0 && s.ws && s.ws.readyState === 1) s.ws.send('\u0001' + JSON.stringify({ cols: s.term.cols, rows: s.term.rows }));
 }
-function alternarTerminal() { if ($('#cajon').hidden) abrirTerminal(modoTerminal || 'shell'); else cerrarCajon(); }
+function conectar(s) {
+  s.cerrada = false; s.pendiente = ''; pintarSesiones();
+  const ws = new WebSocket(wsUrl(s.modo === 'profesor' ? '/pty?profesor=1' : '/pty')); s.ws = ws;
+  // Lo tecleado antes de que el canal abra no se pierde: espera y sale junto en cuanto abre.
+  ws.onopen = () => { redimensionar(s); if (s.pendiente) { ws.send(s.pendiente); s.pendiente = ''; } };
+  ws.onmessage = e => s.term.write(e.data);
+  ws.onclose = () => { if (s.ws !== ws) return; s.cerrada = true; s.term.write('\r\n[terminal cerrada: Enter abre otra igual]\r\n'); pintarSesiones(); };
+}
+function crearSesion(modo) {
+  const n = ++numSesion, elemento = document.createElement('div'); elemento.className = 'sesion'; elemento.hidden = true; $('#terminal').append(elemento);
+  const term = new Terminal({ fontFamily: variable('--mono'), fontSize: 13.5, lineHeight: 1.25, cursorBlink: true, cursorStyle: 'bar', scrollback: 5000, allowProposedApi: true, theme: temaTerminal() });
+  const fit = new FitAddon.FitAddon(); term.loadAddon(fit); term.open(elemento);
+  const s = { id: n, modo, titulo: modo === 'profesor' ? 'Profesor' : (n === 1 ? 'Terminal' : `Terminal ${n}`), term, fit, ws: null, elemento, cerrada: false };
+  term.attachCustomKeyEventHandler(e => !((e.ctrlKey || e.metaKey) && e.key === '`'));   // Ctrl ` es de la app: abre y cierra el cajón
+  term.onData(d => { if (s.cerrada) { if (d === '\r') { s.term.reset(); conectar(s); } return; } if (s.ws && s.ws.readyState === 1) s.ws.send(d); else if (s.ws && s.ws.readyState === 0) s.pendiente += d; });
+  conectar(s); sesiones.push(s);
+  return s;
+}
+function activarSesion(s) {
+  sesionActiva = s;
+  for (const o of sesiones) o.elemento.hidden = o !== s;
+  pintarSesiones();
+  s.term.focus();   // ya, para teclear sin esperar; y otra vez tras medir, que el ajuste no se lo lleve
+  requestAnimationFrame(() => { redimensionar(s); s.term.focus(); });
+}
+function cerrarSesion(s) {
+  const ws = s.ws; s.ws = null; if (ws) ws.close();
+  s.term.dispose(); s.elemento.remove();
+  sesiones = sesiones.filter(o => o !== s);
+  if (sesionActiva === s) { sesionActiva = null; if (sesiones.length) return activarSesion(sesiones[sesiones.length - 1]); }
+  pintarSesiones();
+}
+function cerrarSesiones() { for (const s of [...sesiones]) cerrarSesion(s); }
+function pintarSesiones() {
+  $('.sesiones').innerHTML = sesiones.map(s => `<div class="sesion-pestana${s === sesionActiva ? ' activa' : ''}${s.cerrada ? ' cerrada' : ''}" role="tab" aria-selected="${s === sesionActiva}"><button type="button" data-activar="${s.id}">${esc(s.titulo)}</button><button type="button" data-cerrar="${s.id}" aria-label="Cerrar ${esc(s.titulo)}">×</button></div>`).join('');
+  $('.sin-sesiones').hidden = sesiones.length > 0;
+}
+$('.sesiones').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const s = sesiones.find(o => o.id === +(b.dataset.activar || b.dataset.cerrar)); if (!s) return;
+  if (b.dataset.cerrar) cerrarSesion(s); else activarSesion(s);
+});
+new ResizeObserver(() => { if (sesionActiva) redimensionar(sesionActiva); }).observe($('#terminal'));
+// Abrir la terminal: el cajón y la sesión que toque. «Profesor» reutiliza la suya si sigue viva; nunca mata un shell.
+function abrirTerminal(modo) {
+  abrirCajon();
+  let s = modo === 'profesor' ? sesiones.find(o => o.modo === 'profesor' && !o.cerrada) : (sesionActiva || sesiones[0]);
+  if (!s || (modo === 'nueva')) s = crearSesion(modo === 'profesor' ? 'profesor' : 'shell');
+  activarSesion(s);
+}
+function alternarTerminal() { if ($('#cajon').hidden) abrirTerminal('shell'); else cerrarCajon(); }
 $('#btn-terminal').onclick = () => alternarTerminal();
-$('#btn-cerrar-terminal').onclick = () => alternarTerminal();
+$('#btn-cerrar-terminal').onclick = () => cerrarCajon();
+$('#btn-nueva-sesion').onclick = () => abrirTerminal('nueva');
 $('#btn-profesor').onclick = () => abrirTerminal('profesor');
 
 // ---------- cuadernos (pantalla de inicio)
@@ -427,6 +468,7 @@ async function abrirCuadernos() {
 }
 async function abrirCarpeta(ruta) {
   try { info = await api('/api/abrir', { ruta }); } catch (e) { avisar(e.message); return; }
+  cerrarSesiones();   // las terminales eran del cuaderno anterior (el servidor ya ha matado sus ptys)
   await cargarCuaderno();
   location.hash = cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/';
   if (location.hash === '#/') enrutar();
@@ -527,7 +569,7 @@ function enrutar() {
 window.addEventListener('hashchange', enrutar);
 
 // ---------- recarga en vivo
-try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
+try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
 
 (async () => {
   info = await api('/api/info');
