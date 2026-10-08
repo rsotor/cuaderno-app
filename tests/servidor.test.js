@@ -170,3 +170,14 @@ test('flashcards: las tarjetas con sus líneas, y marcar una casilla pasa por /a
     assert.equal((await (await s.pedir('/api/flashcards?p=flashcards/01-tarjetas.md')).json()).tarjetas[0].sabia, false);
   } finally { await s.cerrar(); }
 });
+
+test('la pestaña lleva icono: index.html lo enlaza y /public/icono.svg se sirve como SVG', async () => {
+  const s = await arrancar();
+  try {
+    const html = await (await s.pedir('/')).text();
+    assert.match(html, /<link rel="icon" type="image\/svg\+xml" href="\/public\/icono\.svg">/);
+    const r = await s.pedir('/public/icono.svg');
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('content-type'), 'image/svg+xml');
+  } finally { await s.cerrar(); }
+});
