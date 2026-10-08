@@ -28,6 +28,9 @@ test('HTML: la página corre con su script, ocupa el ancho y casi todo el alto, 
   const caja = await marco.boundingBox(), centro = await e.pagina.locator('#centro').boundingBox();
   assert.ok(caja.width > centro.width - 120, `html: la página mide ${caja.width} px de ancho en una columna de ${centro.width}; se queda encajada en la columna de lectura`);
   assert.ok(caja.height > 600, `html: la página mide ${caja.height} px de alto en una ventana de 800`);
+  assert.equal(await e.pagina.locator('#miga strong').textContent(), 'Calculadora 50/30/20', 'html: la miga no usa el título de la página');
+  const miga = await e.pagina.locator('#miga').boundingBox();
+  assert.ok(Math.abs(miga.x - caja.x) < 4, `html: la miga empieza en x=${miga.x} y la página en x=${caja.x}`);
 });
 
 test('PDF: se ve en el visor del navegador, a todo el ancho', async () => {
@@ -49,7 +52,11 @@ test('JSON con sangría; un JSON roto sale tal cual; CSV y TXT como texto; ningu
   await abrirDelArbol('roto.json');
   await conTexto(e.pagina.locator('#nota pre.fichero-texto'), /^\{"a": 1,,\}$/, 'json roto', 'el texto tal cual');
   await abrirDelArbol('gastos-octubre.csv');
-  await conTexto(e.pagina.locator('#nota pre.fichero-texto'), /^concepto,categoria,importe\nAlquiler/, 'csv', 'las filas tal cual');
+  await conTexto(e.pagina.locator('#nota .tabla-csv thead'), /concepto\s*categoria\s*importe/, 'csv', 'la cabecera de la tabla');
+  assert.equal(await e.pagina.locator('#nota .tabla-csv tbody tr').count(), 4, 'csv: no salen las cuatro filas');
+  assert.equal(await e.pagina.locator('#nota .tabla-csv td.cifra').first().textContent(), '650', 'csv: el importe no va como cifra');
+  await e.pagina.locator('#nota .como-texto summary').click();
+  await conTexto(e.pagina.locator('#nota .como-texto pre'), /^concepto,categoria,importe\nAlquiler/, 'csv', 'el texto tal cual tras «Ver como texto»');
   await abrirDelArbol('apuntes-de-clase.txt');
   await conTexto(e.pagina.locator('#nota pre.fichero-texto'), /fondo de emergencia/, 'txt', 'el texto');
   assert.equal(await e.pagina.locator('#nota .bloque, #nota [data-accion="editar"]').count(), 0, 'txt: un fichero de texto sale con acciones de editar');

@@ -139,16 +139,29 @@ document.addEventListener('click', e => {
 const TOPE_TEXTO = 1e6;
 async function abrirFichero(ruta, tipo) {
   const url = `/fichero/${encodeURI(ruta)}`, nombre = ruta.split('/').pop();
-  $('#nota').classList.toggle('ancha', tipo === 'pdf');
+  ancho(tipo === 'pdf');
   if (tipo === 'pdf') { $('#nota').innerHTML = `<iframe class="visor-pdf" src="${url}" title="${esc(nombre)}"></iframe>`; return; }
   let texto;
   try { const r = await fetch(url); if (!r.ok) throw new Error(`respuesta ${r.status}`); texto = await r.text(); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   const cortado = texto.length > TOPE_TEXTO;
   if (cortado) texto = texto.slice(0, TOPE_TEXTO);
   else if (tipo === 'json') { try { texto = JSON.stringify(JSON.parse(texto), null, 2); } catch { /* no es JSON válido: tal cual */ } }
-  $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><pre class="fichero-texto" data-tipo="${esc(tipo)}">${esc(texto)}</pre>`
+  // Un CSV se lee mejor como tabla (la primera fila, de cabecera); el texto tal cual queda a un clic.
+  const tabla = tipo === 'csv' && !cortado ? tablaCsv(texto) : '';
+  $('#nota').innerHTML = `<h1>${esc(nombre)}</h1>` + (tabla ? `${tabla}<details class="como-texto"><summary>Ver como texto</summary><pre class="fichero-texto" data-tipo="csv">${esc(texto)}</pre></details>` : `<pre class="fichero-texto" data-tipo="${esc(tipo)}">${esc(texto)}</pre>`)
     + (cortado ? `<p class="resumen">Es muy largo: aquí va el principio. <a href="${url}" target="_blank" rel="noopener">Verlo entero en otra pestaña</a>.</p>` : '');
 }
+
+// Las filas de un CSV (comas o punto y coma; comillas dobles con "" dentro). Si no parece una tabla, nada.
+function tablaCsv(texto) {
+  const sep = (texto.split('\n')[0].match(/;/g) || []).length > (texto.split('\n')[0].match(/,/g) || []).length ? ';' : ',';
+  const filas = texto.replace(/\r\n/g, '\n').split('\n').filter(l => l.trim()).map(l => { const c = []; let v = '', q = false; for (let i = 0; i < l.length; i++) { const ch = l[i]; if (q) { if (ch === '"' && l[i + 1] === '"') { v += '"'; i++; } else if (ch === '"') q = false; else v += ch; } else if (ch === '"') q = true; else if (ch === sep) { c.push(v); v = ''; } else v += ch; } c.push(v); return c; });
+  if (filas.length < 2 || filas[0].length < 2) return '';
+  const num = v => /^-?\d+([.,]\d+)?$/.test(v.trim());
+  return `<div class="tabla-csv"><table><thead><tr>${filas[0].map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${filas.slice(1).map(f => `<tr>${f.map(v => `<td${num(v) ? ' class="cifra"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+// PDF y páginas HTML a todo el ancho: la miga se alinea con ellos, no con la columna de lectura.
+function ancho(si) { $('#nota').classList.toggle('ancha', si); $('.miga-barra').classList.toggle('ancha', si); }
 
 // ---------- nota
 function sinPortada() {
@@ -163,8 +176,8 @@ async function abrirNota(ruta, lineaDestino) {
   $('#panel').hidden = true; $('#nota').hidden = false;
   let n;
   try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
-  $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop());
-  $('#nota').classList.toggle('ancha', !!n.esHtml);
+  $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop());
+  ancho(!!n.esHtml);
   if (n.esFichero) return abrirFichero(ruta, n.tipo);
   const tipo = n.frontmatter && n.frontmatter.tipo;
   if (vistaNota !== ruta && tipo === 'examen') return abrirExamen(ruta);

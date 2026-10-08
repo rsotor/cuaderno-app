@@ -101,8 +101,12 @@ button.mostrar:focus-visible { opacity: 1; }
 #miga .mostrar { vertical-align: middle; margin-left: 6px; min-width: 24px; min-height: 24px; }
 #miga .mostrar .icono { width: 15px; height: 15px; }
 /* ficheros que no son notas */
-#arbol .hoja.fichero .nombre { color: var(--tinta-suave); }
 #nota.ancha { max-width: none; }
+.miga-barra.ancha { padding-left: 40px; }
+#nota .tabla-csv { overflow-x: auto; }
+#nota .tabla-csv td.cifra { text-align: right; font-variant-numeric: tabular-nums; }
+#nota .como-texto { margin-top: 14px; }
+#nota .como-texto summary { cursor: pointer; color: var(--tinta-suave); font-size: 13.5px; margin-bottom: 8px; }
 #nota .visor-pdf { width: 100%; height: calc(100vh - 70px); border: 1px solid var(--linea); border-radius: var(--radio-bloque); background: #fff; }
 #nota .fichero-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio-bloque); padding: 14px 16px; margin: 0; }
 #arbol .hoja small { color: var(--tinta-suave); font-size: 12px; margin-left: auto; padding-left: 8px; }   /* dos notas con el mismo título: el fichero las distingue */

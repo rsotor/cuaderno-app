@@ -20,6 +20,7 @@
 **Después:** primer uso de Roberto del botón Terminal y Profesor (Mac con Ghostty, y el Windows de su padre) y de los ficheros. Luego la fase del chat propio desde `chat-diseno.md` (ronda completa, pruebas previas a–d, plan por tareas; el cajón vuelve del historial); luego la fase 11 (arranque sin terminal).
 
 **Inbox**
+- Árbol: la fila al pasar el ratón pesa más que la seleccionada (crítica de la fase 10, objeción 5); revisarlo con la próxima ronda del árbol.
 - Buscador / acciones rápidas, revisarlo como un bloque (Roberto, 2026-10-08): en la misma caja conviven buscar, «+» tarea y Escape, al lado el botón Nueva nota, y los accesos de arriba se esconden al buscar. Qué comandos hay, cómo se descubren, qué pasa al terminar cada uno. Encaja con una paleta de comandos (Ctrl K) cuando haya varios: Profesor, Guardar, Traer, cambiar de cuaderno.
 - Servidor: Guardar y Traer en asíncrono (hoy `spawnSync` para el servidor mientras git trabaja) y que su resultado no se abra encima del editor; y decidir si un servidor puede tener varios cuadernos a la vez (hoy uno, la pantalla de Cuadernos lo cambia para todas las pestañas). Usar este repo como cuaderno hace que «Guardar» haga commits en el repo de la app: para trastear, copia de `ejemplos/`.
 - Barra lateral plegable también en escritorio (hoy solo a 760 px o menos): pendiente de que Roberto diga si le estorba la barra entera.
@@ -32,7 +33,7 @@
 
 **Rondas de abogado del diablo:** 2026-10-07, sobre el punto 0 y el prototipo, 7 objeciones → reorden de fases (§7), tabla caso → kit (§4b) y decisiones nuevas (§6) · 2026-10-07, sobre la crítica de diseño, 7 objeciones → todas atendidas (ver el final de `docs/diseno/critica-2026-10-07.md`).
 
-**Rondas de crítica de diseño:** 2026-10-08, tanda del primer uso (árbol, buscador, páginas, vault), 5 objeciones → las 5 aplicadas (`docs/diseno/critica-2026-10-08.md`).
+**Rondas de crítica de diseño:** 2026-10-08, tanda del primer uso (árbol, buscador, páginas, vault), 5 objeciones → las 5 aplicadas (`docs/diseno/critica-2026-10-08.md`). · 2026-10-08, fase 10 (ficheros), 5 objeciones → 3 aplicadas (CSV como tabla, miga alineada, tinta normal y título del HTML), 2 razonadas (`docs/diseno/critica-2026-10-08-ficheros.md`).
 
 **Diario del 2026-10-08 (lo que estaba en «Ahora»; detalle de cada cambio y por qué):**
 - Fase 6 cerrada el 2026-10-07 tras la ronda de abogado del diablo (7 objeciones atendidas): crítica con cifras en `docs/diseno/critica-2026-10-07.md` (18 hallazgos), cambios aplicados y medidos otra vez: 0 fallos de contraste en 15 pantallas y dos temas, foco 9,6:1 / 6,0:1, sin desbordamiento a 390 px. Decisiones de Roberto: fuente del sistema, Destapar discreto, botón «Corregir». Capturas antes y después en `docs/capturas/`. 46 tests.
