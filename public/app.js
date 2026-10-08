@@ -165,6 +165,18 @@ document.addEventListener('click', e => {
 
 // ---------- papelera: el fichero va a la papelera del sistema, sin confirmar (de allí se recupera; Roberto, 2026-10-08)
 const PAPELERA = /Win/i.test(navigator.platform) ? 'la papelera de reciclaje' : 'la papelera';
+// Copiar la ruta completa del fichero (para pegarla en la terminal, al profesor o en el Finder), con el separador
+// del sistema donde corre la app.
+const rutaCompleta = ruta => { const c = cuaderno(); return c.base + c.sep + ruta.split('/').join(c.sep); };
+const botonCopiar = ruta => `<button type="button" class="copiar" data-copiar="${esc(ruta)}" title="Copiar la ruta del fichero" aria-label="Copiar la ruta de ${esc(ruta.split('/').pop())}">${icono('copiar')}</button>`;
+async function copiarRuta(ruta) {
+  const texto = rutaCompleta(ruta);
+  try { await navigator.clipboard.writeText(texto); } catch {
+    const t = document.createElement('textarea'); t.value = texto; document.body.append(t); t.select(); document.execCommand('copy'); t.remove();
+  }
+  avisar('Ruta copiada');
+}
+document.addEventListener('click', e => { const b = e.target.closest('button[data-copiar]'); if (!b) return; e.preventDefault(); copiarRuta(b.dataset.copiar); });
 const botonPapelera = (ruta, nombre) => `<button type="button" class="papelera" data-papelera="${esc(ruta)}" title="Mandar a ${PAPELERA}" aria-label="Mandar ${esc(String(nombre).replace(/<[^>]*>/g, ''))} a ${PAPELERA}">${icono('papelera')}</button>`;
 async function mandarAPapelera(ruta) {
   try { await api('/api/papelera', { ruta }); } catch (e) { avisar(e.message); return; }
@@ -223,7 +235,7 @@ async function abrirNota(ruta, lineaDestino) {
   $('#panel').hidden = true; $('#nota').hidden = false;
   let n;
   try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
-  $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonPapelera(ruta, ruta.split('/').pop());
+  $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonCopiar(ruta) + botonPapelera(ruta, ruta.split('/').pop());
   ancho(!!n.esHtml);
   if (n.esFichero) return abrirFichero(ruta, n.tipo);
   const tipo = n.frontmatter && n.frontmatter.tipo;

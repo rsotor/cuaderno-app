@@ -59,7 +59,7 @@ test('la API: info, árbol, nota, escrituras y el 409 cuando la nota cambió', a
   const s = await arrancar({ kit: 'kit' });
   try {
     const info = await (await s.pedir('/api/info')).json();
-    assert.deepEqual(info.cuaderno, { nombre: path.basename(s.c.raiz), ruta: s.c.raiz, kit: 'kit', profesor: true, portada: 'inicio.md', git: null });
+    assert.deepEqual(info.cuaderno, { nombre: path.basename(s.c.raiz), ruta: s.c.raiz, base: s.c.base, sep: path.sep, kit: 'kit', profesor: true, portada: 'inicio.md', git: null });
     assert.equal(info.configuracion.tema, 'auto');
     assert.ok((await (await s.pedir('/api/arbol')).json()).includes('conceptos/interes.md'));
     assert.equal((await s.pedir('/api/nota?p=no/existe.md')).status, 404);

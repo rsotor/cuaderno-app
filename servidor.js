@@ -76,7 +76,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
     if (!estado.cuaderno) return base;
     const { cuaderno: cu, kit: k } = estado;
     const comando = k.tipo === 'kit' ? k.comando : (k.tipo === 'carpeta' ? c.comando_agente : null);
-    return { ...base, cuaderno: { nombre: cu.nombre(), ruta: cu.raiz, kit: k.tipo, profesor: !!comando, portada: cu.portada(), git: estadoGit(cu.raiz) } };
+    return { ...base, cuaderno: { nombre: cu.nombre(), ruta: cu.raiz, base: cu.base, sep: path.sep, kit: k.tipo, profesor: !!comando, portada: cu.portada(), git: estadoGit(cu.raiz) } };
   };
   // Una ruta del índice está oculta si lo está ella o una carpeta que la contiene (solo en la app; ver config.ocultar).
   const oculta = r => { if (!estado.cuaderno) return false; const l = config.ocultas(estado.cuaderno.raiz); return l.some(o => r === o || r.startsWith(o + '/')); };
