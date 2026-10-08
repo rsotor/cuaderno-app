@@ -44,6 +44,7 @@ test('portada: inicio.md si existe; si no, la primera nota de la raíz; si no, n
 test('buscar sin acentos, por nombre y por línea', con({}, (c, cu) => {
   const r = cu.buscar('interes');
   assert.ok(r.ficheros.includes('conceptos/interes.md'));
+  assert.ok(cu.buscar('módulo').ficheros.includes('examenes/01-examen.md'), 'una nota coincide también por su título (el fichero es 01-examen.md)');
   assert.ok(r.lineas.some(l => l.ruta === 'conceptos/capital.md' && l.texto.includes('interés')));
   assert.deepEqual(cu.buscar('  '), { ficheros: [], lineas: [] });
 }));

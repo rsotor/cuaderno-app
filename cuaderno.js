@@ -120,7 +120,8 @@ class Cuaderno {
     const nq = quitarAcentos(String(q || '').trim());
     if (!nq) return { ficheros: [], lineas: [] };
     const todos = this.listar();
-    const ficheros = todos.filter(p => quitarAcentos(p).includes(nq));
+    const titulos = this.titulos();
+    const ficheros = todos.filter(p => quitarAcentos(p).includes(nq) || (titulos[p] && quitarAcentos(titulos[p]).includes(nq)));
     const lineas = [];
     for (const p of todos) {
       if (!p.endsWith('.md') || lineas.length >= tope) continue;

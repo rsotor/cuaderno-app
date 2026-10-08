@@ -25,7 +25,10 @@ test('buscar: Ctrl K enfoca el buscador, «interes» enseña resultados y el pri
   await e.pagina.keyboard.press('Control+k');
   await hasta(() => e.pagina.evaluate(() => document.activeElement && document.activeElement.id === 'buscador'), 'buscador', 'Ctrl K no deja el foco en el buscador');
   await e.pagina.keyboard.type('interes');
-  await conTexto(e.pagina.locator('#arbol .resultado[role="status"]'), /\d+ notas · \d+ líneas/, 'buscador', 'el recuento de resultados');
+  await conTexto(e.pagina.locator('#arbol [role="status"]'), /\d+ notas? y \d+ líneas?/, 'buscador', 'el recuento de resultados');
+  await oculto(e.pagina.locator('.paginas'), 'buscador', 'Inicio/Tareas/Comentarios mientras se busca: los resultados necesitan el sitio');
+  await conTexto(e.pagina.locator('#arbol h3.tramo').first(), /^\d+ notas?$/, 'buscador', 'el tramo «Notas» primero');
+  await conTexto(e.pagina.locator('#arbol h3.tramo').nth(1), /^En el texto/, 'buscador', 'el tramo «En el texto» después');
   const nota = await visible(e.pagina.locator('#arbol a.resultado', { hasText: 'Interés' }), 'buscador', 'la nota «Interés» entre los resultados');
   await visible(e.pagina.locator('#arbol a.resultado mark'), 'buscador', 'el texto buscado resaltado');
   await visible(e.pagina.locator('#arbol a.resultado', { hasText: 'Capital' }), 'buscador', 'la línea de «Capital» que menciona el interés');
@@ -34,6 +37,23 @@ test('buscar: Ctrl K enfoca el buscador, «interes» enseña resultados y el pri
   await conTexto(e.pagina.locator('#nota h1'), /^Interés$/, 'nota', 'el título «Interés»');
   await visible(e.pagina.locator('#nota .propiedades .etiqueta', { hasText: 'rédito' }), 'nota', 'las propiedades del frontmatter (alias)');
   await visible(e.pagina.locator('#nota .backlinks a', { hasText: 'Capital' }), 'nota', 'quién enlaza aquí');
+});
+
+test('buscar con teclado: por título («módulo» abre el examen), flecha abajo y Enter; Escape vuelve al árbol', async () => {
+  await e.ir('#/');
+  await e.pagina.keyboard.press('Control+k');
+  await e.pagina.keyboard.type('módulo');   // el fichero se llama 01-examen.md: solo coincide por el título
+  const nota = await visible(e.pagina.locator('#arbol a.resultado', { hasText: 'Módulo 1' }), 'buscador', 'el examen encontrado por su título, no por el nombre de fichero');
+  await e.pagina.keyboard.press('ArrowDown');
+  await hasta(() => e.pagina.evaluate(() => document.activeElement && document.activeElement.classList.contains('resultado')), 'buscador', 'la flecha abajo no lleva el foco al primer resultado');
+  await e.pagina.keyboard.press('ArrowUp');
+  await hasta(() => e.pagina.evaluate(() => document.activeElement && document.activeElement.id === 'buscador'), 'buscador', 'la flecha arriba desde el primer resultado no vuelve al buscador');
+  await e.pagina.keyboard.press('Enter');
+  await hashCumple(e.pagina, /^#\/n\/examenes\/01-examen\.md/, 'buscador');
+  await e.pagina.keyboard.press('Control+k'); await e.pagina.keyboard.press('Escape');
+  await visible(e.pagina.locator('.paginas'), 'buscador', 'Inicio/Tareas/Comentarios al vaciar con Escape');
+  await visible(e.pagina.locator('#arbol a.hoja', { hasText: 'Interés' }), 'buscador', 'el árbol de vuelta al vaciar');
+  void nota;
 });
 
 test('editar un bloque: el editor trae el Markdown del tramo y guardar cambia el fichero y la pantalla', async () => {

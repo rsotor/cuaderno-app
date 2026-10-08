@@ -62,16 +62,38 @@ async function anadirTareaDesdeBuscador() {
   if (enTareas()) abrirTareas();
 }
 $('#buscador').addEventListener('keydown', e => { if (e.key === 'Enter' && comandoTarea(e.target.value) != null) { e.preventDefault(); clearTimeout(tBusqueda); anadirTareaDesdeBuscador(); } });
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
 async function buscar(q) {
+  $('#lateral').classList.toggle('buscando', !!q.trim());   // con algo escrito, Inicio/Tareas/Comentarios dejan sitio a los resultados
   if (!q.trim()) return pintarArbol(arbol);
   if (comandoTarea(q) != null) return pintarComando(comandoTarea(q));
   const r = await api(`/api/buscar?q=${encodeURIComponent(q)}`);
   const re = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig');
   const marcar = s => esc(s).replace(re, m => `<mark>${m}</mark>`);
-  $('#arbol').innerHTML = `<div class="resultado" role="status"><small>${r.ficheros.length} notas · ${r.lineas.length} líneas</small></div>`
-    + r.ficheros.map(p => `<a class="resultado" href="#/n/${encodeURI(p)}">${marcar(tituloDe(p))}<small>${esc(p)}</small></a>`).join('')
-    + r.lineas.map(l => `<a class="resultado" href="#/n/${encodeURI(l.ruta)}?l=${l.linea}">${esc(tituloDe(l.ruta))}<small>${marcar(l.texto)}</small></a>`).join('');
+  // Primero las notas (por título o nombre de fichero: para abrir una, no hace falta leer todo el texto); después las líneas.
+  const notas = r.ficheros.map(p => `<a class="resultado" href="#/n/${encodeURI(p)}">${marcar(tituloDe(p))}<small>${marcar(p)}</small></a>`).join('');
+  const lineas = r.lineas.map(l => `<a class="resultado" href="#/n/${encodeURI(l.ruta)}?l=${l.linea}">${esc(tituloDe(l.ruta))}<small>${marcar(l.texto)}</small></a>`).join('');
+  const nada = !r.ficheros.length && !r.lineas.length;
+  $('#arbol').innerHTML = `<div class="oculto" role="status">${nada ? `nada con «${esc(q.trim())}»` : `${plural(r.ficheros.length, 'nota', 'notas')} y ${plural(r.lineas.length, 'línea', 'líneas')}`}</div>`
+    + (nada ? `<p class="vacio">Nada con «${esc(q.trim())}».</p>` : '')
+    + (r.ficheros.length ? `<h3 class="tramo">${plural(r.ficheros.length, 'nota', 'notas')}</h3>${notas}` : '')
+    + (r.lineas.length ? `<h3 class="tramo">En el texto <small>${plural(r.lineas.length, 'línea', 'líneas')}</small></h3>${lineas}` : '');
 }
+// Teclado en el buscador: flecha abajo o Enter van al primer resultado (Enter lo abre); Escape vacía y vuelve al árbol.
+$('#buscador').addEventListener('keydown', e => {
+  if (comandoTarea(e.target.value) != null || !e.target.value.trim()) return;
+  const primero = $('#arbol a.resultado');
+  if (e.key === 'ArrowDown' && primero) { e.preventDefault(); primero.focus(); }
+  if (e.key === 'Enter' && primero) { e.preventDefault(); primero.click(); }
+  if (e.key === 'Escape') { e.preventDefault(); e.target.value = ''; buscar(''); }
+});
+$('#arbol').addEventListener('keydown', e => {
+  const a = e.target.closest('a.resultado'); if (!a || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+  e.preventDefault();
+  const todos = [...$('#arbol').querySelectorAll('a.resultado')], i = todos.indexOf(a);
+  if (e.key === 'ArrowDown' && todos[i + 1]) todos[i + 1].focus();
+  else if (e.key === 'ArrowUp') (todos[i - 1] || $('#buscador')).focus();
+});
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#buscador').focus(); $('#buscador').select(); }
   if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); alternarTerminal(); }

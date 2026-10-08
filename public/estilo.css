@@ -85,6 +85,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 @media (prefers-reduced-motion: no-preference) { #arbol summary::before { transition: transform .15s ease; } }
 #arbol .hoja { display: flex; padding-left: 26px; }   /* el texto alineado con el nombre de la carpeta, tras el chevron */
 #arbol .hoja small { color: var(--tinta-suave); font-size: 12px; margin-left: auto; padding-left: 8px; }   /* dos notas con el mismo título: el fichero las distingue */
+#lateral.buscando .paginas { display: none; }   /* buscando, los resultados necesitan el sitio */
+#arbol .tramo { margin: 10px 10px 2px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--tinta-suave); }
+#arbol .tramo small { font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 6px; }
 #arbol .resultado { padding: 6px 10px; display: block; }
 #arbol .resultado small { display: block; color: var(--tinta-suave); white-space: normal; font-size: 12px; line-height: 1.35; }
 #arbol .comando { white-space: normal; color: var(--tinta-suave); line-height: 1.45; }   /* la pista del «+»: Enter añade la tarea */
