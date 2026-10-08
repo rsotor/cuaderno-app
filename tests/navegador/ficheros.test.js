@@ -131,3 +131,12 @@ test('papelera: el botón de la fila manda el fichero a la papelera sin pregunta
   await hasta(() => e.ejecutado.length === antes + 2, 'miga', 'el botón de la miga no manda nada a la papelera');
   await hasta(async () => !(await e.pagina.evaluate(() => location.hash)).includes('apuntes-de-clase'), 'miga', 'la app se queda en el fichero borrado');
 });
+
+test('copiar la ruta: el botón de la miga copia la ruta completa del fichero abierto y lo dice', async () => {
+  await e.pagina.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await e.ir('#/n/material/extracto-octubre.pdf');
+  await (await visible(e.pagina.locator('#miga button.copiar'), 'miga', 'el botón de copiar la ruta')).click();
+  await visible(e.pagina.locator('.aviso-flotante', { hasText: 'Ruta copiada' }), 'miga', 'el aviso de ruta copiada');
+  const copiado = await e.pagina.evaluate(() => navigator.clipboard.readText());
+  assert.equal(copiado, path.join(e.c.base, 'material', 'extracto-octubre.pdf'), 'miga: no copia la ruta completa del fichero');
+});
