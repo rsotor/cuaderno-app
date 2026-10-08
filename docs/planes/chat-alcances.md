@@ -19,9 +19,9 @@ Lo que no está documentado se marca como **por comprobar**.
 
 ## 0. Lo que manda
 
-1. **Suscripción, sin API key** (§6 del plan). El alumno ya paga Claude Code; la app no puede exigirle otra cosa.
+1. **Suscripción, sin API key** (§6 del plan). El alumno ya paga Claude Code; la app no puede exigirle otra cosa. @@ debemos tener en cuenta que puede ser claude, codex, gemini o lo qeu sea deberiamos tener una settings apra logarnos y guardar esa conexion no?
 2. **El profesor es la sesión del kit.** Quien contesta tiene que llevar el AGENTS.md del cuaderno, sus skills y sus
-   herramientas (principios 2 y 3). Un chat que hable con "otro Claude" sin ese contexto no es el profesor.
+   herramientas (principios 2 y 3). Un chat que hable con "otro Claude" sin ese contexto no es el profesor. @@ el profesor o el aistente, da igual. es decir el llm lee laconfiguración del proyecto al quee sta conctado el cuaderno apra saber que ejecutar. si tengo varios cuadernos, pueden ser varias sesiones diferentes
 3. **Nada que esconder.** El repo es público y lo usarán otros alumnos. Lo que hagamos tiene que estar permitido
    para un producto de terceros, no solo para uso propio.
 4. **Control de la experiencia** (principio 4), pero no a cualquier precio: la terminal ya funciona.
@@ -41,6 +41,9 @@ Profesor. Sin chat propio.
   `ANTHROPIC_API_KEY` está en el entorno, Claude Code la usa y factura por API: la app debe quitarla del entorno
   del proceso hijo.
 - **Esfuerzo:** pequeño. Una o dos sesiones. Hay que hacerlo en cualquier caso: es la base y el plan B de todo lo demás.
+
+> [!comment] Alumno (2026-10-08)
+> no me esta funcionando me dale el sesion terminada y no me permite escribir como si fuese una terminal
 
 ### B. Un *channel* propio (un `fakechat` nuestro)
 
@@ -148,6 +151,9 @@ bot en el Developer Portal con *Message Content Intent*, invitarlo a un servidor
 trae hilos, reacciones, indicador de "escribiendo", historial (`fetch_messages`, hasta 100) y adjuntos (10 × 25 MB).
 iMessage: solo macOS, sin bot ni token; lee la base de Mensajes (Acceso total al disco) y basta escribirse a uno
 mismo.
+
+> [!comment] Alumno (2026-10-08)
+> no no, esto seria integrarlo aqui, es decir que tenga una sección drawer a al derecha que me abra la conversacion/hat pero todo dentro del mismo sitio, la cosa es si podemos integrarlo aqui
 
 - **Da:** un chat de verdad, con historial, notificaciones y móvil, sin escribir nada. Permiten el relay de
   permisos desde el chat (Telegram y Discord lo gatean con la allowlist).

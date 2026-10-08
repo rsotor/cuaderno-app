@@ -88,18 +88,15 @@ test('nota nueva: el botón abre el modal, Enter la crea en la carpeta de la not
   await visible(e.pagina.locator('#arbol a.hoja', { hasText: 'Idea rápida' }), 'nueva nota', 'la nota nueva en el árbol');
 });
 
-test('nota nueva desde el buscador: sin resultados, Enter propone crearla con ese título', async () => {
+test('buscador sin resultados: no crea nada con Enter (buscar, «+» tarea y nota nueva no se mezclan)', async () => {
   await e.ir('#/n/larga.md');
   await e.pagina.keyboard.press('Control+k');
   await e.pagina.keyboard.type('Pendientes de hoy');
-  await visible(e.pagina.locator('#arbol button.crear'), 'buscador', 'la propuesta de crear la nota cuando no hay resultados');
+  await conTexto(e.pagina.locator('#arbol .vacio'), /Nada con «Pendientes de hoy»/, 'buscador', 'el aviso de que no hay resultados');
   await e.pagina.keyboard.press('Enter');
-  await visible(e.pagina.locator('#nueva-nota-nombre'), 'buscador', 'el modal de nota nueva');
-  assert.equal(await e.pagina.inputValue('#nueva-nota-nombre'), 'Pendientes de hoy');
-  await e.pagina.selectOption('#nueva-nota-carpeta', '');
-  await e.pagina.keyboard.press('Enter');
-  await hashCumple(e.pagina, /^#\/n\/Pendientes%20de%20hoy\.md$/, 'buscador');
-  await hasta(() => fs.existsSync(path.join(e.c.base, 'Pendientes de hoy.md')), 'buscador', 'el fichero no está en el cuaderno');
+  await e.pagina.waitForTimeout(500);
+  assert.equal(await e.pagina.locator('#nueva-nota').isVisible(), false, 'buscador: Enter sin resultados no debe abrir «Nueva nota»');
+  assert.ok(!fs.existsSync(path.join(e.c.base, 'Pendientes de hoy.md')), 'buscador: Enter sin resultados no debe crear una nota');
 });
 
 test('otra pestaña abre otro cuaderno: esta se entera, lo dice y pasa al nuevo (un servidor, un cuaderno)', async () => {

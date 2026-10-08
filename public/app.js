@@ -43,7 +43,7 @@ function marcarActiva() {
   const a = document.querySelector('#arbol a.activa'); if (a) { let d = a.parentElement; while (d && d.id !== 'arbol') { if (d.tagName === 'DETAILS') d.open = true; d = d.parentElement; } }
 }
 
-// ---------- nota nueva: botón «Nueva nota» (título y carpeta) o, en el buscador, Enter cuando no hay resultados
+// ---------- nota nueva: botón «Nueva nota» (título y carpeta). El buscador solo busca; con «+», tarea (Roberto, 2026-10-08)
 function pintarCarpetas(lista) {
   const carpetas = [...new Set(lista.map(p => p.split('/').slice(0, -1).join('/')).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
   $('#nueva-nota-carpeta').innerHTML = `<option value="">(raíz del cuaderno)</option>` + carpetas.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
@@ -100,20 +100,18 @@ async function buscar(q) {
   const lineas = [...porNota].map(([ruta, ls]) => `<div class="grupo"><a class="resultado" href="#/n/${encodeURI(ruta)}">${esc(tituloDe(ruta))}<small>${esc(ruta)}</small></a>${ls.map(l => `<a class="resultado linea" href="#/n/${encodeURI(l.ruta)}?l=${l.linea}">${marcar(l.texto)}</a>`).join('')}</div>`).join('');
   const nada = !r.ficheros.length && !r.lineas.length;
   $('#arbol').innerHTML = `<div class="oculto" role="status">${nada ? `nada con «${esc(q.trim())}»` : `${plural(r.ficheros.length, 'nota', 'notas')} y ${plural(r.lineas.length, 'línea', 'líneas')}`}</div>`
-    + (nada ? `<p class="vacio">Nada con «${esc(q.trim())}».</p><button type="button" class="resultado crear" data-crear="${esc(q.trim())}"><kbd>Enter</kbd> crea la nota <b>${esc(q.trim())}</b></button>` : '')
+    + (nada ? `<p class="vacio">Nada con «${esc(q.trim())}». Con <b>+</b> delante sería una tarea; «Nueva nota» crea una nota.</p>` : '')
     + (r.ficheros.length ? `<h3 class="tramo">${plural(r.ficheros.length, 'nota', 'notas')}</h3>${notas}` : '')
     + (r.lineas.length ? `<h3 class="tramo">En el texto <small>${plural(r.lineas.length, 'línea', 'líneas')} en ${plural(porNota.size, 'nota', 'notas')}</small></h3>${lineas}` : '');
 }
 // Teclado en el buscador: flecha abajo o Enter van al primer resultado (Enter lo abre); Escape vacía y vuelve al árbol.
 $('#buscador').addEventListener('keydown', e => {
   if (comandoTarea(e.target.value) != null || !e.target.value.trim()) return;
-  const primero = $('#arbol a.resultado'), crear = $('#arbol button.crear');
+  const primero = $('#arbol a.resultado');
   if (e.key === 'ArrowDown' && primero) { e.preventDefault(); primero.focus(); }
   if (e.key === 'Enter' && primero) { e.preventDefault(); primero.click(); }
-  else if (e.key === 'Enter' && crear) { e.preventDefault(); abrirNuevaNota(crear.dataset.crear); }
   if (e.key === 'Escape') { e.preventDefault(); e.target.value = ''; buscar(''); }
 });
-$('#arbol').addEventListener('click', e => { const b = e.target.closest('button.crear'); if (b) abrirNuevaNota(b.dataset.crear); });
 $('#arbol').addEventListener('keydown', e => {
   const a = e.target.closest('a.resultado'); if (!a || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
   e.preventDefault();
