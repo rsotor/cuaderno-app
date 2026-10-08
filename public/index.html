@@ -90,7 +90,8 @@
 </div>
 <div id="ajustes" class="modal" role="dialog" aria-modal="true" aria-labelledby="ajustes-titulo" hidden>
   <div class="editor-caja estrecha">
-    <div class="cabecera"><span id="ajustes-titulo">Ajustes</span><span class="editor-lineas">iguales para todos tus cuadernos</span></div>
+    <div class="cabecera"><span id="ajustes-titulo">Ajustes</span></div>
+    <p class="editor-lineas ajustes-alcance">Para todos tus cuadernos</p>
     <form class="ajustes">
       <label>Tema <select id="ajustes-tema"><option value="auto">Como el sistema</option><option value="claro">Claro</option><option value="oscuro">Oscuro</option></select></label>
       <label>Letra <select id="ajustes-letra"><option value="pequeña">Pequeña</option><option value="media">Media</option><option value="grande">Grande</option></select></label>
@@ -99,7 +100,8 @@
       <label>Comando del profesor en carpetas sin kit <input id="ajustes-comando" placeholder="claude" autocomplete="off"></label>
     </form>
     <section class="ocultas-cuaderno" id="ajustes-ocultas" hidden>
-      <div class="cabecera"><span>Ocultas en este cuaderno</span><span class="editor-lineas">solo en la app: no se borra nada</span></div>
+      <div class="cabecera"><span>Ocultas en este cuaderno</span></div>
+      <p class="editor-lineas ajustes-alcance">Solo en este cuaderno y solo en la app: no se borra nada</p>
       <ul id="lista-ocultas"></ul>
     </section>
     <div class="pie"><button type="button" id="ajustes-cerrar">Cerrar</button></div>

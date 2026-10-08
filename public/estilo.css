@@ -97,9 +97,9 @@ button.mostrar, button.ocultar, button.papelera { flex: none; display: inline-fl
 button.mostrar:hover, button.ocultar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 button.papelera:hover { color: var(--mal); background: rgba(127,127,127,.15); }
 button.mostrar:focus-visible, button.ocultar:focus-visible, button.papelera:focus-visible { opacity: 1; }
-#arbol .fila .acciones-fila { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; gap: 2px; }
-#arbol summary .acciones-fila { margin-left: auto; display: flex; gap: 2px; }
-#arbol .acciones-fila .papelera { margin-left: 6px; }   /* sin confirmar, la separación es lo que evita mandar a la papelera por un píxel */
+#arbol .fila .acciones-fila { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; }
+#arbol summary .acciones-fila { margin-left: auto; display: flex; gap: 6px; }
+#arbol .acciones-fila .papelera { margin-left: 4px; }   /* sin confirmar, la separación es lo que evita mandar a la papelera por un píxel */
 #arbol .fila:hover :is(.mostrar, .ocultar, .papelera), #arbol .fila:focus-within :is(.mostrar, .ocultar, .papelera), #arbol summary:hover :is(.mostrar, .ocultar), #arbol summary:focus-within :is(.mostrar, .ocultar), #miga :is(.mostrar, .papelera) { opacity: 1; }
 @media (hover: none) { button.mostrar, button.ocultar, button.papelera { opacity: 1; } }
 #miga :is(.mostrar, .papelera) { vertical-align: middle; margin-left: 6px; min-width: 24px; min-height: 24px; }
@@ -293,6 +293,7 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 #guardar-mensaje { padding: 10px 12px; background: var(--fondo); resize: vertical; }
 .editor-caja .pie { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
 .ajustes { display: flex; flex-direction: column; gap: 10px; }
+.ajustes-alcance { margin: -6px 0 2px; }
 .ocultas-cuaderno { border-top: 1px solid var(--linea); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .ocultas-cuaderno ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .ocultas-cuaderno li { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; }

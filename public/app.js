@@ -149,7 +149,7 @@ async function pintarOcultas() {
   if (!cuaderno()) { sec.hidden = true; return; }
   const l = await api('/api/ocultas');
   sec.hidden = !l.length;
-  $('#lista-ocultas').innerHTML = l.map(r => `<li><code>${esc(r)}</code><button type="button" class="secundario pequeno" data-mostrar-de-nuevo="${esc(r)}">Mostrar</button></li>`).join('');
+  $('#lista-ocultas').innerHTML = l.map(r => `<li><code>${esc(r)}</code><button type="button" class="secundario pequeno" data-mostrar-de-nuevo="${esc(r)}" aria-label="Mostrar ${esc(r)} otra vez">Mostrar</button></li>`).join('');
 }
 $('#lista-ocultas').addEventListener('click', e => { const b = e.target.closest('button[data-mostrar-de-nuevo]'); if (b) ocultar(b.dataset.mostrarDeNuevo, false); });
 async function mostrarEnCarpeta(ruta) { try { await api('/api/mostrar-en-carpeta', { ruta }); } catch (e) { avisar(e.message); } }
