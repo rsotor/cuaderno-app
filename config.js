@@ -2,11 +2,12 @@
 // La configuración del usuario: igual para todos sus cuadernos y fuera de los repos. Tema, letra, fuente, el panel
 // (dónde va y cuánto mide), los cuadernos recientes y lo que es de esta máquina (comando del agente sin kit). Un JSON en la carpeta de
 // configuración del sistema; CUADERNO_CONFIG_DIR la cambia (los tests la ponen en una carpeta temporal).
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const POR_DEFECTO = { tema: 'auto', letra: 'media', fuente: 'sistema', comando_agente: '', panel: 'derecha', panel_ancho: 420, panel_alto: 320, recientes: [] };
+const POR_DEFECTO = { tema: 'auto', letra: 'media', fuente: 'sistema', comando_agente: '', panel: 'derecha', panel_ancho: 420, panel_alto: 320, recientes: [], ocultas: {} };
 const TEMAS = ['auto', 'claro', 'oscuro'], LETRAS = ['pequeña', 'media', 'grande'], FUENTES = ['sistema', 'serif'];
 const PANELES = ['derecha', 'abajo'];
 // Tamaños del panel en píxeles: enteros dentro de un tope amplio. El límite fino (que la nota conserve su sitio en
@@ -32,6 +33,7 @@ function leer() {
   if (!PANELES.includes(c.panel)) c.panel = POR_DEFECTO.panel;
   for (const campo of Object.keys(TAMANOS_PANEL)) if (!tamanoValido(campo, c[campo])) c[campo] = POR_DEFECTO[campo];
   if (!Array.isArray(c.recientes)) c.recientes = [];
+  if (!c.ocultas || typeof c.ocultas !== 'object' || Array.isArray(c.ocultas)) c.ocultas = {};
   if (typeof c.comando_agente !== 'string') c.comando_agente = '';
   return c;
 }
@@ -63,6 +65,32 @@ function olvidarReciente(ruta) {
   escribir(c);
   return c;
 }
+// Lo que la persona oculta del árbol de un cuaderno (carpetas o ficheros), por cuaderno. Solo en la app: no toca el
+// cuaderno, ni su repo, ni Obsidian, ni al profesor. La clave es la ruta de la raíz del cuaderno.
+function ocultas(raiz) {
+  const l = leer().ocultas[raiz];
+  return Array.isArray(l) ? l.filter(r => typeof r === 'string' && r) : [];
+}
+function ocultar(raiz, ruta, si) {
+  const c = leer();
+  const l = (Array.isArray(c.ocultas[raiz]) ? c.ocultas[raiz] : []).filter(r => r !== ruta);
+  if (si) l.push(ruta);
+  if (l.length) c.ocultas[raiz] = l.sort((a, b) => a.localeCompare(b, 'es')); else delete c.ocultas[raiz];
+  escribir(c);
+  return ocultas(raiz);
+}
+// El código de la URL de la app: uno por usuario, creado la primera vez y guardado en su carpeta de configuración,
+// que solo él puede leer. Así la dirección no cambia al reiniciar y basta con recargar la pestaña (Roberto,
+// 2026-10-09). Lo que protege de otras webs sigue siendo, además del código, la comprobación de Origin.
+function token() {
+  const f = path.join(carpeta(), 'token');
+  try { const t = fs.readFileSync(f, 'utf8').trim(); if (/^[0-9a-f]{32}$/.test(t)) return t; } catch { /* aún no hay: se crea */ }
+  fs.mkdirSync(carpeta(), { recursive: true });
+  const t = crypto.randomBytes(16).toString('hex');
+  fs.writeFileSync(f, t + '\n', { mode: 0o600 });
+  try { fs.chmodSync(f, 0o600); } catch { /* Windows: los permisos los da la carpeta del usuario */ }
+  return t;
+}
 const apariencia = c => ({ tema: c.tema, letra: c.letra, fuente: c.fuente, comando_agente: c.comando_agente, panel: c.panel, panel_ancho: c.panel_ancho, panel_alto: c.panel_alto });
 
-module.exports = { leer, ajustar, registrarReciente, olvidarReciente, apariencia, carpeta, POR_DEFECTO };
+module.exports = { leer, ajustar, registrarReciente, olvidarReciente, apariencia, carpeta, ocultas, ocultar, token, POR_DEFECTO };

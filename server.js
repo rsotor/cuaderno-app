@@ -17,8 +17,9 @@ try {
   try { if (process.platform !== 'win32' && fs.existsSync(ayudante)) fs.accessSync(ayudante, fs.constants.X_OK); } catch { try { fs.chmodSync(ayudante, 0o755); } catch { /* se verá al abrir la terminal */ } }
 } catch { console.error('node-pty no está disponible: la app arranca sin terminal.'); }
 
-// CUADERNO_TOKEN (solo si lo fija quien arranca): el código de la URL no cambia en cada reinicio; para desarrollar.
-const server = crearServidor({ pty, ...(process.env.CUADERNO_TOKEN ? { token: process.env.CUADERNO_TOKEN } : {}) });
+// El código de la URL es el del usuario (config.token(): fijo entre arranques); CUADERNO_TOKEN lo cambia si se fija.
+const config = require('./config');
+const server = crearServidor({ pty, token: process.env.CUADERNO_TOKEN || config.token() });
 if (carpeta) {
   try { server.abrir(carpeta); } catch (e) { console.error(`No se puede abrir ${carpeta}: ${e.message}`); process.exit(2); }
 }

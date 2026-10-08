@@ -27,6 +27,25 @@ test('panel: posición y tamaños se validan; lo que no vale vuelve al valor por
   assert.deepEqual(Object.keys(config.apariencia(c)).sort(), ['comando_agente', 'fuente', 'letra', 'panel', 'panel_alto', 'panel_ancho', 'tema']);
 });
 
+test('el código de la URL: se crea una vez, solo lo lee el usuario y se reutiliza en cada arranque', () => {
+  const t = config.token();
+  assert.match(t, /^[0-9a-f]{32}$/);
+  assert.equal(config.token(), t, 'el segundo arranque cambia el código');
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(config.carpeta(), 'token')).mode & 0o777, 0o600, 'el fichero del código lo pueden leer otros usuarios');
+  fs.writeFileSync(path.join(config.carpeta(), 'token'), 'roto');
+  assert.match(config.token(), /^[0-9a-f]{32}$/, 'un fichero roto no se usa como código');
+});
+
+test('ocultar: por cuaderno, sin repetir, y se recupera; otro cuaderno no se entera', () => {
+  assert.deepEqual(config.ocultar('/c/a', 'plan', true), ['plan']);
+  assert.deepEqual(config.ocultar('/c/a', 'notas/borrador.md', true), ['notas/borrador.md', 'plan']);
+  assert.deepEqual(config.ocultar('/c/a', 'plan', true), ['notas/borrador.md', 'plan'], 'ocultar dos veces repite');
+  assert.deepEqual(config.ocultas('/c/b'), []);
+  assert.deepEqual(config.ocultar('/c/a', 'plan', false), ['notas/borrador.md']);
+  assert.deepEqual(config.ocultar('/c/a', 'notas/borrador.md', false), []);
+  assert.deepEqual(config.leer().ocultas, {}, 'un cuaderno sin ocultas deja su clave');
+});
+
 test('ajustar solo toca la apariencia y el comando; recientes van del más nuevo al más viejo, sin repetir', () => {
   const c = config.ajustar({ tema: 'oscuro', fuente: 'serif', letra: 'enorme', comando_agente: '  claude ', recientes: ['x'] });
   assert.equal(c.tema, 'oscuro'); assert.equal(c.fuente, 'serif'); assert.equal(c.letra, 'media'); assert.equal(c.comando_agente, 'claude'); assert.deepEqual(c.recientes, []);

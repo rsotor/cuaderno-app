@@ -78,6 +78,8 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
     const comando = k.tipo === 'kit' ? k.comando : (k.tipo === 'carpeta' ? c.comando_agente : null);
     return { ...base, cuaderno: { nombre: cu.nombre(), ruta: cu.raiz, kit: k.tipo, profesor: !!comando, portada: cu.portada(), git: estadoGit(cu.raiz) } };
   };
+  // Una ruta del índice está oculta si lo está ella o una carpeta que la contiene (solo en la app; ver config.ocultar).
+  const oculta = r => { if (!estado.cuaderno) return false; const l = config.ocultas(estado.cuaderno.raiz); return l.some(o => r === o || r.startsWith(o + '/')); };
   const comandoProfesor = () => { const k = estado.kit; if (!k) return null; return k.tipo === 'kit' ? k.comando : (k.tipo === 'carpeta' ? config.leer().comando_agente || null : null); };
   const cuadernos = () => config.leer().recientes.map(r => ({ ...r, existe: fs.existsSync(r.ruta), abiertoAhora: !!estado.cuaderno && estado.cuaderno.raiz === r.ruta, git: fs.existsSync(r.ruta) ? estadoGit(r.ruta) : null }));
   const conCuaderno = () => { if (!estado.cuaderno) throw new ErrorPeticion('no hay ningún cuaderno abierto'); return estado.cuaderno; };
@@ -116,7 +118,8 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
       // Entrada con el token de la URL: se guarda en la cookie y se vuelve a / sin él.
       if (p === '/' && url.searchParams.has('t')) {
         if (!iguales(url.searchParams.get('t'), token)) { res.writeHead(403); return res.end('token incorrecto'); }
-        res.writeHead(302, { 'set-cookie': `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/`, location: '/' });
+        // Un año: el código ya no cambia en cada arranque, así que la cookie vale también tras reiniciar el navegador.
+        res.writeHead(302, { 'set-cookie': `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`, location: '/' });
         return res.end();
       }
       if (!autorizado(req, token)) {
@@ -130,9 +133,10 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
       if (p.startsWith('/assets/')) return servir(res, path.join(NODE_MODULES, path.normalize(p.slice(8))));
       if (p === '/api/info') return json(res, info());
       if (p === '/api/cuadernos') return json(res, cuadernos());
-      if (p === '/api/arbol') return json(res, conCuaderno().arbol());
+      if (p === '/api/arbol') return json(res, conCuaderno().arbol().filter(r => !oculta(r)));
+      if (p === '/api/ocultas') return json(res, config.ocultas(conCuaderno().raiz));
       if (p === '/api/titulos') return json(res, conCuaderno().titulos());
-      if (p === '/api/buscar') return json(res, conCuaderno().buscar(url.searchParams.get('q') || ''));
+      if (p === '/api/buscar') { const r = conCuaderno().buscar(url.searchParams.get('q') || ''); return json(res, { ficheros: r.ficheros.filter(f => !oculta(f)), lineas: r.lineas.filter(l => !oculta(l.ruta)) }); }
       if (p === '/api/nota') return json(res, conCuaderno().nota(url.searchParams.get('p')));
       if (p === '/api/tareas') return json(res, conCuaderno().tareas({ soloPropias: estado.kit.tipo === 'carpeta' }));   // una salida del kit sin motor sigue teniendo sus formatos
       if (p === '/api/comentarios') return json(res, conCuaderno().comentarios());
@@ -160,6 +164,12 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
         if (p === '/api/abrir') return json(res, abrir(b.ruta));
         if (p === '/api/olvidar') { config.olvidarReciente(String(b.ruta || '')); return json(res, { ok: true }); }
         if (p === '/api/configuracion') return json(res, config.apariencia(config.ajustar(b)));
+        // Ocultar del árbol y del buscador una carpeta o un fichero, solo en la app (o volver a mostrarlo).
+        if (p === '/api/ocultar') {
+          const cu = conCuaderno(), ruta = String(b.ruta || '').replace(/\/+$/, '');
+          cu.dentro(ruta);
+          return json(res, config.ocultar(cu.raiz, ruta, b.ocultar !== false));
+        }
         // Mostrar una carpeta o un fichero del cuaderno en el gestor de archivos del sistema (Finder, Explorador…).
         if (p === '/api/mostrar-en-carpeta') {
           const cu = conCuaderno(), abs = b.ruta ? cu.dentro(String(b.ruta)) : cu.base;

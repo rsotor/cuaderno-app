@@ -15,7 +15,8 @@
   <symbol id="i-casillas" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></symbol>
   <symbol id="i-bocadillo" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
   <symbol id="i-terminal" viewBox="0 0 24 24"><path d="m4 17 6-5-6-5M12 19h8"/></symbol>
-  <symbol id="i-engranaje" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-engranaje" viewBox="0 0 24 24"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-ojo-tachado" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A9.8 9.8 0 0 1 12 5c5 0 9 5 9 7a10.7 10.7 0 0 1-2.4 3.4M6.6 6.6C4.3 8 3 10.3 3 12c0 2 4 7 9 7a9.7 9.7 0 0 0 5.4-1.6"/></symbol>
   <symbol id="i-guardar" viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5zM8 3v6h7V3M8 21v-7h8v7"/></symbol>
   <symbol id="i-traer" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 17v3h16v-3"/></symbol>
   <symbol id="i-deshacer" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
@@ -42,7 +43,7 @@
     <nav id="arbol" aria-label="Notas"></nav>
     <footer class="pie-lateral">
       <button type="button" id="btn-terminal" title="Abrir la terminal (Ctrl `)"><svg class="icono" aria-hidden="true"><use href="#i-terminal"/></svg>Terminal</button>
-      <button type="button" id="btn-ajustes" title="Ajustes" aria-label="Ajustes"><svg class="icono" aria-hidden="true"><use href="#i-engranaje"/></svg></button>
+      <button type="button" id="btn-ajustes" title="Ajustes de la app"><svg class="icono" aria-hidden="true"><use href="#i-engranaje"/></svg>Ajustes</button>
     </footer>
   </aside>
   <main id="centro">
@@ -97,6 +98,10 @@
       <label>Panel de la terminal <select id="ajustes-panel"><option value="derecha">A la derecha</option><option value="abajo">Abajo</option></select></label>
       <label>Comando del profesor en carpetas sin kit <input id="ajustes-comando" placeholder="claude" autocomplete="off"></label>
     </form>
+    <section class="ocultas-cuaderno" id="ajustes-ocultas" hidden>
+      <div class="cabecera"><span>Ocultas en este cuaderno</span><span class="editor-lineas">solo en la app: no se borra nada</span></div>
+      <ul id="lista-ocultas"></ul>
+    </section>
     <div class="pie"><button type="button" id="ajustes-cerrar">Cerrar</button></div>
   </div>
 </div>

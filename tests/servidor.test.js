@@ -240,3 +240,31 @@ test('papelera y árbol: un fichero va a la papelera del sistema; una carpeta, u
     assert.equal(s.ejecutado.length, 1);
   } finally { await s.cerrar(); }
 });
+
+test('ocultar: la carpeta y lo que tiene dentro salen del árbol y del buscador, no del disco; se recupera; fuera del cuaderno, no', async () => {
+  const s = await arrancar();
+  const post = body => s.pedir('/api/ocultar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    assert.deepEqual(await (await post({ ruta: 'conceptos/' })).json(), ['conceptos']);
+    const arbol = await (await s.pedir('/api/arbol')).json();
+    assert.ok(!arbol.some(r => r.startsWith('conceptos/')), 'la carpeta oculta sigue en el árbol');
+    assert.ok(arbol.includes('inicio.md'));
+    const b = await (await s.pedir('/api/buscar?q=capital')).json();
+    assert.ok(!b.ficheros.some(r => r.startsWith('conceptos/')) && !b.lineas.some(l => l.ruta.startsWith('conceptos/')), 'lo oculto sale en el buscador');
+    assert.ok(fs.existsSync(path.join(s.c.base, 'conceptos', 'capital.md')), 'ocultar ha tocado el disco');
+    assert.equal((await s.pedir('/api/nota?p=conceptos/capital.md')).status, 200, 'una nota oculta deja de abrirse por su enlace');
+    assert.deepEqual(await (await s.pedir('/api/ocultas')).json(), ['conceptos']);
+    assert.deepEqual(await (await post({ ruta: 'conceptos', ocultar: false })).json(), []);
+    assert.ok((await (await s.pedir('/api/arbol')).json()).includes('conceptos/capital.md'));
+    assert.equal((await post({ ruta: '../fuera' })).status, 400);
+  } finally { await s.cerrar(); }
+});
+
+test('la cookie dura un año: con el código fijo, recargar tras reiniciar el servidor o el navegador sigue valiendo', async () => {
+  const s = await arrancar();
+  try {
+    const r = await fetch(`${s.base}/?t=${s.server.token}`, { redirect: 'manual' });
+    assert.match(r.headers.get('set-cookie'), /Max-Age=31536000/);
+    assert.match(r.headers.get('set-cookie'), /HttpOnly; SameSite=Strict/);
+  } finally { await s.cerrar(); }
+});

@@ -89,22 +89,22 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width
 /* «Mostrar en el Finder»: un botón al final de cada fila (carpeta o fichero); aparece al pasar el ratón o al llegar
    con el teclado, y siempre en pantallas táctiles */
 #arbol .fila { position: relative; }
-#arbol .fila .hoja { padding-right: 8px; }   /* el nombre entero; el sitio de los dos botones, solo cuando salen (crítica 2026-10-08, 2) */
-#arbol .fila:is(:hover, :focus-within) .hoja { padding-right: 66px; }
-@media (hover: none) { #arbol .fila .hoja { padding-right: 66px; } }
+#arbol .fila .hoja { padding-right: 8px; }   /* el nombre entero; el sitio de los botones, solo cuando salen (crítica 2026-10-08, 2) */
+#arbol .fila:is(:hover, :focus-within) .hoja { padding-right: 98px; }
+@media (hover: none) { #arbol .fila .hoja { padding-right: 98px; } }
 #arbol summary .nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-button.mostrar, button.papelera { flex: none; display: inline-flex; align-items: center; justify-content: center; padding: 0; min-width: 26px; min-height: 26px; border: none; background: none; color: var(--tinta-suave); border-radius: var(--radio); opacity: 0; }
-button.mostrar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
-button.mostrar:focus-visible { opacity: 1; }
-#arbol .fila .botones-fila { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; }   /* sin confirmar, la separación es lo que evita mandar a la papelera por un píxel */
-#arbol summary .mostrar { margin-left: auto; }
-#arbol .fila:hover :is(.mostrar, .papelera), #arbol .fila:focus-within :is(.mostrar, .papelera), #arbol summary:hover .mostrar, #arbol summary:focus-within .mostrar, #miga :is(.mostrar, .papelera) { opacity: 1; }
-@media (hover: none) { button.mostrar, button.papelera { opacity: 1; } }
+button.mostrar, button.ocultar, button.papelera { flex: none; display: inline-flex; align-items: center; justify-content: center; padding: 0; min-width: 26px; min-height: 26px; border: none; background: none; color: var(--tinta-suave); border-radius: var(--radio); opacity: 0; }
+button.mostrar:hover, button.ocultar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
+button.papelera:hover { color: var(--mal); background: rgba(127,127,127,.15); }
+button.mostrar:focus-visible, button.ocultar:focus-visible, button.papelera:focus-visible { opacity: 1; }
+#arbol .fila .acciones-fila { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; gap: 2px; }
+#arbol summary .acciones-fila { margin-left: auto; display: flex; gap: 2px; }
+#arbol .acciones-fila .papelera { margin-left: 6px; }   /* sin confirmar, la separación es lo que evita mandar a la papelera por un píxel */
+#arbol .fila:hover :is(.mostrar, .ocultar, .papelera), #arbol .fila:focus-within :is(.mostrar, .ocultar, .papelera), #arbol summary:hover :is(.mostrar, .ocultar), #arbol summary:focus-within :is(.mostrar, .ocultar), #miga :is(.mostrar, .papelera) { opacity: 1; }
+@media (hover: none) { button.mostrar, button.ocultar, button.papelera { opacity: 1; } }
 #miga :is(.mostrar, .papelera) { vertical-align: middle; margin-left: 6px; min-width: 24px; min-height: 24px; }
 #miga .papelera { margin-left: 10px; }
 #miga :is(.mostrar, .papelera) .icono { width: 15px; height: 15px; }
-button.papelera:hover { color: var(--mal); background: rgba(127,127,127,.15); }
-button.papelera:focus-visible { opacity: 1; }
 /* ficheros que no son notas */
 #nota.ancha { max-width: none; }
 .miga-barra.ancha { padding-left: 40px; }
@@ -130,7 +130,7 @@ button.papelera:focus-visible { opacity: 1; }
 #arbol .comando b { color: var(--tinta); font-weight: 600; overflow-wrap: anywhere; }
 .pie-lateral { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--linea); }
 .pie-lateral button { flex: 1; white-space: nowrap; }
-.pie-lateral #btn-ajustes { flex: 0 0 auto; padding: 6px 9px; }
+.pie-lateral #btn-ajustes { flex: 0 0 auto; }
 
 #centro { overflow: auto; min-height: 0; min-width: 0; padding: 0 0 40px; }
 .miga-barra { position: sticky; top: 0; background: var(--fondo); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px max(40px, calc((100% - 76ch - 80px) / 2 + 40px)); }   /* empieza donde empieza la columna de #nota */
@@ -293,6 +293,10 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 #guardar-mensaje { padding: 10px 12px; background: var(--fondo); resize: vertical; }
 .editor-caja .pie { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
 .ajustes { display: flex; flex-direction: column; gap: 10px; }
+.ocultas-cuaderno { border-top: 1px solid var(--linea); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.ocultas-cuaderno ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ocultas-cuaderno li { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; }
+.ocultas-cuaderno li code { overflow-wrap: anywhere; }
 .ajustes label { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .ajustes select, .ajustes input { padding: 6px 8px; background: var(--fondo); min-width: 180px; }
 .resultado-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; background: var(--fondo); border: 1px solid var(--linea); border-radius: var(--radio); padding: 10px 12px; margin: 0; max-height: 50vh; overflow: auto; }
