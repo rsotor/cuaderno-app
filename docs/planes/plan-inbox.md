@@ -24,8 +24,10 @@ añadir documentos; preparar una clase se hace hablando con el profesor. Lo que 
 ## Cómo, para que no rompa lo demás (ronda corta)
 
 - **Notas y ficheros, separados.** El índice distingue *notas* (`.md`, `.html`) de *ficheros* (`.pdf`, `.json`,
-  `.txt`, `.csv`). Los ficheros solo salen en el árbol y como destino de un enlace con su extensión
-  (`[[stations-sample.json]]`); el buscador, los backlinks, las tareas y la portada siguen mirando solo notas.
+  `.txt`, `.csv`). Los ficheros salen en el árbol, **en el buscador por su nombre** (Roberto, 2026-10-08: «si
+  buscamos ficheros, ¿por qué no incluirlos?»; sin conflicto) y como destino de un enlace con su extensión
+  (`[[stations-sample.json]]`). La búsqueda *dentro* del texto, los backlinks, las tareas y la portada siguen
+  mirando solo notas (leer un PDF como texto daría basura).
 - **Un fichero no pasa por `/api/nota`** (hoy lo leería entero como texto y lo pintaría como Markdown). La vista
   sale de su extensión: el PDF va en `iframe` directo a `/fichero/…`; JSON, TXT y CSV se piden a `/fichero/…` con un
   tope de 1 MB, y si pasa, se enseña el principio y un enlace «verlo entero en otra pestaña». La recarga en vivo
