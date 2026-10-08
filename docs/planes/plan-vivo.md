@@ -4,25 +4,26 @@
 
 ## 0. Estado
 
-**Última actualización:** 2026-10-07, cierre de sesión.
+**Última actualización:** 2026-10-08.
 
 **Ahora**
 - Fase 6 cerrada el 2026-10-07 tras la ronda de abogado del diablo (7 objeciones atendidas): crítica con cifras en `docs/diseno/critica-2026-10-07.md` (18 hallazgos), cambios aplicados y medidos otra vez: 0 fallos de contraste en 15 pantallas y dos temas, foco 9,6:1 / 6,0:1, sin desbordamiento a 390 px. Decisiones de Roberto: fuente del sistema, Destapar discreto, botón «Corregir». Capturas antes y después en `docs/capturas/`. 46 tests.
-- Siguiente: **fase 7**. Primer paso concreto: leer la documentación de Claude Code sobre *channels* (el oficial `fakechat`) y escribir en §6 si la app puede ser un channel de la sesión que abre en su terminal; en paralelo, abrir la terminal en un navegador normal y comprobar si también se cierra sola. Luego, la terminal cuidada (pestañas, fuente, tema) y el botón Profesor con el curso de prueba con kit.
+- Validación de Roberto (2026-10-08) sobre tres cosas: no hay tests de navegador (solo la sonda de macOS); no hay comando rápido para crear tareas (solo Ctrl K para buscar); las tareas no se pueden relacionar con notas ni filtrar. Decisiones en §6 (Tests de navegador, Tareas rápidas) y dos fases nuevas en §7.
+- En marcha: **fase 7** (tareas rápidas y primeros tests de navegador) y, en paralelo, el análisis de la **fase 8** (el chat con el profesor: vías, alcances y tiempos) en `docs/planes/chat-alcances.md`. Roberto decide la vía antes de tocar la terminal (fase 9).
 
-**Después:** fase 8 (inbox).
+**Después:** fase 9 (terminal cuidada, con la vía del chat ya decidida), fase 10 (inbox).
 
 **Inbox**
 - Diseño (nota de Roberto, 2026-10-07): revisar los espacios entre titulares en la vista de concepto (captura `despues/02-concepto.png`): hay demasiado aire entre un `h2` y el siguiente bloque.
-- Visor de PDF y de ficheros de texto (JSON, txt): hoy el índice solo lista `.md` y `.html`. El navegador pinta PDF en un iframe sin librería; JSON y txt, como texto preformateado. Solo lectura. Decidir en qué fase entra (encaja en la 8, inbox, donde llegan los PDF de clase).
-- Fase 7: la terminal en Chrome headless se cierra nada más abrirse («[terminal cerrada]»); comprobar con un navegador normal y, si pasa, por qué.
+- Visor de PDF y de ficheros de texto (JSON, txt): hoy el índice solo lista `.md` y `.html`. El navegador pinta PDF en un iframe sin librería; JSON y txt, como texto preformateado. Solo lectura. Decidir en qué fase entra (encaja en la 10, inbox, donde llegan los PDF de clase).
+- Fase 9: la terminal en Chrome headless se cierra nada más abrirse («[terminal cerrada]»); reproducirlo con un test de navegador (fase 7) y, si pasa en un navegador normal, por qué.
 - Para el kit: `pendientes.md` trae textos cortados («solo trae el títu»); avisar en profesor-kit.
-- Fase 7: analizar a fondo el chat como *channel* de Claude Code (el oficial `fakechat`: chat web en localhost conectado a la sesión local). Si es viable, la fase 10 se adelanta a la 7.
-- Fase 9: en cuanto haya una máquina Windows, probar `npm install` + `node-pty` y los ficheros CRLF.
+- Fase 8: analizar a fondo el chat como *channel* de Claude Code (el oficial `fakechat`: chat web en localhost conectado a la sesión local), frente a las otras vías, con alcance y tiempo de cada una. Si es viable, la fase 12 se adelanta a la 9.
+- Fase 11: en cuanto haya una máquina Windows, probar `npm install` + `node-pty` y los ficheros CRLF.
 - Visto con la bóveda sin kit (2026-10-07): sin `inicio.md` la app enseña un error en vez del árbol; el panel Tareas toma como tarea cualquier casilla de cualquier nota (miles en una bóveda grande): sin kit, Tareas debe limitarse a lo que configure el usuario o no mostrarse. Con `node_modules` fuera, las respuestas tardan menos de 0,2 s.
 - Cuaderno de pruebas con kit: se monta en una carpeta temporal copiando el motor del kit (`.kit/`, AGENTS.md, CLAUDE.md, .gitignore, .claude/settings.json) más `estudio/` y `config/` del curso de ejemplo, `git init`, `preparar-curso.js --subir no`, `reparar.js` y un commit base. El test `guardar y deshacer con el kit de verdad` corre con `CUADERNO_KIT_PRUEBA=<esa carpeta>`.
 
-**Contexto:** las decisiones y el orden de fases están abajo; los detalles del kit (formatos, herramientas, reglas) viven en el repo del kit. Para medir diseño otra vez: `pruebas/sonda-navegador.js` lanza las sondas de `ux-ui-audit` y captura con el viewport exacto; el curso de prueba con kit se monta como dice el Inbox. El repo está en GitHub (`rsotor/cuaderno-app`, privado).
+**Contexto:** las decisiones y el orden de fases están abajo; los detalles del kit (formatos, herramientas, reglas) viven en el repo del kit. Para medir diseño otra vez: `pruebas/sonda-navegador.js` lanza las sondas de `ux-ui-audit` y captura con el viewport exacto (solo macOS; los recorridos de navegador de `tests/navegador/` corren en cualquier sistema); el curso de prueba con kit se monta como dice el Inbox. El repo está en GitHub (`rsotor/cuaderno-app`, privado).
 
 **Rondas de abogado del diablo:** 2026-10-07, sobre el punto 0 y el prototipo, 7 objeciones → reorden de fases (§7), tabla caso → kit (§4b) y decisiones nuevas (§6) · 2026-10-07, sobre la crítica de diseño, 7 objeciones → todas atendidas (ver el final de `docs/diseno/critica-2026-10-07.md`).
 
@@ -86,7 +87,7 @@ primero se añade al kit (y funciona sin la app) o el caso espera.
 | 7 Flashcards | casillas `✅ la sabía / ❌ no la sabía` del fichero (la app marca una y desmarca la otra); `guardar.js` las lee para el repaso | hecho (fase 5) |
 | 8 Examen tipo test | casillas del examen + `examen.js --corregir <examen.md>` (clave en `config/claves/`); solo si `examen.js --revision` dice resuelta. La app lee las preguntas con las mismas reglas que `examen.js` (número `**1.**`, opción `- [ ] a)`), "(elige una)" → una sola respuesta | hecho (fase 5) |
 | 8 Examen de respuesta libre | Fuera de v1 hasta que el kit lo resuelva: [profesor-kit#46](https://github.com/rsotor/profesor-kit/issues/46) ("/examen: desarrollo, problemas y supuestos prácticos"). Hoy lo corrige el profesor en el chat y lo registra con `--registrar` | espera al kit |
-| 9 Tareas | casillas `- [ ]` de cualquier nota + `tareas.md` | **TBD:** `tareas.md` hoy lo crea la app; decidir si es del kit |
+| 9 Tareas | casillas `- [ ]` de cualquier nota + `tareas.md`. Una tarea se relaciona con una nota con un `[[wikilink]]` en su línea y se etiqueta con `#etiqueta` en línea (formato Obsidian, nada nuevo); la app solo los lee para filtrar | **TBD:** `tareas.md` hoy lo crea la app; decidir si es del kit y avisar allí de que las líneas pueden llevar enlaces y etiquetas |
 | 10 Terminal / Profesor | comando del adaptador del kit (`.kit/adaptadores/<id>.json` → `comando`) | listo |
 | 11 Inbox | `estudio/inbox/`, `estudio/pendientes.md`; preparar → `preparar.js` | **TBD:** cómo se lanza desde la app |
 | 12 Guardar / Traer / Deshacer | `guardar.js "<mensaje>"`, `guardar.js --traer`, `deshacer.js --ver` y `deshacer.js` | listo; errores y conflictos se pasan al profesor por la terminal, la app no los resuelve |
@@ -133,6 +134,8 @@ Capturas del prototipo (en `docs/capturas-prototipo/`), tal como salió, antes d
 | Botón Profesor | Lanza el comando del adaptador del kit en una terminal nueva (`pty.spawn`), no lo teclea; sin kit, el comando sale de la configuración del usuario, nunca del repo. Si el binario no existe, lo dice |
 | Varios cuadernos | Pantalla de inicio con recientes. La lista vive en la configuración del usuario, fuera de los repos. Arrancar sin carpeta abre esa pantalla |
 | Configuración | **Del usuario, igual para todos sus cuadernos** (2026-10-07): tema, letra, fuente y el comando del profesor para carpetas sin kit, en `~/.config/cuaderno/config.json` (`%APPDATA%\cuaderno` en Windows). `cuaderno.json` en la raíz del cuaderno, opcional y versionado con él, solo con lo del cuaderno en sí: nombre para mostrar y portada |
+| Tests de navegador | **Playwright como biblioteca, con `node --test`** (2026-10-08). Hasta hoy nada probaba la pantalla: 46 tests de Node y HTTP, y una sonda de diseño que solo corre en macOS. Los recorridos viven en `tests/navegador/*.test.js`, arrancan `crearServidor` en el puerto 0 con el cuaderno de `tests/ayuda.js` y conducen Chromium. Se lanzan con `npm run test:navegador`, aparte de `npm test`, que sigue sin exigir un navegador. No se usa `@playwright/test`: un solo runner, el de siempre. Dependencia de desarrollo nueva, `playwright`, justificada así: es la única forma seria de probar lo que ve el alumno en Mac, Windows y Linux, y a medio plazo sustituye a la sonda de macOS |
+| Tareas rápidas | **El buscador es el comando** (2026-10-08): si lo que se escribe en Ctrl K empieza por `+`, Enter añade esa tarea a `tareas.md`. Ni atajo nuevo ni panel: Ctrl T y Ctrl Shift T los retiene el navegador. Si se está leyendo una nota, la tarea lleva `[[esa nota]]` al final. Relación con notas y etiquetas: wikilinks y `#etiqueta` en la propia línea (§4b, caso 9); el panel Tareas filtra por nota enlazada, por etiqueta y por pendientes o hechas, sin escribir nada nuevo en el cuaderno |
 | Diseño | **Repaso de UX/UI con plugins cuando existan las pantallas que más lo piden** (examen, tarjetas, cuadernos): fase 6. Plugins del catálogo de Anthropic a activar en la sesión: **Design** (Anthropic; skills `design-critique`, `accessibility-review`, `ux-copy`) para la crítica pantalla a pantalla y los textos; **ux-ui-audit** (comunidad) para medir en el navegador contraste WCAG, tamaño de objetivos y foco; **frontend-design** (Anthropic) para aplicar los cambios con criterio. Entrada: las capturas de §5 y la app arrancada. Salida: lista priorizada, cambios aplicados, capturas de antes y después. Lo que ya se ve en las capturas se arregla antes, en la fase 2 |
 
 ## 7. Fases
@@ -143,10 +146,12 @@ Capturas del prototipo (en `docs/capturas-prototipo/`), tal como salió, antes d
 4. ✅ 2026-10-07 **Guardar / Traer / Deshacer.**
 5. ✅ 2026-10-07 **Formulario de examen** (tipo test) y **modo tarjeta** de flashcards. La respuesta libre espera a profesor-kit#46.
 6. ✅ 2026-10-07 **Repaso de diseño** con los plugins de §6 (Design, ux-ui-audit, frontend-design), cambios aplicados, capturas antes y después: `docs/diseno/critica-2026-10-07.md`.
-7. **Terminal cuidada** (pestañas, fuente, tema) y botón Profesor. Aquí se analiza a fondo el chat como *channel* (§6, Agente): si es viable, la fase 10 se adelanta a esta.
-8. **Inbox** y preparación de clases nuevas.
-9. **`npx cuaderno <carpeta>`**, prueba en Mac y Windows, prueba real automatizada.
-10. **Chat con el profesor** como *channel* de Claude Code (§6, Agente).
+7. **Tareas rápidas y primeros tests de navegador:** `+` en el buscador, enlaces y etiquetas en las tareas, filtros en el panel; Playwright con `node --test` en `tests/navegador/` con los recorridos de portada, buscar, editar, tareas, examen y tarjetas (§6).
+8. **Análisis del chat con el profesor:** las vías posibles (channel de Claude Code, terminal sola, otras), con alcance, riesgos y tiempo de cada una, en `docs/planes/chat-alcances.md`. Termina con una decisión de Roberto sobre la vía; hasta entonces no se toca la terminal.
+9. **Terminal cuidada** (pestañas, fuente, tema) y botón Profesor, con la vía del chat ya decidida. Si el channel es viable, la fase 12 se adelanta a esta.
+10. **Inbox** y preparación de clases nuevas.
+11. **`npx cuaderno <carpeta>`**, prueba en Mac y Windows, y los recorridos de navegador sobre el curso de prueba con kit.
+12. **Chat con el profesor** como *channel* de Claude Code (§6, Agente).
 
 Cada fase termina usable y guardada.
 
