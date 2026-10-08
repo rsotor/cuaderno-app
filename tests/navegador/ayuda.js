@@ -55,11 +55,16 @@ async function arrancar({ pty = null, ...opciones } = { kit: false }) {   // por
   }
   const pagina = await navegador.newPage({ viewport: { width: 1280, height: 800 } });
   pagina.setDefaultTimeout(ESPERA);
+  // Cobertura del código de la pantalla (public/app.js), solo si se pide (npm run cobertura:pantalla): V8 cuenta qué
+  // funciones y bloques corren en los recorridos. Es un informe, no un suelo.
+  const cobertura = process.env.CUADERNO_COBERTURA_PANTALLA;
+  if (cobertura) await pagina.coverage.startJSCoverage({ resetOnNavigation: false });
   pagina.on('pageerror', e => { console.error('[error en la página]', e.message); });
   await pagina.goto(server.url());
   // Va a una ruta de la app (#/tareas, #/n/…) con la página recién cargada: nada de la pantalla anterior se queda.
   const ir = async hash => { await pagina.goto(`${base}/${hash}`); await pagina.reload(); await pagina.locator('#miga strong').waitFor(); };   // la miga se rellena al pintar cualquier pantalla
   const cerrar = async () => {
+    if (cobertura) { const c = (await pagina.coverage.stopJSCoverage()).filter(x => x.url.endsWith('/public/app.js')); fs.mkdirSync(cobertura, { recursive: true }); fs.writeFileSync(path.join(cobertura, `${process.pid}-${Date.now()}.json`), JSON.stringify(c)); }
     await navegador.close();
     await new Promise(r => server.close(r));
     c.borrar();

@@ -68,10 +68,18 @@ jobs:
         run: npm ci
 
       - name: Tests de Node
-        run: npm test
+        # Con el suelo de cobertura del código del servidor (85 % de líneas, ramas y funciones; Roberto, 2026-10-09).
+        run: npm run test:cobertura
 
       - name: Chromium para Playwright
         run: npx playwright install --with-deps chromium
 
       - name: Recorridos de navegador
+        # En Linux, además, la cobertura del código de la pantalla (informe, no suelo).
+        env:
+          CUADERNO_COBERTURA_PANTALLA: ${{ runner.os == 'Linux' && '.cobertura-pantalla' || '' }}
         run: npm run test:navegador
+
+      - name: Cobertura de la pantalla (informe)
+        if: runner.os == 'Linux'
+        run: node pruebas/cobertura-pantalla.js .cobertura-pantalla

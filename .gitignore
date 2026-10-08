@@ -18,3 +18,4 @@ cuadernos-prueba/
 Thumbs.db
 *.tmp
 *~
+.cobertura-pantalla/
