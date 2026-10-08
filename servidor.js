@@ -21,6 +21,9 @@ const COOKIE = 'cuaderno';
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' };
 const PUBLICO = path.join(__dirname, 'public');
 const NODE_MODULES = path.join(__dirname, 'node_modules');
+// Ruta relativa a la raíz del cuaderno tal como se le pasa a una herramienta del kit: siempre con «/», también en
+// Windows (es lo que el kit escribe en sus ficheros y Node la entiende en cualquier sistema).
+const relKit = (raiz, abs) => path.relative(raiz, abs).split(path.sep).join('/');
 
 const iguales = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 function cookieDe(req) { const m = (req.headers.cookie || '').match(new RegExp(`(?:^|;\\s*)${COOKIE}=([a-f0-9]+)`)); return m ? m[1] : null; }
@@ -125,7 +128,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
         const { datos } = leerFrontmatter(texto);
         const ex = formulario.leerExamen(texto.split(/\r?\n/).slice(leerFrontmatter(texto).lineas).join('\n'));
         const desplaza = leerFrontmatter(texto).lineas;
-        const v = formulario.validable(cu.raiz, estado.kit, path.relative(cu.raiz, cu.dentro(rel)), datos);
+        const v = formulario.validable(cu.raiz, estado.kit, relKit(cu.raiz, cu.dentro(rel)), datos);
         return json(res, { ruta: rel, frontmatter: datos, validable: v.ok, motivo: v.motivo, cabecera: cu.md.render(ex.cabecera, {}),
           preguntas: ex.preguntas.map(q => ({ numero: q.numero, unica: q.unica, enunciado: cu.md.render(q.enunciado.replace(/^(\d+\.\s|\*\*\d+\.\*\*)\s*/, ''), {}), opciones: q.opciones.map(o => ({ letra: o.letra, marcada: o.marcada, linea: o.linea + desplaza, texto: cu.md.renderInline(o.texto, {}) })) })),
           resto: ex.resto ? cu.md.render(ex.resto, {}) : '' });
@@ -154,9 +157,9 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
           const partes = texto.split(/(\r?\n)/);   // conserva los finales de línea
           const cabeza = partes.slice(0, lineas * 2).join(''), cuerpo = partes.slice(lineas * 2).join('');
           fs.writeFileSync(abs, cabeza + formulario.marcar(cuerpo, b.respuestas || {})); cu.invalidar();
-          const v = formulario.validable(cu.raiz, estado.kit, path.relative(cu.raiz, abs), leerFrontmatter(texto).datos);
+          const v = formulario.validable(cu.raiz, estado.kit, relKit(cu.raiz, abs), leerFrontmatter(texto).datos);
           if (!v.ok) return json(res, { codigo: 0, corregido: false, salida: `Respuestas guardadas en la nota. ${v.motivo}` });
-          const r = accion(raiz => formulario.corregir(raiz, path.relative(raiz, abs)));
+          const r = accion(raiz => formulario.corregir(raiz, relKit(raiz, abs)));
           cu.invalidar();
           return json(res, { ...r, corregido: r.codigo === 0 });
         }
