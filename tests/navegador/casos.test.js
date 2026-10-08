@@ -113,24 +113,35 @@ test('Tareas sin kit: el panel solo enseña tareas.md (no las casillas de otras 
 // Al final: cambia el cuaderno abierto en el servidor, y los recorridos de antes cuentan con el del principio.
 test('pantalla de Cuadernos: el abierto sale en recientes; abrir otro por su ruta y quitarlo de la lista', async () => {
   const otro = crearCuaderno({ kit: false });
+  // Abrir por la ruta y esperar a que el servidor conteste y la app llegue a la portada: así ningún salto pendiente se
+  // lleva por delante la pantalla siguiente (en la CI, más lenta, pasaba).
+  const abrirPorRuta = async ruta => {
+    await e.ir('#/cuadernos');
+    await e.pagina.fill('#ruta-carpeta', ruta);
+    const [r] = await Promise.all([e.pagina.waitForResponse(x => x.url().endsWith('/api/abrir')), e.pagina.press('#ruta-carpeta', 'Enter')]);
+    assert.equal(r.status(), 200, `cuadernos: abrir ${ruta} da ${r.status()}`);
+    await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(path.basename(ruta)), 'cuadernos', 'el nombre del cuaderno abierto');
+    await hashCumple(e.pagina, /^#\/n\/inicio\.md$/, 'cuadernos');
+  };
+  // La lista que da el servidor y la que se pinta, para que un fallo diga cuál de las dos no lo tiene.
+  const recientes = async () => {
+    const lista = (await (await e.pagina.request.get(`${e.base}/api/cuadernos`, { headers: { origin: e.base } })).json()).map(c => c.ruta);
+    await e.ir('#/cuadernos');
+    return lista;
+  };
   try {
     // El cuaderno de los recorridos se abre al arrancar, sin pasar por la lista: se abre una vez por su ruta para que entre.
-    await e.ir('#/cuadernos');
-    await e.pagina.fill('#ruta-carpeta', e.c.raiz); await e.pagina.press('#ruta-carpeta', 'Enter');
-    // Abrir termina saltando a la portada: se espera, o ese salto se lleva por delante la pantalla siguiente.
-    await hashCumple(e.pagina, /^#\/n\/inicio\.md$/, 'cuadernos');
-    await e.ir('#/cuadernos');
+    await abrirPorRuta(e.c.raiz);
+    assert.ok((await recientes()).includes(e.c.raiz), 'cuadernos: el servidor no lo apunta en recientes');
     await visible(e.pagina.locator('#panel .cuaderno.abierto'), 'cuadernos', 'el cuaderno abierto en recientes');
-    await e.pagina.fill('#ruta-carpeta', otro.raiz); await e.pagina.press('#ruta-carpeta', 'Enter');
-    await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(path.basename(otro.raiz)), 'cuadernos', 'el nombre del cuaderno abierto');
-    await hashCumple(e.pagina, /^#\/n\/inicio\.md$/, 'cuadernos');
-    await e.ir('#/cuadernos');
+    await abrirPorRuta(otro.raiz);
+    const lista = await recientes();
+    assert.deepEqual([...lista].sort(), [e.c.raiz, otro.raiz].sort(), 'cuadernos: el servidor no lista los dos');
     const fila = e.pagina.locator('#panel .cuaderno', { hasText: path.basename(e.c.raiz) });
-    await (await visible(fila, 'cuadernos', 'el cuaderno anterior en recientes')).locator('button[data-olvidar]').click();
+    await (await visible(fila, 'cuadernos', `el cuaderno anterior en recientes (en pantalla: «${(await e.pagina.locator('#panel').textContent()).slice(0, 200)}»)`)).locator('button[data-olvidar]').click();
     await oculto(fila, 'cuadernos', 'el cuaderno quitado de la lista');
     assert.ok(fs.existsSync(e.c.raiz), 'quitar de la lista ha borrado la carpeta');
     // De vuelta al cuaderno del resto de recorridos.
-    await e.pagina.fill('#ruta-carpeta', e.c.raiz); await e.pagina.press('#ruta-carpeta', 'Enter');
-    await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(path.basename(e.c.raiz)), 'cuadernos', 'de vuelta al cuaderno');
+    await abrirPorRuta(e.c.raiz);
   } finally { otro.borrar(); }
 });

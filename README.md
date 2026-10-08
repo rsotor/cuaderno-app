@@ -16,10 +16,11 @@ Sin carpeta, arranca en la pantalla de cuadernos: los recientes y una casilla pa
 (tema, letra, fuente) son tuyos, iguales para todos tus cuadernos. Un `cuaderno.json` opcional en la raíz de un
 cuaderno le da nombre y portada (`{ "nombre": "Finanzas", "portada": "inicio.md" }`).
 
-La terminal imprime la dirección que hay que abrir (lleva un código que cambia en cada arranque: así ninguna otra
-web abierta en el navegador puede hablar con tu cuaderno). Para desarrollar, `CUADERNO_TOKEN=<lo que sea>` fija ese
-código y las pestañas sobreviven a los reinicios. Para probar sin un cuaderno propio, `ejemplos/` trae dos inventados:
-`curso-demo` y `vault-demo`; cópialos antes de escribir en ellos. Necesita Node 24 o más reciente.
+La terminal imprime la dirección que hay que abrir. Lleva un código que se crea la primera vez y se guarda en tu
+carpeta de configuración: la dirección no cambia entre arranques, y ninguna otra web abierta en el navegador puede
+hablar con tu cuaderno. Para probar sin un cuaderno propio, `ejemplos/cuaderno-ejemplo/` trae uno inventado que cubre
+todo lo que la app sabe hacer (`ejemplos/cuaderno-ejemplo.md` dice qué hay en cada nota); cópialo antes de escribir
+en él. Necesita Node 24 o más reciente.
 
 `npm test` lanza los tests. `npm run test:navegador` lanza los recorridos de navegador (Playwright con Chromium headless;
 en un ordenador normal hace falta `npx playwright install chromium` una vez, o la variable `CUADERNO_CHROMIUM` con la ruta
