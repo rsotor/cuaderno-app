@@ -172,14 +172,20 @@ function leerFrontmatter(src) {
   if (fin < 0) return { datos: null, lineas: 0 };
   const cuerpo = src.slice(4, fin);
   const datos = {};
+  let lista = null;   // la clave cuya lista viene en las líneas siguientes («etiquetas:» y debajo «  - una»), como escribe Obsidian
   for (const l of cuerpo.split('\n')) {
+    const item = l.match(/^\s+-\s+(.*)$/);
+    if (item && lista) { datos[lista].push(item[1].trim().replace(/^(["'])(.*)\1$/, '$2')); continue; }
+    lista = null;
     const m = l.match(/^([\w-]+):\s*(.*)$/);
     if (!m) continue;
     let v = m[2].trim();
+    if (v === '') { datos[m[1]] = []; lista = m[1]; continue; }
     if (v.startsWith('[') && v.endsWith(']')) v = v.slice(1, -1).split(',').map(s => s.trim()).filter(Boolean);
     else if (v === 'true') v = true; else if (v === 'false') v = false;
     datos[m[1]] = v;
   }
+  for (const k of Object.keys(datos)) if (Array.isArray(datos[k]) && !datos[k].length && !/^\s*[\w-]+:\s*\[\s*\]/m.test(cuerpo.split('\n').find(l => l.startsWith(k + ':')) || '')) datos[k] = '';   // «clave:» vacía sin lista debajo: vacía, no lista
   return { datos, lineas: cuerpo.split('\n').length + 2 };
 }
 
