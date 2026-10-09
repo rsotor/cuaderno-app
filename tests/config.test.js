@@ -24,7 +24,15 @@ test('panel: posición y tamaños se validan; lo que no vale vuelve al valor por
   assert.equal(c.panel, 'abajo'); assert.equal(c.panel_ancho, 500); assert.equal(c.panel_alto, 320);
   c = config.ajustar({ panel_ancho: 99999, panel_alto: 180.7 });
   assert.equal(c.panel_ancho, 500, 'fuera de rango: se ignora'); assert.equal(c.panel_alto, 320, 'no entero: se ignora');
-  assert.deepEqual(Object.keys(config.apariencia(c)).sort(), ['comando_agente', 'fuente', 'letra', 'panel', 'panel_alto', 'panel_ancho', 'tema']);
+  assert.deepEqual(Object.keys(config.apariencia(c)).sort(), ['comando_agente', 'editor', 'fuente', 'letra', 'panel', 'panel_alto', 'panel_ancho', 'tema']);
+});
+
+test('editor: «con vista» o «plano»; lo que no vale vuelve a «con vista»', () => {
+  assert.equal(config.leer().editor, 'vista');
+  assert.equal(config.ajustar({ editor: 'plano' }).editor, 'plano');
+  assert.equal(config.ajustar({ editor: 'otro' }).editor, 'plano', 'un valor raro se ignora');
+  fs.writeFileSync(path.join(config.carpeta(), 'config.json'), JSON.stringify({ editor: 'raro' }));
+  assert.equal(config.leer().editor, 'vista');
 });
 
 test('el código de la URL: se crea una vez, solo lo lee el usuario y se reutiliza en cada arranque', () => {

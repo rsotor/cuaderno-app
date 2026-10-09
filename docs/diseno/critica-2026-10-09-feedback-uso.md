@@ -46,3 +46,19 @@ Las 5, 2026-10-09. Capturas del después (copia temporal del ejemplo): `despues-
 3. **Estilo de «Tareas que la mencionan», hecha.** `#nota .menciones h2` (gana a `#nota h2`): 14 px, sin borde ni margen superior (medido 14 px / 0 / 0). Cambio de Roberto encima: se quita el enlace de cada tarea a su nota y queda un solo «Ver en Tareas» junto al título, a `#/tareas?nota=<nombre>`; el selector Nota del panel añade ese valor si ninguna tarea la enlaza directamente (las que entran solo por etiqueta o carpeta), para que no salga «Todas» con el filtro puesto.
 4. **×, hecha.** 32×32 px (medido) y `border-radius: 50%`; el hover redondo sale de `color-mix`.
 5. **«Vacía», hecha.** `var(--tinta-suave)` (5,50:1 sobre el fondo del lateral) y `margin-left: 26px`: empieza en x = 50, como sus hermanos. Opcional sin hacer: atenuar el nombre de la carpeta vacía plegada (no cambia nada que el alumno necesite para actuar).
+
+---
+
+## Segunda tanda (2026-10-09, tras probar el bloque de edición y comentarios): editor y comentarios
+
+Cinco retoques de Roberto sobre el editor y los comentarios (barras pegadas, marco de foco, hover, Esc con el ratón, marca del margen). Capturas: `docs/capturas/despues-feedback-2026-10-09-{claro,oscuro}-{editor,lectura}.png`. Una ronda corta (agente `general-purpose`, sonnet; sin la lectura completa de la skill ni de las críticas previas: puede repetir alguna).
+
+Resumen: **5 objeciones: 3 aplicadas, 1 aplicada con matiz, 1 razonada.**
+
+| # | Objeción | Decisión | Por qué |
+|---|---|---|---|
+| 1 | El texto que pasa bajo la barra de formato (80 % de opacidad) compite con los botones y se lee como ruido | **Aplicada con matiz** | Opacidad del 90 % en las dos barras (el agente proponía 92 %; Roberto pidió que se «intuya» lo de debajo: se queda en el 90 %) |
+| 2 | En oscuro la sombra de las barras no se ve (`--tinta` es clara y el 22 % apenas oscurece) | **Aplicada** | Sombra con negro fijo al 32 %, que se ve en los dos temas |
+| 3 | El marco azul en la hoja se entiende como «esta hoja está activa», pero el cursor es una raya de 1 px | **Aplicada (el cursor)** | El marco no cambia (decisión de Roberto); el cursor del editor pasa a 2 px |
+| 4 | Sin fondo en la línea activa ni marca de margen, la posición solo la da el cursor | **Aplicada** | Se resuelve con el cursor de 2 px (objeción 3); el fondo de la línea activa se quita por decisión de Roberto («demasiado ruido, ya tenemos el cursor») |
+| 5 | En oscuro el subrayado inferior (`--tinta-suave`) casi se funde con el ocre y, sin marca de margen, no hay pista a distancia de un bloque comentado | **Razonada en parte** | El subrayado pasa a `--tinta` en oscuro (aplicado). La marca de margen no vuelve: Roberto la quitó («no lo entiendo»); la pista a distancia del comentario es el rotulador |

@@ -41,19 +41,18 @@ test('buscar: Ctrl K enfoca el buscador, «interes» enseña resultados y el pri
   await visible(e.pagina.locator('#nota .backlinks a', { hasText: 'Capital' }), 'nota', 'quién enlaza aquí');
 });
 
-test('editar una lista: el bloque es solo la lista y guardar no da conflicto (bug del 2026-10-08)', async () => {
+test('editar una lista desde el editor de la nota: la casilla nueva queda en el fichero y no da conflicto (bug del 2026-10-08)', async () => {
   await e.ir('#/n/conceptos/interes.md');
-  const bloque = await visible(e.pagina.locator('#nota .bloque', { hasText: 'Repasar con' }), 'nota Interés', 'la lista de casillas');
-  await bloque.hover();
-  await (await visible(bloque.locator('button[data-accion="editar"]'), 'nota Interés', 'el botón «editar» en la lista')).click();
-  await visible(e.pagina.locator('#editor'), 'editor', 'el diálogo de edición');
-  const texto = await e.pagina.locator('#editor-texto').inputValue();
-  assert.ok(!texto.endsWith('\n'), 'editor: el bloque de la lista no debería traer la línea en blanco que la sigue');
-  await e.pagina.locator('#editor-texto').fill(texto + '\n- [ ] Una casilla más');
-  await e.pagina.locator('#editor-guardar').click();
+  await visible(e.pagina.locator('#nota .bloque', { hasText: 'Repasar con' }), 'nota Interés', 'la lista de casillas');
+  await (await visible(e.pagina.locator('#btn-editar'), 'nota Interés', 'el botón «Editar» en la miga')).click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'editor', 'el editor de la nota');
+  await e.pagina.keyboard.press('ControlOrMeta+End');
+  await e.pagina.keyboard.type('- [ ] Una casilla más');
+  await e.pagina.keyboard.press('Enter');
+  await e.pagina.locator('#edicion-aplicar').click();
   await ficheroCumple(e.c, 'conceptos/interes.md', /- \[ \] Una casilla más\n/, 'editor');
-  await oculto(e.pagina.locator('#editor'), 'editor', 'el diálogo de edición tras guardar');
-  await conTexto(e.pagina.locator('#nota'), /Una casilla más/, 'nota Interés', 'la casilla nueva tras guardar');
+  await oculto(e.pagina.locator('#edicion-cm'), 'editor', 'el editor tras aplicar');
+  await conTexto(e.pagina.locator('#nota'), /Una casilla más/, 'nota Interés', 'la casilla nueva tras aplicar');
 });
 
 test('buscar con teclado: por título («módulo» abre el examen), flecha abajo y Enter; Escape vuelve al árbol', async () => {
@@ -73,42 +72,36 @@ test('buscar con teclado: por título («módulo» abre el examen), flecha abajo
   void nota;
 });
 
-test('editar un bloque: el editor trae el Markdown del tramo y guardar cambia el fichero y la pantalla', async () => {
+test('editar un párrafo desde el editor de la nota: el editor trae el Markdown del fichero y aplicar cambia el fichero y la pantalla', async () => {
   await e.ir('#/n/conceptos/capital.md');
-  const bloque = await visible(e.pagina.locator('#nota .bloque', { hasText: 'Lo que pones' }), 'nota Capital', 'el párrafo «Lo que pones»');
-  await bloque.hover();
-  await (await visible(bloque.locator('button[data-accion="editar"]'), 'nota Capital', 'el botón «editar» al pasar por el bloque')).click();
-  await visible(e.pagina.locator('#editor'), 'editor', 'el diálogo de edición');
-  await conTexto(e.pagina.locator('#editor-lineas'), /líneas 3–3/, 'editor', 'las líneas del tramo');
-  assert.equal(await e.pagina.locator('#editor-texto').inputValue(), 'Lo que pones. Enlaza con [[interes|el interés]].', 'editor: el texto no es el Markdown original del bloque');
-  await e.pagina.locator('#editor-texto').fill('Lo que pones tú.');
-  await e.pagina.locator('#editor-guardar').click();
+  await visible(e.pagina.locator('#nota .bloque', { hasText: 'Lo que pones' }), 'nota Capital', 'el párrafo «Lo que pones»');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'editor', 'el editor de la nota');
+  // Con vista, el Markdown crudo se ve en la línea del cursor: se baja a ella y se comprueba tal cual está en el fichero.
+  await e.pagina.keyboard.press('ArrowDown'); await e.pagina.keyboard.press('ArrowDown');
+  assert.equal(await e.pagina.locator('#edicion-cm .cm-line').nth(2).textContent(), 'Lo que pones. Enlaza con [[interes|el interés]].', 'editor: la línea del cursor no es el Markdown del fichero');
+  await e.pagina.locator('#edicion-cm .cm-content').press('ControlOrMeta+a');
+  await e.pagina.keyboard.insertText('# Capital\n\nLo que pones tú.\n');
+  await e.pagina.locator('#edicion-aplicar').click();
   await ficheroCumple(e.c, 'conceptos/capital.md', /^# Capital\n\nLo que pones tú\.\n$/, 'editor');
-  await conTexto(e.pagina.locator('#nota'), /Lo que pones tú\./, 'nota Capital', 'el texto nuevo tras guardar');
-  await oculto(e.pagina.locator('#editor'), 'editor', 'el diálogo de edición tras guardar');
+  await conTexto(e.pagina.locator('#nota'), /Lo que pones tú\./, 'nota Capital', 'el texto nuevo tras aplicar');
+  await oculto(e.pagina.locator('#edicion-cm'), 'editor', 'el editor tras aplicar');
 });
 
-test('bloques: al pasar el ratón el fondo no cambia y editar y comentar salen en el margen, fuera del texto; clicar en el texto no deja nada marcado', async () => {
+test('bloques: sin iconos en el margen, el fondo no cambia al pasar el ratón ni al clicar en el texto', async () => {
   await e.ir('#/n/conceptos/interes.md');
   const bloque = await visible(e.pagina.locator('#nota .bloque', { has: e.pagina.locator('ul') }), 'nota Interés', 'la lista');
-  const acciones = bloque.locator('.acciones');
-  const fondo = () => bloque.evaluate(b => getComputedStyle(b).backgroundColor);
-  await e.pagina.mouse.move(5, 5);   // el ratón, fuera de la nota (el recorrido anterior lo dejó encima)
-  await hasta(() => acciones.evaluate(a => getComputedStyle(a).opacity === '0'), 'nota Interés', 'las acciones se ven sin pasar el ratón');
+  const fondo = b => b.evaluate(x => getComputedStyle(x).backgroundColor);
   const transparente = 'rgba(0, 0, 0, 0)';
   await bloque.hover();
-  await hasta(() => acciones.evaluate(a => getComputedStyle(a).opacity === '1'), 'nota Interés', 'las acciones no aparecen al pasar el ratón');
-  assert.equal(await fondo(), transparente, 'el bloque cambia de fondo al pasar el ratón');
-  const texto = await bloque.locator('ul').boundingBox(), caja = await acciones.boundingBox();
-  assert.ok(caja.x + caja.width <= texto.x, `las acciones (x=${caja.x}, ${caja.width} px) pisan el texto (x=${texto.x})`);
-  assert.equal(await acciones.locator('button').count(), 2);
-  const lapiz = await acciones.locator('button').first().boundingBox(), linea = await bloque.locator('ul li').first().boundingBox();
-  assert.ok(Math.abs((lapiz.y + lapiz.height / 2) - (linea.y + linea.height / 2)) < 6, `el lápiz (centro y=${lapiz.y + lapiz.height / 2}) no está a la altura de la primera línea (y=${linea.y + linea.height / 2})`);
-  // Clicar en el texto y sacar el ratón: ni fondo ni acciones se quedan. Se clica un párrafo, no una casilla: marcar una
+  assert.equal(await fondo(bloque), transparente, 'el bloque cambia de fondo al pasar el ratón');
+  // Comentar es seleccionar un texto (o C): ni editar ni comentar tienen ya un icono por bloque (tareas 2 y 8 del bloque de edición).
+  assert.equal(await e.pagina.locator('#nota .bloque .acciones, #nota .bloque button[data-accion]').count(), 0, 'quedan iconos de acción por bloque');
+  // Clicar en el texto y sacar el ratón: el fondo no se queda. Se clica un párrafo, no una casilla: marcar una
   // casilla escribe en el fichero y la recarga en vivo cambia el bloque por otro (esa línea se prueba en diseno.test.js).
   const parrafo = await visible(e.pagina.locator('#nota .bloque', { hasText: 'El precio del dinero' }), 'nota Interés', 'el párrafo de la introducción');
   await parrafo.click({ position: { x: 100, y: 5 } });
   await e.pagina.mouse.move(5, 5);
-  await hasta(() => parrafo.locator('.acciones').evaluate(a => getComputedStyle(a).opacity === '0'), 'nota Interés', 'las acciones se quedan tras clicar en el texto y salir');
-  assert.equal(await parrafo.evaluate(b => getComputedStyle(b).backgroundColor), transparente, 'el bloque se queda marcado tras clicar en el texto');
+  // Se pregunta de nuevo hasta que la recarga en vivo (que repinta la nota con lo que escribió el recorrido anterior) se asiente.
+  await hasta(async () => (await fondo(e.pagina.locator('#nota .bloque', { hasText: 'El precio del dinero' })).catch(() => null)) === transparente, 'nota Interés', 'el bloque se queda marcado tras clicar en el texto');
 });

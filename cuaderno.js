@@ -7,10 +7,11 @@ const { crearRender, leerFrontmatter } = require('./markdown');
 const { crearFiltro } = require('./ignorar');
 
 class ErrorConflicto extends Error { constructor(msg) { super(msg); this.status = 409; } }
-class ErrorPeticion extends Error { constructor(msg) { super(msg); this.status = 400; } }
+class ErrorPeticion extends Error { constructor(msg, status = 400) { super(msg); this.status = status; } }
 
 const quitarAcentos = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const escaparRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const RE_TITULO_COMENTARIO = /^(.*?) \((\d{4}-\d{2}-\d{2})\)(?: · «(.*)»)?\s*$/;
 const RE_CASILLA = /^(\s*- \[)([ xX])(\] .*)$/;
 // Una etiqueta en línea, como en Obsidian: «#» tras un espacio (o al principio), una letra y luego letras, dígitos,
 // guiones, guiones bajos o barras; acentos admitidos. «#1» y «# título» no lo son. Se busca fuera del código `…`.
@@ -254,7 +255,8 @@ class Cuaderno {
         if (!m) return;
         let j = i + 1; const cuerpo = [];
         while (j < ls.length && ls[j].startsWith('>')) cuerpo.push(ls[j++].replace(/^>\s?/, ''));
-        lista.push({ ruta: p, linea: i, titulo: m[1], texto: cuerpo.join(' ') });
+        const t = m[1].match(RE_TITULO_COMENTARIO);   // 'Alumno (2026-10-09)' o 'Alumno (2026-10-09) · «cita»'; si no cuadra (lo escribió otro), solo `titulo`
+        lista.push({ ruta: p, linea: i, titulo: m[1], autor: t ? t[1] : null, fecha: t ? t[2] : null, cita: t && t[3] ? t[3] : null, texto: cuerpo.join(' '), original: ls.slice(i, j).join('\n') });
       });
     }
     return lista;
@@ -293,6 +295,25 @@ class Cuaderno {
     ls.splice(desde, hasta - desde, ...String(texto).replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n'));
     this.escribir(abs, ls, this.finDeLinea(src));
   }
+  // La nota entera (editor del navegador). Comparación estricta con `original` (sin BOM, CRLF→LF, nada más); el texto
+  // manda: no se añade ni se quita el salto final. Conserva el EOL y el BOM del fichero; con finales mezclados, 422.
+  escribirNota(rel, texto, original) {
+    const abs = this.dentro(rel);
+    if (typeof texto !== 'string') throw new ErrorPeticion('falta el texto de la nota');
+    const src = fs.readFileSync(abs, 'utf8');
+    const bom = src.startsWith('\uFEFF');
+    const sinBom = bom ? src.slice(1) : src;
+    if (sinBom.includes('\r\n') && /(^|[^\r])\n/.test(sinBom)) throw new ErrorPeticion('la nota tiene saltos de línea mezclados', 422);
+    const norm = s => String(s).replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+    if (original != null && norm(original) !== norm(sinBom)) throw new ErrorConflicto('la nota cambió desde que la abriste; vuelve a cargarla');
+    const eol = this.finDeLinea(sinBom);
+    fs.writeFileSync(abs, (bom ? '\uFEFF' : '') + norm(texto).replace(/\n/g, eol));
+    this.invalidar();
+  }
+  // Pinta un fragmento de Markdown como la lectura (mismo render que `nota`), para el editor.
+  renderizar(texto, rel = '') {
+    return this.md.render(String(texto == null ? '' : texto).replace(/\r\n/g, '\n'), { ruta: String(rel || '') });
+  }
   marcarCasilla(rel, linea, marcada, textoOriginal) {
     const abs = this.dentro(rel), src = fs.readFileSync(abs, 'utf8');
     const ls = this.lineas(src);
@@ -302,17 +323,53 @@ class Cuaderno {
     ls[linea] = `${m[1]}${marcada ? 'x' : ' '}${m[3]}`;
     this.escribir(abs, ls, this.finDeLinea(src));
   }
+  // Cita de un comentario: una sola línea, espacios colapsados, sin «» dentro, de 120 caracteres como mucho (se corta
+  // en el último espacio y se añade …). Vacía tras normalizar = comentario sin cita. La unicidad no es de aquí: la
+  // decide la pantalla sobre el texto que se ve.
+  normalizarCita(cita) {
+    let c = String(cita || '').replace(/[«»]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (c.length > 120) {
+      c = c.slice(0, 120);
+      const sp = c.lastIndexOf(' ');
+      c = (sp > 0 ? c.slice(0, sp) : c).trimEnd() + '…';
+    }
+    return c;
+  }
   // Comentario del alumno debajo de un bloque (desde..hasta), separado por líneas en blanco para que Markdown no
-  // lo pegue al párrafo siguiente.
-  comentar(rel, desde, hasta, texto, original, fecha = new Date().toISOString().slice(0, 10)) {
+  // lo pegue al párrafo siguiente. `opciones.cita`: el texto seleccionado, que va en el título tras « · ».
+  //
+  // Regla que comparte con cerrarComentario(): comentar() añade SIEMPRE una línea en blanco antes del callout, y otra
+  // después solo si la línea siguiente no estaba en blanco.
+  comentar(rel, desde, hasta, texto, original, fecha = new Date().toISOString().slice(0, 10), opciones = {}) {
     const abs = this.dentro(rel), src = fs.readFileSync(abs, 'utf8');
     const ls = this.lineas(src);
     if (!String(texto || '').trim()) throw new ErrorPeticion('comentario vacío');
     this.comprobarOriginal(ls, desde, hasta, original);
     const cuerpo = String(texto).trim().replace(/\r\n/g, '\n').split('\n').map(l => `> ${l}`);
-    const nuevas = ['', `> [!comment] Alumno (${fecha})`, ...cuerpo];
+    const cita = this.normalizarCita(opciones && opciones.cita);
+    const nuevas = ['', `> [!comment] Alumno (${fecha})${cita ? ` · «${cita}»` : ''}`, ...cuerpo];
     if (hasta < ls.length && ls[hasta].trim() !== '') nuevas.push('');
     ls.splice(hasta, 0, ...nuevas);
+    this.escribir(abs, ls, this.finDeLinea(src));
+  }
+  // Cierra (borra) el comentario cuyo título está en la línea `linea`. `original` es el callout tal como lo da
+  // comentarios() (campo `original`: título y cuerpo, con `> ` y unidos por \n); sin él solo se comprueba que ahí hay un
+  // comentario. 409 si en esa línea ya no está.
+  //
+  // Quita el callout y la línea en blanco anterior (la que comentar() añade siempre). La posterior se deja: comentar()
+  // solo la añade si la siguiente no estaba en blanco, y con una línea en blanco delante de otra cosa el fichero queda
+  // igual en los dos casos; quitarla podría pegar dos bloques que estaban separados. Así el fichero queda byte a byte
+  // como antes de comentar salvo si el bloque seguía pegado al siguiente sin línea en blanco: ahí queda una de más.
+  cerrarComentario(rel, linea, original) {
+    const abs = this.dentro(rel), src = fs.readFileSync(abs, 'utf8');
+    const ls = this.lineas(src);
+    if (!Number.isInteger(linea) || linea < 0 || linea >= ls.length || !/^> \[!comment\]/.test(ls[linea])) throw new ErrorConflicto('ese comentario ya no está; vuelve a cargar la nota');
+    let fin = linea + 1;
+    while (fin < ls.length && ls[fin].startsWith('>')) fin++;
+    const norm = t => String(t).replace(/\r\n/g, '\n').replace(/\n+$/, '');
+    if (original != null && norm(ls.slice(linea, fin).join('\n')) !== norm(original)) throw new ErrorConflicto('el comentario cambió desde que lo abriste; vuelve a cargar la nota');
+    const ini = linea > 0 && ls[linea - 1].trim() === '' ? linea - 1 : linea;
+    ls.splice(ini, fin - ini);
     this.escribir(abs, ls, this.finDeLinea(src));
   }
   // Nota nueva: el título es el nombre del fichero (sin los caracteres que un sistema de ficheros no admite), en la

@@ -7,8 +7,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const POR_DEFECTO = { tema: 'auto', letra: 'media', fuente: 'sistema', comando_agente: '', panel: 'derecha', panel_ancho: 420, panel_alto: 320, recientes: [], ocultas: {} };
-const TEMAS = ['auto', 'claro', 'oscuro'], LETRAS = ['pequeña', 'media', 'grande'], FUENTES = ['sistema', 'serif'];
+const POR_DEFECTO = { tema: 'auto', letra: 'media', fuente: 'sistema', comando_agente: '', editor: 'vista', panel: 'derecha', panel_ancho: 420, panel_alto: 320, recientes: [], ocultas: {} };
+const TEMAS = ['auto', 'claro', 'oscuro'], LETRAS = ['pequeña', 'media', 'grande'], FUENTES = ['sistema', 'serif'], EDITORES = ['vista', 'plano'];
 const PANELES = ['derecha', 'abajo'];
 // Tamaños del panel en píxeles: enteros dentro de un tope amplio. El límite fino (que la nota conserve su sitio en
 // esta ventana) lo aplica el navegador, que es quien sabe cuánto mide la pantalla.
@@ -30,6 +30,7 @@ function leer() {
   if (!TEMAS.includes(c.tema)) c.tema = POR_DEFECTO.tema;
   if (!LETRAS.includes(c.letra)) c.letra = POR_DEFECTO.letra;
   if (!FUENTES.includes(c.fuente)) c.fuente = POR_DEFECTO.fuente;
+  if (!EDITORES.includes(c.editor)) c.editor = POR_DEFECTO.editor;
   if (!PANELES.includes(c.panel)) c.panel = POR_DEFECTO.panel;
   for (const campo of Object.keys(TAMANOS_PANEL)) if (!tamanoValido(campo, c[campo])) c[campo] = POR_DEFECTO[campo];
   if (!Array.isArray(c.recientes)) c.recientes = [];
@@ -47,6 +48,7 @@ function ajustar(cambios) {
   if (TEMAS.includes(cambios.tema)) c.tema = cambios.tema;
   if (LETRAS.includes(cambios.letra)) c.letra = cambios.letra;
   if (FUENTES.includes(cambios.fuente)) c.fuente = cambios.fuente;
+  if (EDITORES.includes(cambios.editor)) c.editor = cambios.editor;
   if (PANELES.includes(cambios.panel)) c.panel = cambios.panel;
   for (const campo of Object.keys(TAMANOS_PANEL)) if (tamanoValido(campo, cambios[campo])) c[campo] = cambios[campo];
   if (typeof cambios.comando_agente === 'string') c.comando_agente = cambios.comando_agente.trim();
@@ -101,6 +103,6 @@ function cuadernoAlArrancar(argCarpeta, recientes, existe, elegir = false) {
   for (const r of nuevos) { let ok = false; try { ok = existe(r.ruta); } catch { /* cuenta como que no existe */ } if (ok) return { carpeta: r.ruta, origen: 'reciente' }; }
   return { carpeta: null, origen: null };
 }
-const apariencia = c => ({ tema: c.tema, letra: c.letra, fuente: c.fuente, comando_agente: c.comando_agente, panel: c.panel, panel_ancho: c.panel_ancho, panel_alto: c.panel_alto });
+const apariencia = c => ({ tema: c.tema, letra: c.letra, fuente: c.fuente, comando_agente: c.comando_agente, editor: c.editor, panel: c.panel, panel_ancho: c.panel_ancho, panel_alto: c.panel_alto });
 
 module.exports = { leer, ajustar, registrarReciente, olvidarReciente, apariencia, carpeta, ocultas, ocultar, token, cuadernoAlArrancar, POR_DEFECTO };

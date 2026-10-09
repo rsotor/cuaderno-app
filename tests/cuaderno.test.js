@@ -83,8 +83,86 @@ test('comentar deja el callout separado por líneas en blanco', con({}, (c, cu) 
   // si la línea siguiente no está en blanco, se añade una
   cu.comentar('conceptos/capital.md', 0, 1, 'ok', null, '2026-10-07');
   assert.equal(c.leer('conceptos/capital.md'), '# Capital\n\n> [!comment] Alumno (2026-10-07)\n> ok\n\n\nLo que pones. Enlaza con [[interes|el interés]].\n'.replace('> ok\n\n\nLo', '> ok\n\nLo'));
-  assert.deepEqual(cu.comentarios().map(x => [x.ruta, x.linea, x.texto]), [['conceptos/capital.md', 2, 'ok'], ['sesiones/01-01-01-sesion.md', 6, 'No lo entiendo nada']]);
+  assert.deepEqual(cu.comentarios().filter(x => !x.ruta.startsWith('comentarios/')).map(x => [x.ruta, x.linea, x.texto]), [['conceptos/capital.md', 2, 'ok'], ['sesiones/01-01-01-sesion.md', 6, 'No lo entiendo nada']]);
   assert.throws(() => cu.comentar('conceptos/capital.md', 0, 1, '   '), ErrorPeticion);
+}));
+
+test('comentar con cita: título con « · «cita»», y comentarios() separa autor, fecha y cita (null en los viejos)', con({}, (c, cu) => {
+  cu.comentar('conceptos/capital.md', 2, 3, 'duda', null, '2026-10-09', { cita: 'lo que pones' });
+  cu.comentar('conceptos/capital.md', 0, 1, 'viejo', null, '2026-10-07');
+  assert.equal(c.leer('conceptos/capital.md'), '# Capital\n\n> [!comment] Alumno (2026-10-07)\n> viejo\n\nLo que pones. Enlaza con [[interes|el interés]].\n\n> [!comment] Alumno (2026-10-09) · «lo que pones»\n> duda\n');
+  const l = cu.comentarios().filter(x => x.ruta === 'conceptos/capital.md');
+  assert.deepEqual(l.map(x => [x.linea, x.autor, x.fecha, x.cita, x.texto]), [[2, 'Alumno', '2026-10-07', null, 'viejo'], [7, 'Alumno', '2026-10-09', 'lo que pones', 'duda']]);
+  assert.equal(l[1].titulo, 'Alumno (2026-10-09) · «lo que pones»');
+  assert.equal(l[1].original, '> [!comment] Alumno (2026-10-09) · «lo que pones»\n> duda');
+}));
+
+test('la cita se normaliza: una línea, espacios colapsados, sin «» y vacía = sin cita', con({}, (c, cu) => {
+  assert.equal(cu.normalizarCita('  «dos\n\n líneas»   con   «guillemets»  '), 'dos líneas con guillemets');
+  assert.equal(cu.normalizarCita(' «» \n '), '');
+  cu.comentar('conceptos/capital.md', 0, 1, 'a', null, '2026-10-09', { cita: '«»  \n' });
+  assert.match(c.leer('conceptos/capital.md'), /^# Capital\n\n> \[!comment\] Alumno \(2026-10-09\)\n> a\n/);
+}));
+
+test('una cita de más de 120 caracteres se corta en el último espacio y acaba en …', con({}, (c, cu) => {
+  const larga = Array.from({ length: 40 }, (_, i) => 'pala' + i).join(' ');
+  const cita = cu.normalizarCita(larga);
+  assert.ok(cita.endsWith('…') && cita.length <= 121);
+  assert.ok(larga.startsWith(cita.slice(0, -1)) && larga[cita.length - 1] === ' ', 'corta en una palabra entera');
+  assert.equal(cu.normalizarCita('x'.repeat(130)), 'x'.repeat(120) + '…');
+  assert.equal(cu.normalizarCita('y'.repeat(120)), 'y'.repeat(120));
+}));
+
+// Comentar y cerrar: el fichero vuelve a ser el de antes, byte a byte (la regla está en cerrarComentario).
+const ida_y_vuelta = (nombre, texto, opciones, comentarAqui, hasta) => test(`comentar y cerrar deja el fichero como estaba: ${nombre}`, con(opciones, (c, cu) => {
+  const f = 'conceptos/x.md', abs = path.join(c.base, f);
+  fs.writeFileSync(abs, texto);
+  cu.comentar(f, comentarAqui, hasta, 'una duda\nen dos líneas', null, '2026-10-09', { cita: 'algo' });
+  assert.notEqual(c.leer(f), texto);
+  const [cm] = cu.comentarios().filter(x => x.ruta === f);
+  cu.cerrarComentario(f, cm.linea, cm.original);
+  assert.equal(c.leer(f), texto);
+}));
+ida_y_vuelta('bloque al final sin salto final', '# X\n\nUn párrafo', {}, 2, 3);
+ida_y_vuelta('bloque al final con salto final', '# X\n\nUn párrafo\n', {}, 2, 3);
+ida_y_vuelta('seguido de otro bloque', '# X\n\nUn párrafo\n\nOtro párrafo\n', {}, 2, 3);
+ida_y_vuelta('con CRLF', '# X\n\nUn párrafo\n\nOtro párrafo\n', { crlf: true }, 2, 3);
+ida_y_vuelta('el primer bloque del fichero', '# X\n\nUn párrafo\n', {}, 0, 1);
+
+test('cerrar un comentario de un bloque con otros dos: los demás siguen bien separados', con({}, (c, cu) => {
+  const f = 'conceptos/x.md', base = '# X\n\nUn párrafo\n\nOtro párrafo\n';
+  fs.writeFileSync(path.join(c.base, f), base);
+  cu.comentar(f, 2, 3, 'primero', null, '2026-10-09', { cita: 'Un' });
+  const uno = c.leer(f);
+  cu.comentar(f, 2, 3, 'segundo', null, '2026-10-09', { cita: 'párrafo' });
+  const [segundo, primero] = cu.comentarios().filter(x => x.ruta === f);   // el último en comentar queda justo tras el bloque
+  assert.deepEqual([segundo.texto, primero.texto], ['segundo', 'primero']);
+  cu.cerrarComentario(f, segundo.linea, segundo.original);
+  assert.equal(c.leer(f), uno);
+  cu.comentar(f, 2, 3, 'segundo', null, '2026-10-09', { cita: 'párrafo' });
+  const [, p2] = cu.comentarios().filter(x => x.ruta === f);
+  cu.cerrarComentario(f, p2.linea, p2.original);
+  assert.equal(c.leer(f), '# X\n\nUn párrafo\n\n> [!comment] Alumno (2026-10-09) · «párrafo»\n> segundo\n\nOtro párrafo\n');
+}));
+
+test('cerrar comentario sin línea en blanco tras el bloque deja una de más, nunca pega bloques', con({}, (c, cu) => {
+  const f = 'conceptos/x.md';
+  fs.writeFileSync(path.join(c.base, f), '# X\nUn párrafo\n- lista\n');
+  cu.comentar(f, 1, 2, 'd', null, '2026-10-09');
+  const [cm] = cu.comentarios().filter(x => x.ruta === f);
+  cu.cerrarComentario(f, cm.linea, cm.original);
+  assert.equal(c.leer(f), '# X\nUn párrafo\n\n- lista\n');
+}));
+
+test('cerrar comentario: 409 si en esa línea ya no está ese callout, y no toca nada', con({}, (c, cu) => {
+  cu.comentar('conceptos/capital.md', 2, 3, 'duda', null, '2026-10-09', { cita: 'pones' });
+  const antes = c.leer('conceptos/capital.md'), [cm] = cu.comentarios().filter(x => x.ruta === 'conceptos/capital.md');
+  assert.throws(() => cu.cerrarComentario('conceptos/capital.md', 0, null), ErrorConflicto);
+  assert.throws(() => cu.cerrarComentario('conceptos/capital.md', 99, null), ErrorConflicto);
+  assert.throws(() => cu.cerrarComentario('conceptos/capital.md', cm.linea, cm.original + 'x'), ErrorConflicto);
+  assert.equal(c.leer('conceptos/capital.md'), antes);
+  cu.cerrarComentario('conceptos/capital.md', cm.linea, null);
+  assert.equal(cu.comentarios().filter(x => x.ruta === 'conceptos/capital.md').length, 0);
 }));
 
 test('marcar una casilla cambia solo esa línea y comprueba que sigue siendo ella', con({}, (c, cu) => {
@@ -136,7 +214,7 @@ test('títulos: el # de cada nota, sin wikilinks; las tareas llevan el Markdown 
 
 test('recorrido: cuenta notas, enlaces rotos y fallos', con({}, (c, cu) => {
   const r = cu.recorrido();
-  assert.equal(r.notas, 20);   // las 8 del curso demo, las 8 de cuaderno-ejemplo (render/, estructura/), las 3 de las menciones (personas/, iniciativas/mudanza/) y la nota larga de lectura/ (2026-10-09: una nota nueva en el ejemplo, no un valor arreglado); sus enlaces resuelven todos: el único roto sigue siendo el de interes.md
+  assert.equal(r.notas, 21);   // las 8 del curso demo, las 8 de cuaderno-ejemplo (render/, estructura/), las 3 de las menciones (personas/, iniciativas/mudanza/) y la nota larga de lectura/ (2026-10-09: una nota nueva en el ejemplo, no un valor arreglado); sus enlaces resuelven todos: el único roto sigue siendo el de interes.md
   assert.deepEqual(r.rotos, [{ ruta: 'conceptos/interes.md', destino: 'no-existe' }]);
   assert.deepEqual(r.fallos, []);
 }));
@@ -222,4 +300,49 @@ test('las imágenes salen en el índice como ficheros', con({}, (c, cu) => {
   cu.invalidar();
   assert.deepEqual(cu.listar().filter(p => p.startsWith('material/foto.')), ['material/foto.gif', 'material/foto.jpeg', 'material/foto.jpg', 'material/foto.svg', 'material/foto.webp']);
   assert.deepEqual(cu.nota('material/reparto-50-30-20.png'), { ruta: 'material/reparto-50-30-20.png', tipo: 'png', esFichero: true });
+}));
+
+test('escribirNota conserva el salto final (o su falta), las líneas en blanco finales, el CRLF y el BOM', con({}, (c, cu) => {
+  const abs = rel => path.join(c.base, rel);
+  fs.writeFileSync(abs('sin-final.md'), '# A\n\ntexto');
+  cu.escribirNota('sin-final.md', '# A\n\notro', '# A\n\ntexto');
+  assert.equal(c.leer('sin-final.md'), '# A\n\notro');
+  fs.writeFileSync(abs('blancos.md'), '# B\n\n\n');
+  cu.escribirNota('blancos.md', '# B\n\nx\n\n\n', '# B\n\n\n');
+  assert.equal(c.leer('blancos.md'), '# B\n\nx\n\n\n');
+  assert.throws(() => cu.escribirNota('blancos.md', 'y', '# B\n\nx\n\n'), ErrorConflicto, 'la comparación es estricta con los blancos finales');
+  fs.writeFileSync(abs('bom.md'), '\uFEFF# C\r\n\r\nuno\r\n');
+  cu.escribirNota('bom.md', '# C\n\ndos\n', '# C\n\nuno\n');   // el navegador manda el original sin BOM y con LF
+  assert.equal(c.leer('bom.md'), '\uFEFF# C\r\n\r\ndos\r\n');
+}));
+
+test('escribirNota en un fichero CRLF vuelve CRLF, sin ningún LF suelto', con({ crlf: true }, (c, cu) => {
+  const antes = c.leer('conceptos/capital.md');
+  assert.ok(antes.includes('\r\n'));
+  cu.escribirNota('conceptos/capital.md', 'uno\ndos\r\ntres\n', antes);
+  const despues = c.leer('conceptos/capital.md');
+  assert.equal(despues, 'uno\r\ndos\r\ntres\r\n');
+  assert.ok(!/(^|[^\r])\n/.test(despues));
+}));
+
+test('escribirNota: finales mezclados dan 422, un original distinto 409 y una ruta o texto malos 400', con({}, (c, cu) => {
+  fs.writeFileSync(path.join(c.base, 'mezcla.md'), 'a\r\nb\nc\n');
+  assert.throws(() => cu.escribirNota('mezcla.md', 'x', null), e => e instanceof ErrorPeticion && e.status === 422);
+  assert.equal(c.leer('mezcla.md'), 'a\r\nb\nc\n');
+  assert.throws(() => cu.escribirNota('tareas.md', 'x', 'otro texto'), ErrorConflicto);
+  assert.throws(() => cu.escribirNota('tareas.md', 42, null), e => e instanceof ErrorPeticion && e.status === 400);
+  assert.throws(() => cu.escribirNota('../fuera.md', 'x', null), ErrorPeticion);
+  cu.escribirNota('tareas.md', 'sin comprobar', null);   // sin original no se comprueba
+  assert.equal(c.leer('tareas.md'), 'sin comprobar');
+}));
+
+test('renderizar pinta igual que nota(): callout, fórmula e imagen relativa', con({}, (c, cu) => {
+  const md = '> [!note] Aviso\n> cuerpo\n\n$$x^2 + 1$$\n\n![dibujo](img.png)\n';
+  fs.mkdirSync(path.join(c.base, 'carpeta'));
+  fs.writeFileSync(path.join(c.base, 'carpeta', 'n.md'), md);
+  const esperado = cu.nota('carpeta/n.md').html;
+  assert.ok(esperado.includes('/fichero/carpeta/img.png'));
+  assert.equal(cu.renderizar(md, 'carpeta/n.md'), esperado);
+  assert.equal(typeof cu.renderizar('hola', ''), 'string');
+  assert.equal(typeof cu.renderizar('hola'), 'string');
 }));

@@ -70,10 +70,35 @@ test('la API: info, árbol, nota, escrituras y el 409 cuando la nota cambió', a
     r = await post('/api/bloque', { ruta: 'conceptos/capital.md', desde: 2, hasta: 3, texto: 'Otra vez', original: 'Lo que pones. Enlaza con [[interes|el interés]].' });
     assert.equal(r.status, 409);
     assert.match((await r.json()).error, /cambió/);
+    r = await post('/api/nota/escribir', { ruta: 'conceptos/interes.md', texto: 'nuevo\n', original: 'no es el contenido' });
+    assert.equal(r.status, 409);
+    r = await post('/api/nota/escribir', { ruta: 'conceptos/interes.md', texto: 'nuevo\n', original: s.c.leer('conceptos/interes.md') });
+    assert.equal(r.status, 200);
+    assert.equal(s.c.leer('conceptos/interes.md'), 'nuevo\n');
+    fs.writeFileSync(path.join(s.c.base, 'mezcla.md'), 'a\r\nb\nc\n');
+    assert.equal((await post('/api/nota/escribir', { ruta: 'mezcla.md', texto: 'x', original: null })).status, 422);
+    r = await post('/api/render', { texto: '# Hola\n\n![](img.png)', ruta: 'conceptos/x.md' });
+    assert.equal(r.status, 200);
+    const { html } = await r.json();
+    assert.match(html, /<h1[^>]*>Hola/);
+    assert.match(html, /\/fichero\/conceptos\/img\.png/);
+    assert.equal((await post('/api/render', { texto: 'x' })).status, 200);
     assert.equal((await post('/api/casilla', { ruta: 'tareas.md', linea: 4, marcada: true })).status, 200);
     assert.match(s.c.leer('tareas.md'), /- \[x\] Comprar/);
+    const delEjemplo = (await (await s.pedir('/api/comentarios')).json()).length;   // los de comentarios/nota-comentada.md
     assert.equal((await post('/api/comentario', { ruta: 'conceptos/capital.md', desde: 0, hasta: 1, texto: 'duda', original: '# Capital' })).status, 200);
-    assert.equal((await (await s.pedir('/api/comentarios')).json()).length, 1);
+    assert.equal((await (await s.pedir('/api/comentarios')).json()).length, delEjemplo + 1);
+    const sinCita = (await (await s.pedir('/api/comentarios')).json()).find(x => x.texto === 'duda');
+    assert.equal(sinCita.cita, null);
+    assert.equal((await post('/api/comentario', { ruta: 'conceptos/capital.md', desde: 2, hasta: 3, texto: 'con cita', cita: ' «lo que»\n pones ' })).status, 200);
+    const conCita = (await (await s.pedir('/api/comentarios')).json()).find(x => x.texto === 'con cita');
+    assert.deepEqual([conCita.cita, conCita.autor], ['lo que pones', 'Alumno']);
+    r = await post('/api/comentario/cerrar', { ruta: 'conceptos/capital.md', linea: conCita.linea, original: conCita.original + ' cambiado' });
+    assert.equal(r.status, 409);
+    assert.equal((await post('/api/comentario/cerrar', { ruta: 'conceptos/capital.md', linea: conCita.linea, original: conCita.original })).status, 200);
+    r = await post('/api/comentario/cerrar', { ruta: 'conceptos/capital.md', linea: conCita.linea, original: conCita.original });
+    assert.equal(r.status, 409);
+    assert.equal((await (await s.pedir('/api/comentarios')).json()).length, delEjemplo + 1);
     assert.equal((await post('/api/tarea', { texto: 'Nueva' })).status, 200);
     assert.equal((await (await s.pedir('/api/tareas')).json())[0].items.length, 2);
     assert.equal((await post('/api/tarea', { texto: 'Releer [[conceptos/interes]] #repaso' })).status, 200);
@@ -139,7 +164,7 @@ test('sin cuaderno abierto: la API lo dice; abrir una carpeta cambia el cuaderno
     const lista = await (await pedir('/api/cuadernos')).json();
     assert.deepEqual(lista.map(c => [c.nombre, c.existe, c.abiertoAhora]), [['Mi otro curso', true, true]]);
     // la configuración se guarda y vuelve en /api/info
-    assert.deepEqual(await (await post('/api/configuracion', { tema: 'oscuro', letra: 'grande' })).json(), { tema: 'oscuro', letra: 'grande', fuente: 'sistema', comando_agente: '', panel: 'derecha', panel_ancho: 420, panel_alto: 320 });
+    assert.deepEqual(await (await post('/api/configuracion', { tema: 'oscuro', letra: 'grande' })).json(), { tema: 'oscuro', letra: 'grande', fuente: 'sistema', comando_agente: '', editor: 'vista', panel: 'derecha', panel_ancho: 420, panel_alto: 320 });
     // el panel: un tamaño fuera de rango no da error ni se guarda; vuelve el valor que había
     assert.equal((await (await post('/api/configuracion', { panel: 'abajo', panel_ancho: 99999 })).json()).panel_ancho, 420);
     assert.equal((await (await pedir('/api/info')).json()).configuracion.panel, 'abajo');
@@ -320,7 +345,7 @@ test('rutas de lectura y de nota nueva: títulos, recorrido y crear una nota', a
     const t = await (await s.pedir('/api/titulos')).json();
     assert.equal(t['conceptos/capital.md'], 'Capital'); assert.equal(t['material/calculadora-50-30-20.html'], 'Calculadora 50/30/20');
     const r = await (await s.pedir('/api/recorrido')).json();
-    assert.equal(r.notas, 20); assert.deepEqual(r.fallos, []);   // 20: con la nota larga de lectura/ (2026-10-09)
+    assert.equal(r.notas, 21); assert.deepEqual(r.fallos, []);   // 21: con la nota larga de lectura/ (2026-10-09) y comentarios/nota-comentada.md
     const n = await (await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).json();
     assert.equal(n.ruta, 'conceptos/Idea nueva.md'); assert.equal(s.c.leer('conceptos/Idea nueva.md'), '# Idea nueva\n\n');   // el título y una línea en blanco para escribir debajo
     assert.equal((await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).status, 400, 'una nota repetida no da error');
@@ -376,5 +401,16 @@ test('un fichero del cuaderno se sirve por trozos (Range): vídeo y audio se rep
     assert.equal((await s.pedir('/fichero/clip.mp4', { headers: { range: 'bytes=20-' } })).status, 416);
     const entero = await s.pedir('/fichero/clip.mp4');
     assert.equal(entero.status, 200); assert.equal(entero.headers.get('accept-ranges'), 'bytes'); assert.equal(await entero.text(), '0123456789');
+  } finally { await s.cerrar(); }
+});
+
+test('/api/comentario acepta la fecha (para deshacer un cierre con la del comentario original) y se la salta si no es AAAA-MM-DD', async () => {
+  const s = await arrancar();
+  const post = (ruta, body) => s.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    assert.equal((await post('/api/comentario', { ruta: 'conceptos/capital.md', desde: 0, hasta: 1, texto: 'con fecha', original: '# Capital', fecha: '2026-01-02' })).status, 200);
+    assert.match(s.c.leer('conceptos/capital.md'), /\[!comment\] Alumno \(2026-01-02\)\n> con fecha/);
+    assert.equal((await post('/api/comentario', { ruta: 'conceptos/capital.md', desde: 0, hasta: 1, texto: 'fecha rara', original: '# Capital', fecha: 'ayer' })).status, 200);
+    assert.doesNotMatch(s.c.leer('conceptos/capital.md'), /Alumno \(ayer\)/, 'una fecha que no es AAAA-MM-DD se ignora');
   } finally { await s.cerrar(); }
 });

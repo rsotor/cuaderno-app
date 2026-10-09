@@ -3,6 +3,7 @@
   --papel: #fbfbfc; --fondo: #f2f3f5; --mesa: #e6e8ec; --lateral: #e6e8ec; --tinta: #1b1b1f; --tinta-suave: #5a5e66; --linea: #dcdfe4;
   --acento: #1e5a96; --acento-suave: #e3ecfa; --sobre-acento: #ffffff; --ok: #15803d; --aviso: #7a4a00; --mal: #b91c1c;
   --terminal-fondo: #1b1d23; --marca: #fff3a8;
+  --rotulador: #ffe45c;   /* lo comentado; en claro, contra --tinta (#1b1b1f) 13,5:1 y contra --acento (#1e5a96) 5,6:1 */
   --c-info: var(--acento); --c-question: #6d28d9; --c-warning: var(--aviso); --c-danger: var(--mal); --c-success: var(--ok);
   --c-quote: #4b5563; --c-example: #0e7490; --c-tip: #0f766e; --c-comment: #9a3412;
   --radio: 6px; --radio-bloque: 8px;
@@ -17,6 +18,7 @@
   --papel: #1c1e23; --fondo: #141518; --mesa: #0e0f12; --lateral: #0e0f12; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
   --acento: #8cc8f0; --acento-suave: #22303c; --sobre-acento: #141518; --ok: #86efac; --aviso: #e0a040; --mal: #fca5a5;
   --terminal-fondo: #0f1014; --marca: #5a4d12;
+  --rotulador: #5a4a00;   /* ocre oscuro: contra --tinta (#e6e6e6) 7,0:1 y contra --acento (#8cc8f0) 4,8:1 (el #6b5a00 no pasa: enlace 3,8:1); contra --papel (#1c1e23) 1,9:1, por eso lleva además subrayado */
   --c-question: #c4b5fd; --c-quote: #9ca3af; --c-example: #67e8f9; --c-tip: #5eead4; --c-comment: #fb923c;
   --sombra: 0 10px 30px rgba(0, 0, 0, .45); --borde-cajon: #2c2f36;   /* la mesa y el cajón son casi del mismo negro: la línea los separa (crítica 2026-10-09, 2) */
   color-scheme: dark;
@@ -25,6 +27,7 @@
   --papel: #1c1e23; --fondo: #141518; --mesa: #0e0f12; --lateral: #0e0f12; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
   --acento: #8cc8f0; --acento-suave: #22303c; --sobre-acento: #141518; --ok: #86efac; --aviso: #e0a040; --mal: #fca5a5;
   --terminal-fondo: #0f1014; --marca: #5a4d12;
+  --rotulador: #5a4a00;   /* ocre oscuro: contra --tinta (#e6e6e6) 7,0:1 y contra --acento (#8cc8f0) 4,8:1 (el #6b5a00 no pasa: enlace 3,8:1); contra --papel (#1c1e23) 1,9:1, por eso lleva además subrayado */
   --c-question: #c4b5fd; --c-quote: #9ca3af; --c-example: #67e8f9; --c-tip: #5eead4; --c-comment: #fb923c;
   --sombra: 0 10px 30px rgba(0, 0, 0, .45); --borde-cajon: #2c2f36;   /* la mesa y el cajón son casi del mismo negro: la línea los separa (crítica 2026-10-09, 2) */
   color-scheme: dark;
@@ -37,7 +40,7 @@
 [hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; background: var(--mesa); color: var(--tinta); font: 15px/1.6 var(--fuente); }
 :focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
-@media (prefers-reduced-motion: no-preference) { .bloque, .respuesta-tarjeta { transition: background-color .15s ease; } .bloque .acciones { transition: opacity .12s ease; } }
+@media (prefers-reduced-motion: no-preference) { .bloque, .respuesta-tarjeta { transition: background-color .15s ease; } }
 .oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .saltar { position: absolute; left: -999px; top: 8px; z-index: 50; background: var(--acento); color: var(--sobre-acento); padding: 8px 14px; border-radius: var(--radio); text-decoration: none; }
 .saltar:focus { left: 8px; }
@@ -54,8 +57,8 @@ button:hover { border-color: var(--acento); }
 button:active { transform: translateY(1px); }
 button:disabled { opacity: .45; cursor: not-allowed; transform: none; border-color: var(--linea); }
 button.secundario { color: var(--tinta-suave); }
-button.primario, #editor-guardar, #guardar-ok, #validar { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); font-weight: 600; }
-button.primario:hover, #editor-guardar:hover, #guardar-ok:hover, #validar:hover { filter: brightness(1.08); }
+button.primario, #guardar-ok, #validar { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); font-weight: 600; }
+button.primario:hover, #guardar-ok:hover, #validar:hover { filter: brightness(1.08); }
 button.pequeno { padding: 2px 8px; font-size: 12.5px; min-height: 26px; }
 input, select, textarea { font: inherit; color: var(--tinta); background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio); }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width: 16px; height: 16px; }
@@ -150,7 +153,7 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .pie-lateral button { flex: 1; white-space: nowrap; }
 .pie-lateral #btn-ajustes { flex: 0 0 auto; }
 
-#centro { overflow: auto; min-height: 0; min-width: 0; padding: 0 0 40px; background: var(--mesa); --hoja-pad: 56px; --texto: 800px; }   /* la mesa: un poco más hundida que la hoja (Roberto, 2026-10-09, dirección A) */
+#centro { position: relative; overflow: auto; min-height: 0; min-width: 0; padding: 0 0 40px; background: var(--mesa); --hoja-pad: 56px; --texto: 800px; }   /* la mesa: un poco más hundida que la hoja (Roberto, 2026-10-09, dirección A) */
 .miga-barra { position: sticky; top: 0; background: var(--mesa); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px max(calc(var(--hoja-pad) + 8px), calc((100% - var(--texto) - 2 * var(--hoja-pad)) / 2 + var(--hoja-pad))); }   /* empieza donde empieza el texto de la hoja */
 #miga { font-size: 13px; color: var(--tinta-suave); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #btn-menu { display: none; padding: 6px 8px; }
@@ -164,7 +167,7 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 #centro.con-indice #nota, #centro.con-indice #panel { margin-left: max(16px, calc((100% - var(--texto) - 2 * var(--hoja-pad) - 224px) / 2)); margin-right: 0; }   /* hoja + índice, como un grupo centrado */
 #nota h1, #panel h1 { font-size: 28px; line-height: 1.15; margin: 6px 0 18px; font-weight: 700; letter-spacing: -.01em; }
 #nota h2 { font-size: 22px; line-height: 1.25; margin: 38px 0 10px; scroll-margin-top: 56px; border-bottom: 1px solid var(--linea); padding-bottom: 4px; }
-#nota .bloque:has(> h2) + .bloque > :nth-child(2) { margin-top: 0; }   /* el bloque que sigue a un título se pega a él (el primer hijo es .acciones) */
+#nota .bloque:has(> h2) + .bloque > :first-child { margin-top: 0; }   /* el bloque que sigue a un título se pega a él */
 #nota h3 { font-size: 18px; line-height: 1.3; margin: 26px 0 8px; scroll-margin-top: 56px; }
 #nota a, :where(#panel) a { color: var(--acento); }   /* los enlaces sin estilo salían con el azul del navegador: 1,94:1 en oscuro (hallazgo 9) */
 #nota a { padding: 3px 0; }   /* objetivo ≥ 24 px de alto sin cambiar la línea */
@@ -213,10 +216,6 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .bloque { position: relative; border-radius: var(--radio); margin: 0 -10px 0 -40px; padding: 0 10px 0 40px; }   /* sin relleno arriba ni abajo: el margen del primer hijo sale fuera y el bloque empieza en su primera línea (crítica 2026-10-08, 1) */
 .bloque.resaltado { background: var(--acento-suave); }   /* el destino de un resultado del buscador, un momento */
 .bloque:focus-visible { outline-offset: 0; }
-.bloque .acciones { position: absolute; left: 6px; top: -1px; display: flex; flex-direction: column; gap: 2px; opacity: 0; pointer-events: none; }
-.bloque:hover > .acciones, .bloque:focus-visible > .acciones, .bloque:has(> .acciones :focus-visible) > .acciones { opacity: 1; pointer-events: auto; }
-.bloque .acciones button { padding: 0; min-width: 26px; min-height: 26px; border: none; background: none; color: var(--tinta-suave); }
-.bloque .acciones button:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .backlinks { margin-top: 48px; padding-top: 12px; border-top: 1px solid var(--linea); font-size: 14px; color: var(--tinta-suave); }
 .backlinks a { margin-right: 12px; }
 /* «Tareas que la mencionan»: el pie de la nota, con el aspecto de los backlinks y las filas del panel Tareas */
@@ -322,12 +321,11 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 .xterm { height: 100%; }
 
 /* modales */
-.modal, #editor { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 20; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 20; }
 .editor-caja { width: min(860px, 92vw); background: var(--papel); border-radius: 10px; box-shadow: var(--sombra); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
 .editor-caja.estrecha { width: min(480px, 92vw); }
 .editor-caja .cabecera { display: flex; justify-content: space-between; font-weight: 650; gap: 12px; flex-wrap: wrap; }
 .editor-lineas { color: var(--tinta-suave); font-weight: 400; font-size: 13px; }
-#editor-texto { width: 100%; min-height: 220px; max-height: 60vh; font: 14px/1.5 var(--mono); padding: 12px; background: var(--fondo); resize: vertical; }
 #guardar-mensaje { padding: 10px 12px; background: var(--fondo); resize: vertical; }
 .editor-caja .pie { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
 .ajustes { display: flex; flex-direction: column; gap: 10px; }
@@ -364,8 +362,6 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
   html, body, #centro, .miga-barra { background: var(--papel); }
   .miga-barra { padding: 8px 12px 6px; }
   .bloque { margin: 0; padding: 0 4px; }
-  .bloque .acciones { position: static; flex-direction: row; justify-content: flex-end; display: none; }
-  .bloque:focus-within > .acciones { display: flex; opacity: 1; pointer-events: auto; }   /* sin margen ni ratón: al tocar el bloque */
   #nota table { display: block; overflow-x: auto; }
 }
 
@@ -397,3 +393,100 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
   #app.lateral-plegado .miga-barra { min-height: 44px; }
 }
 @media (max-width: 760px) { .marca .plegar { display: none; } }
+
+/* ---------- editor de la nota entera (CodeMirror; public/live.js) */
+#edicion-cm { min-height: 40vh; }
+.edicion-pie { position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px; padding: 10px 0 4px; margin-top: 24px; background: color-mix(in srgb, var(--papel) 90%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--linea); box-shadow: 0 -8px 14px -8px color-mix(in srgb, #000 32%, transparent); }   /* semiopaco y difuminado: el texto que pasa por debajo se intuye y no se pisa (Roberto, 2026-10-09) */
+.edicion-pie .pista { margin-left: auto; margin-right: 0; }   /* la global lleva margin-right:auto y la dejaba a medias (crítica 2026-10-09, 8) */
+/* live preview (inline): la hoja, no un editor de código. Los tokens son los de la lectura, en claro y oscuro. */
+#edicion-cm .cm-line.live-activa { background: none; }   /* sin fondo (Roberto, 2026-10-09: «demasiado ruido, ya tenemos el cursor»): la señal de la línea activa es que se ven sus marcadores */
+#edicion-cm .live-h1 { font-size: 28px; line-height: 1.15; font-weight: 700; letter-spacing: -.01em; padding: 6px 0 12px; }
+#edicion-cm .live-h2 { font-size: 22px; line-height: 1.25; font-weight: 700; border-bottom: 1px solid var(--linea); padding: 14px 0 4px; }
+#edicion-cm .live-h3 { font-size: 18px; line-height: 1.3; font-weight: 700; padding: 16px 0 0; }
+#edicion-cm :is(.live-h4, .live-h5, .live-h6) { font-weight: 700; padding: 10px 0 0; }
+#edicion-cm .live-negrita { font-weight: 700; }
+#edicion-cm .live-cursiva { font-style: italic; }
+#edicion-cm .live-tachado { text-decoration: line-through; }
+#edicion-cm .live-codigo-en-linea { font-family: var(--mono); font-size: .9em; background: rgba(127,127,127,.12); padding: 1px 5px; border-radius: 4px; }
+#edicion-cm :is(.live-enlace, .live-wiki) { color: var(--acento); }
+#edicion-cm .live-wiki { border-bottom: 1px dotted var(--acento); }
+#edicion-cm .live-etiqueta { background: var(--acento-suave); color: var(--acento); border-radius: 999px; padding: 0 8px; font-size: .85em; }
+#edicion-cm .cm-line.live-cita { border-left: 3px solid var(--tinta-suave); color: var(--tinta-suave); padding-left: 16px; }
+#edicion-cm .cm-line.live-hecha { color: var(--tinta-suave); text-decoration: line-through; }
+#edicion-cm .live-vineta { display: inline-block; width: 1.5em; text-align: center; color: var(--tinta-suave); }
+#edicion-cm .live-casilla { margin: 0 .5em 0 0; border: 1.5px solid var(--tinta-suave); transform: translateY(2px); cursor: pointer; }
+/* live preview (bloques): el widget es el HTML de la lectura; dentro, sin los márgenes de bloque de la hoja */
+/* Sin márgenes verticales en el widget (relleno, y flow-root para contener los de dentro): CodeMirror mide la altura de la caja
+   sin ellos y, con ellos, el clic cae unas líneas más abajo de donde se pulsa (fallo del spike, 2026-10-09). */
+#edicion-cm .live-bloque { padding: 4px 0; display: flow-root; white-space: normal; cursor: text; }
+#edicion-cm .live-bloque > .bloque { margin: 0; padding: 0; }
+#edicion-cm .live-bloque > .bloque > * { margin-top: 0; margin-bottom: 0; }
+#edicion-cm .live-bloque .callout { margin: 0; }
+#edicion-cm .live-bloque .callout-titulo[data-plegable="1"] { cursor: pointer; }
+#edicion-cm .live-formula .math[data-display="1"] { text-align: center; margin: 8px 0; overflow-x: auto; }
+#edicion-cm .live-propiedades { padding: 0 0 14px; display: flow-root; cursor: default; white-space: normal; }
+#edicion-cm .live-propiedades .propiedades { margin: 0; }
+#edicion-cm .cm-line.live-crudo { font-family: var(--mono); font-size: 14px; background: rgba(127,127,127,.08); padding: 0 12px; }
+#edicion-cm .cm-line.live-vacia { height: .7em; line-height: .7em; }   /* la línea en blanco entre bloques no es un renglón entero (crítica 2026-10-09, 3) */
+#edicion-cm .live-marca { color: var(--tinta-suave); font-weight: 400; }   /* el «#» del título, cuando se ve, no compite con él (crítica 2026-10-09, 5) */
+/* lo escrito no se pierde: señal «Editando», franja de conflicto y botón Aplicar sin cambios */
+.editando { font-size: 12px; font-weight: 600; color: var(--aviso); background: color-mix(in srgb, var(--aviso) 12%, transparent); border-radius: 999px; padding: 1px 10px; white-space: nowrap; }
+.edicion-pie { flex-wrap: wrap; }
+#franja-edicion { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--aviso); border-left-width: 4px; border-radius: var(--radio); background: color-mix(in srgb, var(--aviso) 10%, var(--papel)); color: var(--tinta); font-size: 14px; }
+#franja-edicion[hidden] { display: none; }
+#franja-edicion .franja-texto { flex: 1 1 260px; }
+#edicion-aplicar:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+/* barra de formato del editor: fija bajo la miga, dentro de la hoja */
+.edicion-barra { position: sticky; top: var(--alto-miga, 44px); z-index: 1; display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0; margin-bottom: 12px; background: color-mix(in srgb, var(--papel) 90%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--linea); box-shadow: 0 8px 14px -8px color-mix(in srgb, #000 32%, transparent); }
+.edicion-barra button { min-width: 34px; padding: 3px 8px; font-size: 14px; line-height: 1; }
+.edicion-barra button .icono { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.edicion-barra button[aria-pressed="true"] { background: var(--acento-suave); color: var(--acento); border-color: var(--acento); }
+
+/* ---------- comentar un texto seleccionado (tarea 8): subrayado, botón flotante, caja e hilo */
+.comentario-oculto { display: none; }
+/* El subrayado es un botón que se pinta como texto: rotulador, subrayado inferior en tinta (no solo color) y foco visible. */
+button.comentado { all: unset; box-sizing: border-box; cursor: pointer; background: var(--rotulador); text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--tinta-suave); text-underline-offset: 3px; }
+button.comentado:hover { text-decoration-color: var(--acento); }
+button.comentado:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; border-radius: 2px; }
+@media (forced-colors: active) {
+  button.comentado { background: none; text-decoration: underline; border: 1px solid ButtonText; forced-color-adjust: none; color: LinkText; }
+  }
+.cita-perdida { margin: 6px 14px 8px; color: var(--aviso); font-size: 14px; }
+#comentar-boton { position: absolute; z-index: 6; min-height: 32px; padding: 4px 12px; font-weight: 600; background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); box-shadow: var(--sombra); }
+@media (pointer: coarse) { #comentar-boton { min-height: 44px; min-width: 44px; padding: 8px 16px; } }
+#comentar-caja, #comentar-hilo { position: absolute; z-index: 7; width: min(380px, calc(100% - 16px)); box-sizing: border-box; background: var(--papel); color: var(--tinta); border: 1px solid var(--linea); border-radius: var(--radio-bloque); box-shadow: var(--sombra); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.5; }
+#comentar-caja:focus-within, #comentar-hilo:focus-within { border-color: var(--acento); }
+#comentar-hilo:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+#comentar-caja textarea { width: 100%; box-sizing: border-box; min-height: 72px; max-height: 40vh; padding: 8px 10px; resize: vertical; background: var(--fondo); }
+.caja-cita, .hilo-cita { margin: 0; color: var(--tinta-suave); overflow-wrap: anywhere; }
+.caja-pie, .hilo-pie { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.caja-pie .pista { flex: 1 0 100%; margin: 0; }   /* el atajo en su línea: la acción principal no se queda sola en una segunda fila (crítica 2026-10-09, 5) */
+.hilo-meta { margin: 0; font-size: 12.5px; color: var(--tinta-suave); }
+.hilo-texto > * { margin: 0 0 6px; }
+.hilo-x { position: absolute; top: 4px; right: 6px; min-width: 32px; min-height: 32px; padding: 0; border: none; background: none; color: var(--tinta-suave); font-size: 20px; line-height: 1; }
+#comentar-hilo { padding-right: 36px; }
+.aviso-accion { background: none; border: none; padding: 0 2px; min-height: 0; color: inherit; font-weight: 700; text-decoration: underline; }
+.grupo .cita { margin: 2px 0 0; color: var(--tinta-suave); }
+@media (pointer: coarse) { #comentar-caja button, #comentar-hilo button { min-height: 44px; min-width: 44px; } #comentar-caja .pista { display: none; } }
+/* En pantallas estrechas, la caja y el hilo son una hoja fija abajo: no tapan el texto que se comenta (crítica 2026-10-09, 2). */
+@media (max-width: 600px) {
+  #comentar-caja, #comentar-hilo { position: fixed; left: 8px !important; right: 8px; bottom: 8px; top: auto !important; width: auto; max-height: 60vh; overflow: auto; }
+}
+/* auditoría de accesibilidad 2026-10-09 */
+#comentar-caja textarea { border-color: var(--tinta-suave); }   /* el campo se delimita con ≥ 3:1 (hallazgo 7) */
+@media (pointer: coarse) { .edicion-barra button, .edicion-pie button { min-height: 44px; min-width: 44px; } }   /* hallazgo 8 */
+@media (forced-colors: active) {
+  .edicion-barra button[aria-pressed="true"] { border-width: 3px; background: Highlight; color: HighlightText; forced-color-adjust: none; }   /* el estado no depende del color (hallazgo 2) */
+  #descartar .editor-caja { border: 2px solid CanvasText; }   /* el diálogo se distingue de la página (hallazgo 6) */
+}
+/* el marco de foco del editor va en la hoja (la card de la nota), no pegado al texto (Roberto, 2026-10-09) */
+#nota:has(.cm-editor:focus-within) { outline: 2px solid var(--acento); outline-offset: 0; }
+@media (forced-colors: active) {
+  .edicion-barra, .edicion-pie { background: Canvas; backdrop-filter: none; box-shadow: none; border: 1px solid CanvasText; }
+}
+.bloque[data-sin-anillo], button.comentado[data-sin-anillo] { outline: none; }   /* el foco vuelve tras el ratón sin marcar el bloque */
+/* crítica corta del feedback (2026-10-09): el subrayado, con más peso en oscuro, donde el ocre se come la tinta suave */
+:root[data-tema="oscuro"] button.comentado { text-decoration-color: var(--tinta); }
+@media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) button.comentado { text-decoration-color: var(--tinta); } }
+.acciones-comentario { display: flex; gap: 8px; margin: 6px 0 0; }
+.caja-titulo { margin: 0; font-weight: 650; }
