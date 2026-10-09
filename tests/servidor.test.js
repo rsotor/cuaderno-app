@@ -19,7 +19,7 @@ async function arrancar(opciones = {}) {
     plataforma: 'darwin' });   // fija: el resultado no depende del sistema que corre los tests (cada uno, en sistema.test.js)
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const puerto = server.address().port;
-  const base = `http://127.0.0.1:${puerto}`;
+  const base = `http://localhost:${puerto}`;   // la dirección de la app (127.0.0.1 lleva a ella)
   const cookie = `cuaderno=${server.token}`;
   const pedir = (ruta, opts = {}) => fetch(base + ruta, { redirect: 'manual', ...opts, headers: { cookie, ...(opts.headers || {}) } });
   const cerrar = () => new Promise(r => server.close(() => { c.borrar(); r(); }));
@@ -32,11 +32,11 @@ test('sin cookie no se entra; con el token de la URL se fija la cookie y se redi
     assert.equal((await fetch(s.base + '/')).status, 403);
     assert.equal((await fetch(s.base + '/api/arbol')).status, 403);
     assert.equal((await fetch(s.base + '/?t=' + 'ff'.repeat(16), { redirect: 'manual' })).status, 403);
-    const r = await fetch(s.server.url(), { redirect: 'manual' });
+    const r = await fetch(s.server.urlEntrada(), { redirect: 'manual' });
     assert.equal(r.status, 302);
     assert.match(r.headers.get('set-cookie'), /^cuaderno=abab.*HttpOnly; SameSite=Strict; Path=\//);
     assert.equal(r.headers.get('location'), '/');
-    assert.equal((await s.pedir('/')).status, 200);
+    assert.equal((await fetch(s.server.url(), { headers: { cookie: s.cookie } })).status, 200);
   } finally { await s.cerrar(); }
 });
 
@@ -260,6 +260,22 @@ test('ocultar: la carpeta y lo que tiene dentro salen del árbol y del buscador,
   } finally { await s.cerrar(); }
 });
 
+test('una sola dirección: http://localhost:<puerto>/, la misma cada vez; 127.0.0.1 lleva a ella y sin cookie se explica cómo entrar', async () => {
+  const s = await arrancar();
+  try {
+    assert.equal(s.server.url(), `http://localhost:${s.puerto}/`);
+    assert.equal(s.server.urlEntrada(), `http://localhost:${s.puerto}/?t=${'ab'.repeat(16)}`);
+    const r = await fetch(`http://127.0.0.1:${s.puerto}/?t=${s.server.token}`, { redirect: 'manual' });
+    assert.equal(r.status, 302);
+    assert.equal(r.headers.get('location'), `http://localhost:${s.puerto}/?t=${s.server.token}`, '127.0.0.1 no lleva a localhost con el código');
+    assert.equal(r.headers.get('set-cookie'), null, 'la cookie se fija en 127.0.0.1 y localhost no la vería');
+    assert.equal((await fetch(`http://127.0.0.1:${s.puerto}/api/arbol`, { headers: { cookie: s.cookie } })).status, 200, 'la API sigue respondiendo en 127.0.0.1');
+    const sin = await fetch(s.server.url());
+    assert.equal(sin.status, 403);
+    assert.match(await sin.text(), /aún no ha entrado.*node server\.js/s);
+  } finally { await s.cerrar(); }
+});
+
 test('la cookie dura un año: con el código fijo, recargar tras reiniciar el servidor o el navegador sigue valiendo', async () => {
   const s = await arrancar();
   try {
@@ -317,5 +333,19 @@ test('rutas de guardar sin kit: propuesta, guardar, traer y deshacer, por la API
     assert.equal(git('log', '-1', '--format=%s'), 'Guardado por la API', 'deshacer con ver: true ha revertido');
     const d = await post('/api/deshacer', { ver: false });
     assert.equal(d.codigo, 0); assert.doesNotMatch(s.c.leer('tareas.md'), /Por la API/, 'deshacer no ha revertido');
+  } finally { await s.cerrar(); }
+});
+
+// Una web ajena puede lanzar un GET (una imagen, un enlace) aunque no lea la respuesta: ninguno puede cambiar el
+// cuaderno. Las escrituras van por POST con cuerpo JSON, que el navegador no manda a otro origen sin preguntar.
+test('ningún GET de la API escribe en el cuaderno', async () => {
+  const s = await arrancar();
+  const foto = () => fs.readdirSync(s.c.raiz, { recursive: true }).filter(f => !String(f).split(path.sep).includes('.git')).sort()
+    .map(f => { const a = path.join(s.c.raiz, f); return fs.statSync(a).isFile() ? `${f}:${fs.readFileSync(a, 'utf8')}` : f; }).join('\n');
+  try {
+    const antes = foto();
+    const rutas = [...new Set([...fs.readFileSync(path.join(__dirname, '..', 'servidor.js'), 'utf8').matchAll(/p === '(\/api\/[\w/.-]+)'/g)].map(m => m[1]))];
+    for (const r of rutas) await (await s.pedir(`${r}?p=inicio.md&q=a`)).arrayBuffer();
+    assert.equal(foto(), antes);
   } finally { await s.cerrar(); }
 });

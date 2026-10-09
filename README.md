@@ -16,9 +16,10 @@ Sin carpeta, arranca en la pantalla de cuadernos: los recientes y una casilla pa
 (tema, letra, fuente) son tuyos, iguales para todos tus cuadernos. Un `cuaderno.json` opcional en la raíz de un
 cuaderno le da nombre y portada (`{ "nombre": "Finanzas", "portada": "inicio.md" }`).
 
-La terminal imprime la dirección que hay que abrir. Lleva un código que se crea la primera vez y se guarda en tu
-carpeta de configuración: la dirección no cambia entre arranques, y ninguna otra web abierta en el navegador puede
-hablar con tu cuaderno. Para probar sin un cuaderno propio, `ejemplos/cuaderno-ejemplo/` trae uno inventado que cubre
+La app vive siempre en `http://localhost:7331`: guárdala en marcadores. Al arrancar abre una pestaña ya dentro (con
+`-n`, no: imprime la dirección de la primera vez). Esa pestaña entra con un código que se crea la primera vez y se
+guarda en tu carpeta de configuración; el navegador lo recuerda un año y no lo ves, y ninguna otra web abierta en el
+navegador puede hablar con tu cuaderno. Para probar sin un cuaderno propio, `ejemplos/cuaderno-ejemplo/` trae uno inventado que cubre
 todo lo que la app sabe hacer (`ejemplos/cuaderno-ejemplo.md` dice qué hay en cada nota); cópialo antes de escribir
 en él. Necesita Node 24 o más reciente.
 

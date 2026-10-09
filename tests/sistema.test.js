@@ -14,6 +14,16 @@ test('mostrar en el gestor de archivos: macOS señala con open -R, Windows con e
   assert.deepEqual(sistema.comandoMostrar({ abs: '/c/mat', carpeta: true, plataforma: 'linux' }), { cmd: 'xdg-open', args: ['/c/mat'] });
 });
 
+test('abrir una dirección en el navegador: open, explorer o xdg-open, con la dirección como argumento', () => {
+  const url = 'http://localhost:7331/?t=ab';
+  assert.deepEqual(sistema.comandoAbrirUrl({ url, plataforma: 'darwin' }), { cmd: 'open', args: [url] });
+  assert.deepEqual(sistema.comandoAbrirUrl({ url, plataforma: 'win32' }), { cmd: 'explorer', args: [url] });
+  assert.deepEqual(sistema.comandoAbrirUrl({ url, plataforma: 'linux' }), { cmd: 'xdg-open', args: [url] });
+  const lanzado = [];
+  sistema.abrirUrl({ url, plataforma: 'darwin', lanzar: (cmd, args) => lanzado.push({ cmd, args }) });
+  assert.deepEqual(lanzado, [{ cmd: 'open', args: [url] }]);
+});
+
 test('papelera: la orden de cada sistema, con la ruta como argumento', () => {
   const abs = "/c/la nota de 'Ana'.md", hay = (...n) => x => n.includes(x);
   assert.deepEqual(sistema.comandoPapelera({ abs, plataforma: 'darwin', existe: hay('trash') }), { cmd: 'trash', args: [abs] });
