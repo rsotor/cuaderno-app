@@ -152,7 +152,6 @@ $('#arbol').addEventListener('keydown', e => {
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); if (lateralPlegado() && window.innerWidth > 760) plegarLateral(false, { enfocar: false }); $('#buscador').focus(); $('#buscador').select(); }
   if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); alternarTerminal(); }
-  if (e.key === 'Escape' && !$('#editor').hidden) cerrarEditor();
 });
 
 // ---------- mostrar en el gestor de archivos del sistema (Finder, Explorador…)
@@ -297,18 +296,14 @@ async function abrirNota(ruta, lineaDestino) {
   const h1 = $('#nota .bloque > h1');
   if (props) (h1 ? h1.closest('.bloque') : $('#nota')).insertAdjacentHTML(h1 ? 'afterend' : 'afterbegin', props);
   $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* se queda el texto */ } });
-  // acciones por bloque: comentar, un icono en el margen izquierdo (editar es de la nota entera: botón «Editar» de la miga); el bloque no cambia de color (Roberto,
-  // 2026-10-08: el fondo al pasar el ratón distraía). Con teclado: Tab hasta el bloque y aparecen.
-  // Un solo punto de Tab en toda la nota (hallazgo 7): flechas entre bloques, C comenta el bloque enfocado (E edita la nota entera).
-  $('#nota').querySelectorAll('.bloque').forEach((b, i) => {
-    b.tabIndex = i === 0 ? 0 : -1;
-    const acc = document.createElement('div'); acc.className = 'acciones';
-    acc.innerHTML = `<button type="button" tabindex="-1" data-accion="comentar" aria-label="Comentar este bloque" title="Comentar (tecla C con el bloque enfocado)">${icono('comentar')}</button>`;
-    b.prepend(acc);
-  });
+  // Un solo punto de Tab en toda la nota (hallazgo 7): flechas entre bloques, C comenta (el texto seleccionado, o el bloque enfocado) y
+  // E edita la nota entera. Ya no hay iconos por bloque (Roberto, 2026-10-09): comentar es seleccionar y el botón flotante o C.
+  $('#nota').querySelectorAll('.bloque').forEach((b, i) => { b.tabIndex = i === 0 ? 0 : -1; });
+  Comentar.pintar($('#nota'));   // subrayados de los comentarios con cita; sus callouts, ocultos
   $('#nota').dataset.vista = 'nota';   // una nota normal: el índice se puede mostrar (refrescarIndice)
   $('#centro').scrollTop = recarga ? scrollAntes : 0;
-  if (lineaDestino != null) { const b = [...$('#nota').querySelectorAll('.bloque')].find(x => +x.dataset.desde <= lineaDestino && lineaDestino < +x.dataset.hasta); if (b) { b.scrollIntoView({ block: 'center' }); b.classList.add('resaltado'); setTimeout(() => b.classList.remove('resaltado'), 1500); } }
+  if (lineaDestino != null && Comentar.hiloEnLinea(lineaDestino)) { const h = Comentar.hiloEnLinea(lineaDestino); h.botones[0].scrollIntoView({ block: 'center' }); h.botones[0].focus(); Comentar.abrirHilo(h, { enfocar: false }); }
+  else if (lineaDestino != null) { const b = [...$('#nota').querySelectorAll('.bloque')].find(x => +x.dataset.desde <= lineaDestino && lineaDestino < +x.dataset.hasta); if (b) { b.scrollIntoView({ block: 'center' }); b.classList.add('resaltado'); setTimeout(() => b.classList.remove('resaltado'), 1500); } }
 }
 // ---------- el índice de la nota (dirección C de la revisión de diseño, Roberto 2026-10-09)
 // Los h2/h3 de la nota, fijos en el margen derecho de la hoja, con la sección actual marcada. Solo si cabe: hoja entera
@@ -364,19 +359,20 @@ $('#nota').addEventListener('click', async e => {
   if (t.classList.contains('casilla-mencion')) { const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { if (err.status !== 409) avisarError('No se ha podido marcar la tarea.', err.message); abrirNota(rutaActual); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); avisar(t.checked ? 'Marcada' : 'Desmarcada'); refrescarContadores(); } return; }
   if (t.classList.contains('casilla')) { const ok = await marcarCasilla(rutaActual, +t.dataset.linea, t.checked, () => { t.checked = !t.checked; }); if (ok) { avisar(t.checked ? 'Marcada' : 'Desmarcada'); refrescarContadores(); } return; }
   if (t.closest('.callout-titulo')) { const c = t.closest('.callout'); if (c && c.querySelector('.callout-titulo').dataset.plegable) c.classList.toggle('plegado'); return; }
-  const btn = t.closest('button[data-accion]'); if (!btn) return;
-  const b = btn.closest('.bloque'); const desde = +b.dataset.desde, hasta = +b.dataset.hasta;
-  const original = lineasDe(await textoFichero(rutaActual)).slice(desde, hasta).join('\n');
-  if (btn.dataset.accion === 'comentar') abrirEditor('Comentar este bloque', '', 'se guarda en la nota, debajo del bloque', async texto => { if (!texto.trim()) return; await api('/api/comentario', { ruta: rutaActual, desde, hasta, texto, original }); avisar('Comentario añadido a la nota'); abrirNota(rutaActual); refrescarContadores(); }, { boton: 'Comentar', verbo: 'comenta' });
 });
 $('#nota').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('callout-titulo')) e.target.click(); });
 $('#nota').addEventListener('focusin', e => { const b = e.target.closest('.bloque'); if (!b) return; $('#nota').querySelectorAll('.bloque[tabindex="0"]').forEach(x => { if (x !== b) x.tabIndex = -1; }); b.tabIndex = 0; });
 $('#nota').addEventListener('keydown', e => {
-  const b = e.target; if (!b.classList || !b.classList.contains('bloque') || e.ctrlKey || e.metaKey || e.altKey) return;
-  const bs = [...$('#nota').querySelectorAll('.bloque')], i = bs.indexOf(b);
+  const b = e.target; if (!b.classList || !b.classList.contains('bloque') || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;   // Mayús + flechas es seleccionar texto
+  const bs = [...$('#nota').querySelectorAll('.bloque')].filter(x => !x.hidden), i = bs.indexOf(b);   // los callouts de comentarios con subrayado no cuentan
   if (e.key === 'ArrowDown' && bs[i + 1]) { e.preventDefault(); bs[i + 1].focus(); }
   else if (e.key === 'ArrowUp' && bs[i - 1]) { e.preventDefault(); bs[i - 1].focus(); }
-  else if (e.key.toLowerCase() === 'c') { const bt = b.querySelector('[data-accion="comentar"]'); if (bt) { e.preventDefault(); bt.click(); } }
+});
+
+Comentar.iniciar({
+  api, avisar, avisarError, zonaAvisos, textoFichero,
+  ruta: () => rutaActual, recargar: () => abrirNota(rutaActual), contadores: () => refrescarContadores(),
+  edicionActiva: () => !!edicion, dialogoAbierto: () => dialogoAbierto(),
 });
 
 // ---------- examen como formulario
@@ -453,7 +449,7 @@ async function accionTarjeta(que) {
 }
 $('#nota').addEventListener('click', e => { const b = e.target.closest('button[data-tarjeta]'); if (b) accionTarjeta(b.dataset.tarjeta); });
 document.addEventListener('keydown', e => {
-  if (!tarjetasEstado || rutaActual !== tarjetasEstado.ruta || !$('#editor').hidden || !$('#resultado').hidden) return;
+  if (!tarjetasEstado || rutaActual !== tarjetasEstado.ruta || !$('#resultado').hidden) return;
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
   const m = { ' ': 'destapar', '1': 'sabia', '2': 'no-sabia', 'ArrowLeft': 'anterior', 'ArrowRight': 'siguiente' }[e.key];
   if (m) { e.preventDefault(); accionTarjeta(m); }
@@ -604,11 +600,11 @@ document.addEventListener('keydown', e => {
   if (!$('#btn-editar').hidden) { e.preventDefault(); entrarEdicion(); }
 });
 
-// ---------- editor modal (hoy solo para comentar un bloque)
-let alGuardar = null, foco = null;
-// «Guardar» es solo del repositorio (revisión de diseño 2026-10-09, hallazgo 3): el editor de un bloque escribe en la nota y lo dice con otro verbo.
+// ---------- diálogos
+let foco = null;
+// «Guardar» es solo del repositorio (revisión de diseño 2026-10-09, hallazgo 3): la edición de la nota escribe en ella y lo dice con otro verbo («Aplicar»).
 // Con un diálogo abierto, lo de detrás queda `inert` y el Tab da la vuelta dentro (hallazgo 8, WCAG 2.4.3): aria-modal no basta.
-const DIALOGOS = ['#editor', '#nueva-nota', '#guardar', '#resultado', '#ajustes', '#descartar'];
+const DIALOGOS = ['#nueva-nota', '#guardar', '#resultado', '#ajustes', '#descartar'];
 const dialogoAbierto = () => DIALOGOS.map($).find(d => d && !d.hidden) || null;
 function sincronizarInerte() { const hay = !!dialogoAbierto(); for (const el of [$('#app'), $('.saltar'), $('#aviso-reinicio')]) el.inert = hay; }
 document.addEventListener('keydown', e => {
@@ -622,11 +618,6 @@ document.addEventListener('keydown', e => {
   else if (!e.shiftKey && ahora === ultimo) { e.preventDefault(); primero.focus(); }
 });
 document.querySelector('.saltar').addEventListener('click', e => { e.preventDefault(); const destino = $('#panel').hidden ? $('#nota') : $('#panel'); destino.tabIndex = -1; destino.focus(); });   // un enlace a #nota cambiaría la ruta
-function abrirEditor(titulo, texto, lineas, cb, { boton = 'Aplicar', verbo = 'aplica' } = {}) { foco = document.activeElement; $('#editor-titulo').textContent = titulo; $('#editor-guardar').textContent = boton; $('#editor-pista').textContent = `Ctrl Enter ${verbo} · Esc cancela`; $('#editor-lineas').textContent = lineas; $('#editor-texto').value = texto; alGuardar = cb; $('#editor').hidden = false; sincronizarInerte(); $('#editor-texto').focus(); }
-function cerrarEditor() { $('#editor').hidden = true; sincronizarInerte(); alGuardar = null; if (foco) foco.focus(); }
-$('#editor-cancelar').onclick = cerrarEditor;
-$('#editor-guardar').onclick = async () => { const cb = alGuardar; const v = $('#editor-texto').value; cerrarEditor(); if (cb) { try { await cb(v); } catch (e) { if (e.status !== 409) avisarError('No se ha podido escribir el cambio en la nota.', e.message); } } };
-$('#editor-texto').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') $('#editor-guardar').click(); });
 
 // ---------- paneles
 // Los filtros del panel viven en el hash (#/tareas?nota=…&etiqueta=…&estado=…): así sobreviven a la recarga en vivo
@@ -707,7 +698,7 @@ async function abrirComentarios() {
   $('#miga').innerHTML = '<strong>Comentarios</strong>';
   const c = await api('/api/comentarios');
   $('#panel').innerHTML = `<h1>Comentarios</h1><p class="resumen">Lo que has anotado en las notas. Tu profesor los ve en la siguiente sesión y los convierte en dudas o aportaciones.</p>`
-    + (c.length ? c.map(x => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(x.ruta)}?l=${x.linea}" title="${esc(x.ruta)}">${esc(tituloDe(x.ruta))}</a> <span class="editor-lineas">${esc(x.titulo)}</span></h2><p>${esc(x.texto)}</p></section>`).join('') : '<section class="grupo"><p>Todavía no hay comentarios. En cualquier nota, pasa por un párrafo (o llega a él con Tab) y pulsa <b>comentar</b>.</p></section>');
+    + (c.length ? c.map(x => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(x.ruta)}?l=${x.linea}" title="${esc(x.ruta)}">${esc(tituloDe(x.ruta))}</a> <span class="editor-lineas">${esc(x.autor ? `${x.autor} (${x.fecha})` : x.titulo)}</span></h2>${x.cita ? `<p class="cita"><i>«${esc(x.cita)}»</i></p>` : ''}<p>${esc(x.texto)}</p></section>`).join('') : '<section class="grupo"><p>Todavía no hay comentarios. En cualquier nota, selecciona un texto y pulsa <b>Comentar</b> (o la tecla <b>C</b>).</p></section>');
 }
 async function refrescarContadores() {
   if (!cuaderno()) return;
@@ -1001,7 +992,7 @@ window.addEventListener('hashchange', () => {
 });
 
 // ---------- recarga en vivo
-try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
+try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && !Comentar.ocupado() && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
 
 (async () => {
   info = await api('/api/info');

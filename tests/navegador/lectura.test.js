@@ -88,27 +88,19 @@ test('editar un párrafo desde el editor de la nota: el editor trae el Markdown 
   await oculto(e.pagina.locator('#edicion-cm'), 'editor', 'el editor tras aplicar');
 });
 
-test('bloques: al pasar el ratón el fondo no cambia y comentar sale en el margen, fuera del texto; clicar en el texto no deja nada marcado', async () => {
+test('bloques: sin iconos en el margen, el fondo no cambia al pasar el ratón ni al clicar en el texto', async () => {
   await e.ir('#/n/conceptos/interes.md');
   const bloque = await visible(e.pagina.locator('#nota .bloque', { has: e.pagina.locator('ul') }), 'nota Interés', 'la lista');
-  const acciones = bloque.locator('.acciones');
-  const fondo = () => bloque.evaluate(b => getComputedStyle(b).backgroundColor);
-  await e.pagina.mouse.move(5, 5);   // el ratón, fuera de la nota (el recorrido anterior lo dejó encima)
-  await hasta(() => acciones.evaluate(a => getComputedStyle(a).opacity === '0'), 'nota Interés', 'las acciones se ven sin pasar el ratón');
+  const fondo = b => b.evaluate(x => getComputedStyle(x).backgroundColor);
   const transparente = 'rgba(0, 0, 0, 0)';
   await bloque.hover();
-  await hasta(() => acciones.evaluate(a => getComputedStyle(a).opacity === '1'), 'nota Interés', 'las acciones no aparecen al pasar el ratón');
-  assert.equal(await fondo(), transparente, 'el bloque cambia de fondo al pasar el ratón');
-  const texto = await bloque.locator('ul').boundingBox(), caja = await acciones.boundingBox();
-  assert.ok(caja.x + caja.width <= texto.x, `las acciones (x=${caja.x}, ${caja.width} px) pisan el texto (x=${texto.x})`);
-  assert.equal(await acciones.locator('button').count(), 1, 'queda solo el icono de comentar: editar es de la nota entera');
-  const icono = await acciones.locator('button').first().boundingBox(), linea = await bloque.locator('ul li').first().boundingBox();
-  assert.ok(Math.abs((icono.y + icono.height / 2) - (linea.y + linea.height / 2)) < 6, `el icono de comentar (centro y=${icono.y + icono.height / 2}) no está a la altura de la primera línea (y=${linea.y + linea.height / 2})`);
-  // Clicar en el texto y sacar el ratón: ni fondo ni acciones se quedan. Se clica un párrafo, no una casilla: marcar una
+  assert.equal(await fondo(bloque), transparente, 'el bloque cambia de fondo al pasar el ratón');
+  // Comentar es seleccionar un texto (o C): ni editar ni comentar tienen ya un icono por bloque (tareas 2 y 8 del bloque de edición).
+  assert.equal(await e.pagina.locator('#nota .bloque .acciones, #nota .bloque button[data-accion]').count(), 0, 'quedan iconos de acción por bloque');
+  // Clicar en el texto y sacar el ratón: el fondo no se queda. Se clica un párrafo, no una casilla: marcar una
   // casilla escribe en el fichero y la recarga en vivo cambia el bloque por otro (esa línea se prueba en diseno.test.js).
   const parrafo = await visible(e.pagina.locator('#nota .bloque', { hasText: 'El precio del dinero' }), 'nota Interés', 'el párrafo de la introducción');
   await parrafo.click({ position: { x: 100, y: 5 } });
   await e.pagina.mouse.move(5, 5);
-  await hasta(() => parrafo.locator('.acciones').evaluate(a => getComputedStyle(a).opacity === '0'), 'nota Interés', 'las acciones se quedan tras clicar en el texto y salir');
-  assert.equal(await parrafo.evaluate(b => getComputedStyle(b).backgroundColor), transparente, 'el bloque se queda marcado tras clicar en el texto');
+  assert.equal(await fondo(e.pagina.locator('#nota .bloque', { hasText: 'El precio del dinero' })), transparente, 'el bloque se queda marcado tras clicar en el texto');
 });

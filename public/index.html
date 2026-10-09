@@ -88,14 +88,6 @@
     <div id="terminal"><p class="sin-sesiones" hidden>Sin terminales abiertas: <b>+</b> abre una.</p></div>
   </section>
 </div>
-<div id="editor" role="dialog" aria-modal="true" aria-labelledby="editor-titulo" hidden>
-  <div class="editor-caja">
-    <div class="cabecera"><span id="editor-titulo">Editar bloque</span><span class="editor-lineas" id="editor-lineas"></span></div>
-    <label class="oculto" for="editor-texto">Texto en Markdown</label>
-    <textarea id="editor-texto" spellcheck="false"></textarea>
-    <div class="pie"><span class="pista" id="editor-pista">Ctrl Enter aplica · Esc cancela</span><button type="button" id="editor-cancelar" class="secundario">Cancelar</button><button type="button" id="editor-guardar">Aplicar</button></div>
-  </div>
-</div>
 <div id="nueva-nota" class="modal" role="dialog" aria-modal="true" aria-labelledby="nueva-nota-titulo" hidden>
   <form class="editor-caja ajustes" id="nueva-nota-form">
     <div class="cabecera"><span id="nueva-nota-titulo">Nueva nota</span><span class="editor-lineas">el título es el nombre del fichero</span></div>
@@ -150,6 +142,7 @@
 <script src="/assets/katex/dist/katex.min.js"></script>
 <script src="/assets/@xterm/xterm/lib/xterm.js"></script>
 <script src="/assets/@xterm/addon-fit/lib/addon-fit.js"></script>
+<script src="/public/comentar.js"></script>
 <script src="/public/app.js"></script>
 </body>
 </html>

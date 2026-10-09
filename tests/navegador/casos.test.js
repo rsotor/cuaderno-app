@@ -33,11 +33,11 @@ test.after(async () => { if (e) await e.cerrar(); if (remoto) fs.rmSync(remoto, 
 test('comentar un bloque: queda como callout debajo del bloque y sale en el panel Comentarios', async () => {
   await e.ir('#/n/conceptos/capital.md');
   const bloque = e.pagina.locator('#nota .bloque').nth(1);
-  await bloque.hover();
-  await bloque.locator('[data-accion="comentar"]').click();
-  await visible(e.pagina.locator('#editor-texto'), 'comentar', 'el editor del comentario');
-  await e.pagina.fill('#editor-texto', 'No entiendo lo del capital inicial');
-  await e.pagina.click('#editor-guardar');
+  await bloque.focus();
+  await e.pagina.keyboard.press('c');   // sin texto seleccionado, C comenta el bloque entero, por la caja
+  await visible(e.pagina.locator('#comentar-texto'), 'comentar', 'la caja del comentario');
+  await e.pagina.fill('#comentar-texto', 'No entiendo lo del capital inicial');
+  await e.pagina.click('#comentar-enviar');
   await ficheroCumple(e.c, 'conceptos/capital.md', /> \[!comment\][^\n]*\n> No entiendo lo del capital inicial/, 'comentar');
   await e.ir('#/comentarios');
   await conTexto(e.pagina.locator('#panel'), /No entiendo lo del capital inicial/, 'comentarios', 'el comentario en el panel');

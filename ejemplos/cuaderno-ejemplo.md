@@ -19,6 +19,7 @@ nuevo entra en una nota o carpeta nueva, con su fila aquí y su test. Las rutas 
 | Enlaces: por nombre, con ruta y alias, a encabezado, a fichero, relativo, a una web, en tabla | `render/enlaces.md` | `tests/navegador/casos.test.js` |
 | Callouts de tipo nota, aviso y plegado; imagen en Markdown y `![[ ]]`; línea `@@` | `render/callouts-e-imagenes.md` | `tests/navegador/casos.test.js` |
 | Código en línea y en bloque; fórmulas en línea y en bloque | `render/codigo-y-formulas.md` | `tests/navegador/casos.test.js` |
+| Comentarios del alumno: uno viejo sin cita (callout), uno con cita que está (subrayado) y uno con cita que ya no está (callout con aviso) | `comentarios/nota-comentada.md` | `tests/navegador/comentar.test.js` |
 | Nombre de fichero con acentos y espacios | `estructura/Nota con acentos y espacios.md` | `tests/navegador/casos.test.js` |
 | Dos notas con el mismo título en la misma carpeta (el árbol las nombra por su fichero) | `estructura/repetida-a.md`, `estructura/repetida-b.md` | `tests/navegador/casos.test.js` |
 | Carpeta que empieza por `_`: no sale en el árbol | `estructura/_archivo/archivada.md` | `tests/navegador/casos.test.js` |
@@ -37,7 +38,7 @@ test del índice comprueba que el fichero existe y que tiene un recorrido que em
 | 2 | Buscar por nombre y por texto | `tests/navegador/lectura.test.js` | buscar: | sin kit |
 | 3 | Leer una nota: propiedades, enlaces, callouts, imágenes, código, fórmulas | `tests/navegador/casos.test.js` | render: | sin kit |
 | 4 | Editar la nota | `tests/navegador/edicion.test.js` | editar la nota: | sin kit |
-| 5 | Comentar un bloque y verlo en Comentarios | `tests/navegador/casos.test.js` | comentar un bloque: | sin kit |
+| 5 | Comentar un texto seleccionado | `tests/navegador/comentar.test.js` | comentar una selección: | sin kit |
 | 6 | Marcar una sesión como estudiada | — | — | **no implementado** en la app |
 | 7 | Repasar tarjetas | `tests/navegador/tarjetas.test.js` | modo tarjeta: | sin kit |
 | 8 | Hacer y corregir un examen | `tests/navegador/examen.test.js` | con examen.js en el kit: | con kit |

@@ -85,9 +85,10 @@ test('la API: info, árbol, nota, escrituras y el 409 cuando la nota cambió', a
     assert.equal((await post('/api/render', { texto: 'x' })).status, 200);
     assert.equal((await post('/api/casilla', { ruta: 'tareas.md', linea: 4, marcada: true })).status, 200);
     assert.match(s.c.leer('tareas.md'), /- \[x\] Comprar/);
+    const delEjemplo = (await (await s.pedir('/api/comentarios')).json()).length;   // los de comentarios/nota-comentada.md
     assert.equal((await post('/api/comentario', { ruta: 'conceptos/capital.md', desde: 0, hasta: 1, texto: 'duda', original: '# Capital' })).status, 200);
-    assert.equal((await (await s.pedir('/api/comentarios')).json()).length, 1);
-    const sinCita = (await (await s.pedir('/api/comentarios')).json())[0];
+    assert.equal((await (await s.pedir('/api/comentarios')).json()).length, delEjemplo + 1);
+    const sinCita = (await (await s.pedir('/api/comentarios')).json()).find(x => x.texto === 'duda');
     assert.equal(sinCita.cita, null);
     assert.equal((await post('/api/comentario', { ruta: 'conceptos/capital.md', desde: 2, hasta: 3, texto: 'con cita', cita: ' «lo que»\n pones ' })).status, 200);
     const conCita = (await (await s.pedir('/api/comentarios')).json()).find(x => x.texto === 'con cita');
@@ -97,7 +98,7 @@ test('la API: info, árbol, nota, escrituras y el 409 cuando la nota cambió', a
     assert.equal((await post('/api/comentario/cerrar', { ruta: 'conceptos/capital.md', linea: conCita.linea, original: conCita.original })).status, 200);
     r = await post('/api/comentario/cerrar', { ruta: 'conceptos/capital.md', linea: conCita.linea, original: conCita.original });
     assert.equal(r.status, 409);
-    assert.equal((await (await s.pedir('/api/comentarios')).json()).length, 1);
+    assert.equal((await (await s.pedir('/api/comentarios')).json()).length, delEjemplo + 1);
     assert.equal((await post('/api/tarea', { texto: 'Nueva' })).status, 200);
     assert.equal((await (await s.pedir('/api/tareas')).json())[0].items.length, 2);
     assert.equal((await post('/api/tarea', { texto: 'Releer [[conceptos/interes]] #repaso' })).status, 200);
@@ -344,7 +345,7 @@ test('rutas de lectura y de nota nueva: títulos, recorrido y crear una nota', a
     const t = await (await s.pedir('/api/titulos')).json();
     assert.equal(t['conceptos/capital.md'], 'Capital'); assert.equal(t['material/calculadora-50-30-20.html'], 'Calculadora 50/30/20');
     const r = await (await s.pedir('/api/recorrido')).json();
-    assert.equal(r.notas, 20); assert.deepEqual(r.fallos, []);   // 20: con la nota larga de lectura/ (2026-10-09)
+    assert.equal(r.notas, 21); assert.deepEqual(r.fallos, []);   // 21: con la nota larga de lectura/ (2026-10-09) y comentarios/nota-comentada.md
     const n = await (await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).json();
     assert.equal(n.ruta, 'conceptos/Idea nueva.md'); assert.equal(s.c.leer('conceptos/Idea nueva.md'), '# Idea nueva\n\n');   // el título y una línea en blanco para escribir debajo
     assert.equal((await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).status, 400, 'una nota repetida no da error');

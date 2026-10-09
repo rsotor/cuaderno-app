@@ -38,13 +38,13 @@ test('«Guardar» es solo del repositorio: el editor de la nota dice «Aplicar»
   await ficheroCumple(e.c, 'conceptos/capital.md', /Una frase más\./, 'editar');
   await conTexto(e.pagina.locator('#estado-git'), /\d+ cambios? por guardar/, 'estado', 'la línea de estado del repositorio');
   assert.doesNotMatch(await e.pagina.locator('#estado-git').textContent(), /sin guardar/, 'estado: queda «sin guardar»');
-  // Comentar usa su propio diálogo, con sus palabras.
-  await bloque.hover();
-  await bloque.locator('[data-accion="comentar"]').click();
-  await visible(e.pagina.locator('#editor'), 'comentar', 'el editor del comentario');
-  assert.equal((await e.pagina.locator('#editor-guardar').textContent()).trim(), 'Comentar', 'comentar: el botón no se llama «Comentar»');
+  // Comentar usa su propia caja (popover junto al texto), con sus palabras.
+  await bloque.focus();
+  await e.pagina.keyboard.press('c');
+  await visible(e.pagina.locator('#comentar-caja'), 'comentar', 'la caja del comentario');
+  assert.equal((await e.pagina.locator('#comentar-enviar').textContent()).trim(), 'Comentar', 'comentar: el botón no se llama «Comentar»');
   await e.pagina.keyboard.press('Escape');
-  await oculto(e.pagina.locator('#editor'), 'comentar', 'el editor tras Escape');
+  await oculto(e.pagina.locator('#comentar-caja'), 'comentar', 'la caja tras Escape');
 });
 
 test('Tareas con filtros: una línea dice «Filtrando: …» (también al volver, recordados) y con cero resultados hay un estado vacío con salida', async () => {
@@ -76,7 +76,7 @@ test('teclado: «Saltar al contenido» lleva a la nota sin cambiar la ruta; los 
   }
   assert.ok(paradas[0].saltar, 'teclado: la primera parada no es «Saltar al contenido»');
   assert.ok(!paradas.some(p => p.boton), 'teclado: un botón de fila del árbol es parada de Tab');
-  assert.ok(paradas.at(-1).enNota && paradas.length <= 33, `teclado: ${paradas.length} Tab hasta la nota (hoy son 32 con el árbol plegado y el botón «Editar» de la miga, antes 62 con carpetas abiertas; el techo vigila que no crezca; el atajo es «Saltar al contenido»)`);
+  assert.ok(paradas.at(-1).enNota && paradas.length <= 34, `teclado: ${paradas.length} Tab hasta la nota (hoy son 33 con el árbol plegado, el botón «Editar» de la miga y la carpeta «comentarios» del ejemplo, antes 62 con carpetas abiertas; el techo vigila que no crezca; el atajo es «Saltar al contenido»)`);
   // El enlace: Enter va a la nota, y la ruta sigue siendo la misma.
   await e.pagina.locator('.saltar').focus();
   await e.pagina.keyboard.press('Enter');
@@ -110,11 +110,12 @@ test('teclado en la nota: un solo punto de Tab, flechas entre bloques, E edita l
   assert.ok(await e.pagina.evaluate(() => document.activeElement.id === 'btn-editar'), 'nota: al salir del editor el foco no vuelve al botón «Editar»');
   await e.pagina.locator('#nota .bloque').first().focus();
   await e.pagina.keyboard.press('c');
-  await visible(e.pagina.locator('#editor'), 'nota', 'el editor del comentario con la tecla C');
+  await visible(e.pagina.locator('#comentar-caja'), 'nota', 'la caja del comentario con la tecla C');
   await e.pagina.keyboard.press('Escape');
+  assert.ok(await e.pagina.evaluate(() => document.activeElement.classList.contains('bloque')), 'nota: al cerrar la caja el foco no vuelve al bloque');
 });
 
-test('diálogos: Ajustes, Nueva nota, el diálogo de comentar y el de descartar retienen el foco con Tab y Mayús Tab, dejan lo de detrás inerte y devuelven el foco al cerrar', async () => {
+test('diálogos: Ajustes, Nueva nota y el de descartar retienen el foco con Tab y Mayús Tab, dejan lo de detrás inerte y devuelven el foco al cerrar', async () => {
   const dentro = id => e.pagina.evaluate(i => !!document.activeElement.closest(i), id);
   const probar = async (abrir, id, cerrar) => {
     await abrir();
@@ -132,7 +133,12 @@ test('diálogos: Ajustes, Nueva nota, el diálogo de comentar y el de descartar 
   assert.ok(await e.pagina.evaluate(() => document.activeElement.id === 'btn-ajustes'), 'ajustes: al cerrar el foco no vuelve a su botón');
   await probar(() => e.pagina.click('#btn-nueva-nota'), '#nueva-nota', () => e.pagina.keyboard.press('Escape'));
   const bloque = e.pagina.locator('#nota .bloque').nth(1);
-  await probar(async () => { await bloque.hover(); await bloque.locator('[data-accion="comentar"]').click(); }, '#editor', () => e.pagina.keyboard.press('Escape'));
+  // La caja de comentar NO es un diálogo modal (decisión de la tarea 8): es un popover junto al texto; lo de detrás sigue vivo y Esc cierra y devuelve el foco al bloque.
+  await bloque.focus(); await e.pagina.keyboard.press('c');
+  await visible(e.pagina.locator('#comentar-caja'), '#comentar-caja', 'la caja');
+  assert.equal(await e.pagina.evaluate(() => document.querySelector('#app').inert), false, '#comentar-caja: es modal y deja lo de detrás inerte');
+  await e.pagina.keyboard.press('Escape');
+  await oculto(e.pagina.locator('#comentar-caja'), '#comentar-caja', 'la caja tras Esc');
   // «¿Descartar lo escrito?»: con cambios en el editor de la nota, Esc lo abre; Esc dentro es «Seguir editando».
   await probar(async () => { await e.pagina.click('#btn-editar'); await visible(e.pagina.locator('#edicion-cm .cm-content'), '#descartar', 'el editor de la nota'); await e.pagina.keyboard.type('x'); await e.pagina.keyboard.press('Escape'); }, '#descartar', () => e.pagina.keyboard.press('Escape'));
   assert.equal(await e.pagina.evaluate(() => !!document.activeElement.closest('#edicion-cm')), true, '#descartar: al cerrar con Esc el foco no vuelve al editor');

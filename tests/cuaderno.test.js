@@ -83,7 +83,7 @@ test('comentar deja el callout separado por líneas en blanco', con({}, (c, cu) 
   // si la línea siguiente no está en blanco, se añade una
   cu.comentar('conceptos/capital.md', 0, 1, 'ok', null, '2026-10-07');
   assert.equal(c.leer('conceptos/capital.md'), '# Capital\n\n> [!comment] Alumno (2026-10-07)\n> ok\n\n\nLo que pones. Enlaza con [[interes|el interés]].\n'.replace('> ok\n\n\nLo', '> ok\n\nLo'));
-  assert.deepEqual(cu.comentarios().map(x => [x.ruta, x.linea, x.texto]), [['conceptos/capital.md', 2, 'ok'], ['sesiones/01-01-01-sesion.md', 6, 'No lo entiendo nada']]);
+  assert.deepEqual(cu.comentarios().filter(x => !x.ruta.startsWith('comentarios/')).map(x => [x.ruta, x.linea, x.texto]), [['conceptos/capital.md', 2, 'ok'], ['sesiones/01-01-01-sesion.md', 6, 'No lo entiendo nada']]);
   assert.throws(() => cu.comentar('conceptos/capital.md', 0, 1, '   '), ErrorPeticion);
 }));
 
@@ -156,13 +156,13 @@ test('cerrar comentario sin línea en blanco tras el bloque deja una de más, nu
 
 test('cerrar comentario: 409 si en esa línea ya no está ese callout, y no toca nada', con({}, (c, cu) => {
   cu.comentar('conceptos/capital.md', 2, 3, 'duda', null, '2026-10-09', { cita: 'pones' });
-  const antes = c.leer('conceptos/capital.md'), [cm] = cu.comentarios();
+  const antes = c.leer('conceptos/capital.md'), [cm] = cu.comentarios().filter(x => x.ruta === 'conceptos/capital.md');
   assert.throws(() => cu.cerrarComentario('conceptos/capital.md', 0, null), ErrorConflicto);
   assert.throws(() => cu.cerrarComentario('conceptos/capital.md', 99, null), ErrorConflicto);
   assert.throws(() => cu.cerrarComentario('conceptos/capital.md', cm.linea, cm.original + 'x'), ErrorConflicto);
   assert.equal(c.leer('conceptos/capital.md'), antes);
   cu.cerrarComentario('conceptos/capital.md', cm.linea, null);
-  assert.equal(cu.comentarios().length, 0);
+  assert.equal(cu.comentarios().filter(x => x.ruta === 'conceptos/capital.md').length, 0);
 }));
 
 test('marcar una casilla cambia solo esa línea y comprueba que sigue siendo ella', con({}, (c, cu) => {
@@ -214,7 +214,7 @@ test('títulos: el # de cada nota, sin wikilinks; las tareas llevan el Markdown 
 
 test('recorrido: cuenta notas, enlaces rotos y fallos', con({}, (c, cu) => {
   const r = cu.recorrido();
-  assert.equal(r.notas, 20);   // las 8 del curso demo, las 8 de cuaderno-ejemplo (render/, estructura/), las 3 de las menciones (personas/, iniciativas/mudanza/) y la nota larga de lectura/ (2026-10-09: una nota nueva en el ejemplo, no un valor arreglado); sus enlaces resuelven todos: el único roto sigue siendo el de interes.md
+  assert.equal(r.notas, 21);   // las 8 del curso demo, las 8 de cuaderno-ejemplo (render/, estructura/), las 3 de las menciones (personas/, iniciativas/mudanza/) y la nota larga de lectura/ (2026-10-09: una nota nueva en el ejemplo, no un valor arreglado); sus enlaces resuelven todos: el único roto sigue siendo el de interes.md
   assert.deepEqual(r.rotos, [{ ruta: 'conceptos/interes.md', destino: 'no-existe' }]);
   assert.deepEqual(r.fallos, []);
 }));
