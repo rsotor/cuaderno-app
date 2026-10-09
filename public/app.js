@@ -372,7 +372,7 @@ $('#nota').addEventListener('keydown', e => {
 Comentar.iniciar({
   api, avisar, avisarError, zonaAvisos, textoFichero,
   ruta: () => rutaActual, recargar: () => abrirNota(rutaActual), contadores: () => refrescarContadores(),
-  edicionActiva: () => !!edicion, dialogoAbierto: () => dialogoAbierto(),
+  edicionActiva: () => !!edicion, dialogoAbierto: () => dialogoAbierto(), refrescarPanel: () => abrirComentarios(),
 });
 
 // ---------- examen como formulario
@@ -694,13 +694,20 @@ $('#panel').addEventListener('change', e => {
 $('#panel').addEventListener('click', e => { if (e.target.closest('[data-quitar-filtros]')) { recordarFiltros(''); history.replaceState(null, '', '#/tareas'); abrirTareas().then(() => { const s = $('#filtro-estado'); if (s) s.focus(); }); } });
 $('#panel').addEventListener('submit', async e => { if (e.target.id !== 'nueva-tarea') return; e.preventDefault(); const i = e.target.querySelector('input'); if (!i.value.trim()) return; await api('/api/tarea', { texto: i.value }); i.value = ''; avisar('Tarea añadida'); abrirTareas(); refrescarContadores(); });
 $('#panel').addEventListener('change', async e => { const t = e.target; if (t.type !== 'checkbox') return; const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { if (err.status !== 409) avisarError('No se ha podido marcar la tarea.', err.message); abrirTareas(); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); refrescarContadores(); } });
+let comentariosPanel = [];   // los que enseña el panel, para sus botones Editar y Cerrar
 async function abrirComentarios() {
   $('#nota').hidden = true; $('#panel').hidden = false; rutaActual = null;
   $('#miga').innerHTML = '<strong>Comentarios</strong>';
-  const c = await api('/api/comentarios');
+  const c = comentariosPanel = await api('/api/comentarios');
+  const quien = x => esc(x.cita || String(x.texto).slice(0, 40));   // de qué comentario es el botón, para el lector de pantalla
   $('#panel').innerHTML = `<h1>Comentarios</h1><p class="resumen">Lo que has anotado en las notas. Tu profesor los ve en la siguiente sesión y los convierte en dudas o aportaciones.</p>`
-    + (c.length ? c.map(x => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(x.ruta)}?l=${x.linea}" title="${esc(x.ruta)}">${esc(tituloDe(x.ruta))}</a> <span class="editor-lineas">${esc(x.autor ? `${x.autor} (${x.fecha})` : x.titulo)}</span></h2>${x.cita ? `<p class="cita"><i>«${esc(x.cita)}»</i></p>` : ''}<p>${esc(x.texto)}</p></section>`).join('') : '<section class="grupo"><p>Todavía no hay comentarios. En cualquier nota, selecciona un texto y pulsa <b>Comentar</b> (o la tecla <b>C</b>).</p></section>');
+    + (c.length ? c.map((x, i) => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(x.ruta)}?l=${x.linea}" title="${esc(x.ruta)}">${esc(tituloDe(x.ruta))}</a> <span class="editor-lineas">${esc(x.autor ? `${x.autor} (${x.fecha})` : x.titulo)}</span></h2>${x.cita ? `<p class="cita"><i>«${esc(x.cita)}»</i></p>` : ''}<p>${esc(x.texto)}</p><p class="acciones-comentario"><button type="button" class="secundario pequeno" data-comentario-editar="${i}" aria-label="Editar el comentario «${quien(x)}»">Editar</button><button type="button" class="secundario pequeno" data-comentario-cerrar="${i}" aria-label="Cerrar el comentario «${quien(x)}»">Cerrar</button></p></section>`).join('') : '<section class="grupo"><p>Todavía no hay comentarios. En cualquier nota, selecciona un texto y pulsa <b>Comentar</b> (o la tecla <b>C</b>).</p></section>');
 }
+$('#panel').addEventListener('click', e => {
+  const ed = e.target.closest('[data-comentario-editar]'), ce = e.target.closest('[data-comentario-cerrar]');
+  if (ed) Comentar.editarDesdePanel(comentariosPanel[+ed.dataset.comentarioEditar], ed);
+  else if (ce) Comentar.cerrarDesdePanel(comentariosPanel[+ce.dataset.comentarioCerrar]);
+});
 async function refrescarContadores() {
   if (!cuaderno()) return;
   const [t, c] = await Promise.all([api('/api/tareas'), api('/api/comentarios')]);

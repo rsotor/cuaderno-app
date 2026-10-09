@@ -403,3 +403,14 @@ test('un fichero del cuaderno se sirve por trozos (Range): vídeo y audio se rep
     assert.equal(entero.status, 200); assert.equal(entero.headers.get('accept-ranges'), 'bytes'); assert.equal(await entero.text(), '0123456789');
   } finally { await s.cerrar(); }
 });
+
+test('/api/comentario acepta la fecha (para deshacer un cierre con la del comentario original) y se la salta si no es AAAA-MM-DD', async () => {
+  const s = await arrancar();
+  const post = (ruta, body) => s.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    assert.equal((await post('/api/comentario', { ruta: 'conceptos/capital.md', desde: 0, hasta: 1, texto: 'con fecha', original: '# Capital', fecha: '2026-01-02' })).status, 200);
+    assert.match(s.c.leer('conceptos/capital.md'), /\[!comment\] Alumno \(2026-01-02\)\n> con fecha/);
+    assert.equal((await post('/api/comentario', { ruta: 'conceptos/capital.md', desde: 0, hasta: 1, texto: 'fecha rara', original: '# Capital', fecha: 'ayer' })).status, 200);
+    assert.doesNotMatch(s.c.leer('conceptos/capital.md'), /Alumno \(ayer\)/, 'una fecha que no es AAAA-MM-DD se ignora');
+  } finally { await s.cerrar(); }
+});

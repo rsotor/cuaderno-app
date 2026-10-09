@@ -175,12 +175,16 @@
     ctx = info; ctx.teclado = teclado; cajaAbierta = true;
     const f = document.createElement('form');
     f.id = 'comentar-caja'; f.setAttribute('role', 'dialog'); f.setAttribute('aria-label', 'Comentar');
-    f.innerHTML = `${info.cita ? `<p class="caja-cita"><i>«${esc(info.cita)}»</i></p>` : '<p class="caja-cita">Comentario sobre este bloque</p>'}`
+    const edicion = !!info.editar;
+    f.setAttribute('aria-label', edicion ? 'Editar comentario' : 'Comentar');
+    f.innerHTML = (edicion ? '<p class="caja-titulo">Editar comentario</p>' : '')
+      + `${info.cita ? `<p class="caja-cita"><i>«${esc(info.cita)}»</i></p>` : (edicion ? '' : '<p class="caja-cita">Comentario sobre este bloque</p>')}`
       + '<label class="oculto" for="comentar-texto">Tu comentario</label><textarea id="comentar-texto" rows="3" placeholder="Tu comentario…" spellcheck="true"></textarea>'
-      + `<div class="caja-pie"><span class="pista">${/Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl'} Enter comenta · Esc cierra</span><button type="button" id="comentar-cancelar" class="secundario">Cancelar</button><button type="submit" id="comentar-enviar" class="primario" disabled>Comentar</button></div>`;
+      + `<div class="caja-pie"><span class="pista">${/Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl'} Enter ${edicion ? 'guarda' : 'comenta'} · Esc cierra</span><button type="button" id="comentar-cancelar" class="secundario">Cancelar</button><button type="submit" id="comentar-enviar" class="primario" disabled>${edicion ? 'Guardar' : 'Comentar'}</button></div>`;
     $('#centro').append(f);
-    colocar(f, info.rango ? rectDe(info.rango) : info.bloque.getBoundingClientRect());
+    colocar(f, info.rect || (info.rango ? rectDe(info.rango) : info.bloque.getBoundingClientRect()));
     const ta = f.querySelector('textarea');
+    if (edicion) { ta.value = textoDe(info.editar.original); f.querySelector('#comentar-enviar').disabled = !ta.value.trim(); }
     ta.addEventListener('input', () => { f.querySelector('#comentar-enviar').disabled = !ta.value.trim(); });
     ta.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); if (ta.value.trim()) f.requestSubmit(); } });
     f.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrarCaja(true); } });
@@ -192,11 +196,13 @@
     const f = $('#comentar-caja'); if (f) f.remove();
     const c = ctx; cajaAbierta = false; ctx = null;
     // Con el teclado el foco vuelve con su borde; abierta con el ratón vuelve sin él (Roberto, 2026-10-09: «me remarca con borde ese bloque»).
-    if (devolverFoco && c && c.bloque.isConnected) enfocar(c.bloque, !!c.teclado);
+    const vuelve = c && (c.volver || c.bloque);
+    if (devolverFoco && vuelve && vuelve.isConnected) enfocar(vuelve, !!c.teclado);
   }
   async function enviar(texto) {
     const c = ctx, ruta = host.ruta();
     if (!c || !texto.trim()) return;
+    if (c.editar) return guardarEdicion(c, texto);
     cerrarCaja(false);
     try {
       const original = lineasDe(await host.textoFichero(ruta)).slice(c.desde, c.hasta).join('\n');
@@ -212,6 +218,46 @@
     }
   }
 
+  // ---------- editar un comentario (desde el hilo o el panel): se reescribe solo el cuerpo del callout
+  // El texto de un comentario tal como está en el fichero: las líneas «> » bajo el título, sin el «> ».
+  const textoDe = original => original.split('\n').slice(1).map(l => l.replace(/^>\s?/, '')).join('\n');
+  // Vuelve a pedir el comentario (el mismo título) para tener su línea y su texto de ahora.
+  async function refrescarEdicion(e) {
+    const todos = await host.api('/api/comentarios'), titulo = e.original.split('\n')[0];
+    const x = todos.find(y => y.ruta === e.ruta && y.original.split('\n')[0] === titulo);
+    if (x) { e.linea = x.linea; e.original = x.original; }
+    return !!x;
+  }
+  async function guardarEdicion(c, texto) {
+    const e = c.editar, lineas = e.original.split('\n');
+    const cuerpo = texto.trim().replace(/\r\n/g, '\n').split('\n').map(l => `> ${l}`);
+    try { await host.api('/api/bloque', { ruta: e.ruta, desde: e.linea, hasta: e.linea + lineas.length, texto: [lineas[0], ...cuerpo].join('\n'), original: e.original }); }
+    catch (err) {
+      if (err.status !== 409) { host.avisarError('No se ha podido guardar el comentario.', err.message); return; }
+      // El comentario cambió en el disco: la caja sigue con lo escrito y el siguiente Guardar usa lo que hay ahora.
+      if (!host.ruta()) host.avisarError('El comentario cambió en el disco mientras lo editabas. Lo que has escrito sigue aquí: Guardar lo sustituye.');
+      if (!(await refrescarEdicion(e).catch(() => false))) { cerrarCaja(false); host.avisarError('Ese comentario ya no está en la nota.'); }
+      return;
+    }
+    cerrarCaja(false);
+    host.avisar('Comentario guardado');
+    await e.alGuardar();
+  }
+  async function editarHilo(h) {
+    if (!h.original) await cargarOriginal(h);
+    if (!h.original) return host.avisarError('No se ha podido abrir el comentario para editarlo.');
+    const ruta = host.ruta(), volver = h.botones[0], teclado = h.teclado !== false;
+    cerrarHilo(false);
+    abrirCaja({ cita: h.cita, rect: rectDe(volver), volver, editar: { ruta, linea: h.linea, original: h.original, alGuardar: async () => {
+      await host.recargar(); host.contadores();
+      const n = hilos.find(x => x.linea === h.linea && x.botones.length); if (n) n.botones[0].focus();
+    } } }, { teclado });
+  }
+  // Desde el panel Comentarios: `x` es un elemento de /api/comentarios y `ancla`, su botón.
+  function editarDesdePanel(x, ancla) {
+    abrirCaja({ cita: x.cita, rect: ancla.getBoundingClientRect(), volver: ancla, editar: { ruta: x.ruta, linea: x.linea, original: x.original, alGuardar: async () => { await host.refrescarPanel(); host.contadores(); } } });
+  }
+
   // ---------- el hilo (popover junto al subrayado)
   async function abrirHilo(h, { enfocar = true, teclado = true } = {}) {
     cerrarHilo(false); cerrarCaja(false); ocultarBoton();
@@ -221,13 +267,17 @@
     pop.innerHTML = '<button type="button" class="hilo-x" aria-label="Ocultar el hilo">×</button>'
       + (h.cita ? `<p class="hilo-cita"><i>«${esc(h.cita)}»</i></p>` : '')
       + `<p class="hilo-meta">${esc(h.autor)}${h.fecha ? ` · ${esc(h.fecha)}` : ''}</p><div class="hilo-texto">${h.cuerpo}</div>`
-      + '<div class="hilo-pie"><button type="button" class="hilo-cerrar secundario">Cerrar comentario</button></div>';
+      + '<div class="hilo-pie"><button type="button" class="hilo-editar secundario">Editar</button><button type="button" class="hilo-cerrar secundario">Cerrar comentario</button></div>';
     $('#centro').append(pop);
     hiloAbierto = h;
     colocar(pop, rectDe(h.botones[0]));
     pop.querySelector('.hilo-x').onclick = () => cerrarHilo(true);
+    pop.querySelector('.hilo-editar').onclick = () => editarHilo(h);
     pop.querySelector('.hilo-cerrar').onclick = () => cerrarComentario(h);
     if (enfocar) pop.focus();
+    await cargarOriginal(h);
+  }
+  async function cargarOriginal(h) {
     try { const todos = await host.api('/api/comentarios'); const f = todos.find(x => x.ruta === host.ruta() && x.linea === h.linea); if (f) h.original = f.original; } catch { /* sin original, cerrar comprueba solo que ahí hay un comentario */ }
   }
   function cerrarHilo(devolverFoco) {
@@ -244,23 +294,28 @@
     d.append(t, b); host.zonaAvisos().append(d);
     setTimeout(() => d.remove(), ms);
   }
-  async function cerrarComentario(h) {
-    const ruta = host.ruta();
-    cerrarHilo(false);
-    const texto = h.original ? h.original.split('\n').slice(1).map(l => l.replace(/^>\s?/, '')).join('\n') : (h.cal.querySelector('p') || {}).textContent || '';
-    try { await host.api('/api/comentario/cerrar', { ruta, linea: h.linea, original: h.original }); }
-    catch (err) { if (err.status !== 409) host.avisarError('No se ha podido cerrar el comentario.', err.message); return; }
-    await host.recargar(); host.contadores();
+  // Cierra (borra) un comentario y ofrece Deshacer 5 s. `d`: { ruta, linea, original, cita }; `despues()` repinta lo que se ve (la nota o el panel).
+  async function cerrarDatos(d, despues) {
+    const texto = d.original ? textoDe(d.original) : '', fecha = (d.original && (d.original.split('\n')[0].match(/\((\d{4}-\d{2}-\d{2})\)/) || [])[1]) || undefined;
+    try { await host.api('/api/comentario/cerrar', { ruta: d.ruta, linea: d.linea, original: d.original }); }
+    catch (err) { if (err.status !== 409) host.avisarError('No se ha podido cerrar el comentario.', err.message); else if (!host.ruta()) host.avisarError('Ese comentario cambió en el disco. Vuelvo a cargar la lista.'); await despues(); return; }
+    await despues(); host.contadores();
+    if (d.linea < 2) return host.avisar('Comentario cerrado');
     avisoConAccion('Comentario cerrado', 'Deshacer', async () => {
       try {
-        // Vuelve a comentar con la misma cita y texto, sobre el bloque por su tramo actual.
-        const original = lineasDe(await host.textoFichero(ruta)).slice(h.desde, h.hasta).join('\n');
-        await host.api('/api/comentario', { ruta, desde: h.desde, hasta: h.hasta, texto, original, cita: h.cita });
+        // Vuelve a comentar con la misma cita, texto y fecha, detrás de lo que había encima del callout: su último renglón por original.
+        const original = lineasDe(await host.textoFichero(d.ruta))[d.linea - 2];
+        await host.api('/api/comentario', { ruta: d.ruta, desde: d.linea - 2, hasta: d.linea - 1, texto, original, cita: d.cita, fecha });
       } catch (err) { if (err.status !== 409) host.avisarError('No se ha podido deshacer.', err.message); return; }
-      if (host.ruta() === ruta) await host.recargar();
-      host.contadores();
+      await despues(); host.contadores();
     });
   }
+  async function cerrarComentario(h) {
+    if (!h.original) await cargarOriginal(h);
+    cerrarHilo(false);
+    await cerrarDatos({ ruta: host.ruta(), linea: h.linea, original: h.original, cita: h.cita }, () => host.recargar());
+  }
+  const cerrarDesdePanel = x => cerrarDatos({ ruta: x.ruta, linea: x.linea, original: x.original, cita: x.cita }, () => host.refrescarPanel());
 
   // ---------- el teclado y el ratón
   function iniciar(anfitrion) {
@@ -310,5 +365,5 @@
   // La recarga en vivo no repinta con algo a medias: una caja, un hilo o una selección.
   const ocupado = () => cajaAbierta || !!hiloAbierto || (() => { const s = getSelection(); return !!(s && !s.isCollapsed && $('#nota').contains(s.anchorNode)); })();
 
-  window.Comentar = { iniciar, pintar, abrirHilo, hiloEnLinea, ocupado, cajaAbierta: () => cajaAbierta, cerrarTodo: () => { cerrarCaja(false); cerrarHilo(false); ocultarBoton(); } };
+  window.Comentar = { iniciar, pintar, editarDesdePanel, cerrarDesdePanel, abrirHilo, hiloEnLinea, ocupado, cajaAbierta: () => cajaAbierta, cerrarTodo: () => { cerrarCaja(false); cerrarHilo(false); ocultarBoton(); } };
 })();

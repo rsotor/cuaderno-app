@@ -488,3 +488,5 @@ button.comentado:focus-visible { outline: 2px solid var(--acento); outline-offse
 /* crítica corta del feedback (2026-10-09): el subrayado, con más peso en oscuro, donde el ocre se come la tinta suave */
 :root[data-tema="oscuro"] button.comentado { text-decoration-color: var(--tinta); }
 @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) button.comentado { text-decoration-color: var(--tinta); } }
+.acciones-comentario { display: flex; gap: 8px; margin: 6px 0 0; }
+.caja-titulo { margin: 0; font-weight: 650; }

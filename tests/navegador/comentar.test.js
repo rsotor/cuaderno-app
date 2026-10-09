@@ -257,3 +257,66 @@ test('el bloque comentado no lleva marca en el margen: el subrayado inferior es 
   assert.deepEqual(b, ['none', 'none'], 'margen: el bloque comentado tiene marca a la izquierda');
   assert.match(await e.pagina.locator('#nota button.comentado').evaluate(x => getComputedStyle(x).textDecorationLine), /underline/);
 });
+
+// ---------- editar y cerrar comentarios desde el hilo y el panel (tarea 10, Roberto: «puedo crear comentarios pero no editarlos»)
+const COMENTADA = '# Nota\n\nEl capital inicial manda.\n\n> [!comment] Alumno (2026-10-01) · «capital inicial»\n> Texto viejo.\n> Segunda línea.\n\nOtro.\n';
+
+test('editar un comentario desde el hilo: el cuerpo cambia en el fichero y el título queda igual', async () => {
+  await abrir('c13.md', COMENTADA);
+  await e.pagina.locator('#nota button.comentado').click();
+  await visible(e.pagina.locator('#comentar-hilo'), 'editar', 'el hilo');
+  await e.pagina.locator('#comentar-hilo .hilo-editar').click();
+  await visible(e.pagina.locator('#comentar-caja'), 'editar', 'la caja de editar');
+  await conTexto(e.pagina.locator('#comentar-caja'), /Editar comentario/, 'editar', 'el título de la caja');
+  assert.equal(await e.pagina.locator('#comentar-texto').inputValue(), 'Texto viejo.\nSegunda línea.', 'editar: la caja no trae el texto actual');
+  assert.equal((await e.pagina.locator('#comentar-enviar').textContent()).trim(), 'Guardar');
+  await e.pagina.locator('#comentar-texto').fill('   ');
+  assert.equal(await e.pagina.locator('#comentar-enviar').isDisabled(), true, 'editar: Guardar debe estar desactivado con el texto vacío');
+  await e.pagina.locator('#comentar-texto').fill('Texto nuevo\ncon dos líneas');
+  await e.pagina.locator('#comentar-enviar').click();
+  await oculto(e.pagina.locator('#comentar-caja'), 'editar', 'la caja tras guardar');
+  assert.equal(leer('c13.md'), COMENTADA.replace('> Texto viejo.\n> Segunda línea.\n', '> Texto nuevo\n> con dos líneas\n'), 'editar: cambia algo más que el cuerpo (el título lleva fecha y cita)');
+  await e.pagina.locator('#nota button.comentado').click();
+  await conTexto(e.pagina.locator('#comentar-hilo'), /Texto nuevo\s+con dos líneas/, 'editar', 'el texto nuevo en el hilo');
+  await e.pagina.keyboard.press('Escape');
+  // Cancelar con Esc no escribe; y un cambio en el disco mientras se edita da 409, la caja sigue con lo escrito y un segundo Guardar vale.
+  await e.pagina.locator('#nota button.comentado').click();
+  await e.pagina.locator('#comentar-hilo .hilo-editar').click();
+  await visible(e.pagina.locator('#comentar-texto'), 'editar', 'la caja otra vez');
+  await e.pagina.locator('#comentar-texto').fill('Mi versión');
+  fs.writeFileSync(fichero('c13.md'), leer('c13.md').replace('Texto nuevo', 'Texto cambiado fuera'));
+  await e.pagina.locator('#comentar-enviar').click();
+  await visible(e.pagina.locator('.aviso-flotante.error'), 'editar', 'el aviso del 409');
+  assert.equal(await e.pagina.locator('#comentar-texto').inputValue(), 'Mi versión', 'editar: el 409 ha borrado lo escrito');
+  assert.match(leer('c13.md'), /Texto cambiado fuera/, 'editar: el 409 ha escrito igualmente');
+  await e.pagina.locator('#comentar-enviar').click();
+  await oculto(e.pagina.locator('#comentar-caja'), 'editar', 'la caja tras el segundo Guardar');
+  assert.match(leer('c13.md'), /> Mi versión\n\nOtro\.\n$/, 'editar: el segundo Guardar no escribe lo del editor');
+});
+
+test('panel Comentarios: Editar cambia el texto y Cerrar lo quita del fichero con Deshacer', async () => {
+  await abrir('c14.md', COMENTADA);
+  await e.ir('#/comentarios');
+  const fila = e.pagina.locator('#panel .grupo', { has: e.pagina.locator('a[title="c14.md"]') });
+  await visible(fila, 'panel', 'el comentario en el panel');
+  const editar = fila.locator('button[data-comentario-editar]'), cerrar = fila.locator('button[data-comentario-cerrar]');
+  assert.match(await editar.getAttribute('aria-label'), /capital inicial/, 'panel: «Editar» no dice de qué comentario es');
+  assert.match(await cerrar.getAttribute('aria-label'), /capital inicial/, 'panel: «Cerrar» no dice de qué comentario es');
+  await editar.click();
+  await visible(e.pagina.locator('#comentar-caja'), 'panel', 'la caja de editar en el panel');
+  await e.pagina.locator('#comentar-texto').fill('Desde el panel');
+  await e.pagina.locator('#comentar-enviar').click();
+  await oculto(e.pagina.locator('#comentar-caja'), 'panel', 'la caja tras guardar');
+  assert.equal(leer('c14.md'), COMENTADA.replace('> Texto viejo.\n> Segunda línea.\n', '> Desde el panel\n'), 'panel: Editar cambia algo más que el cuerpo');
+  await conTexto(fila, /Desde el panel/, 'panel', 'el texto nuevo en la lista');
+  const comentado = leer('c14.md');
+  await cerrar.click();
+  await ficheroCumple(e.c, 'c14.md', /^# Nota\n\nEl capital inicial manda\.\n\nOtro\.\n$/, 'panel');
+  await oculto(e.pagina.locator('#panel .grupo', { has: e.pagina.locator('a[title="c14.md"]') }), 'panel', 'el comentario fuera de la lista');
+  const aviso = e.pagina.locator('.aviso-flotante', { hasText: 'Comentario cerrado' });
+  await visible(aviso, 'panel', 'el aviso «Comentario cerrado»');
+  await aviso.locator('button', { hasText: 'Deshacer' }).click();
+  await ficheroCumple(e.c, 'c14.md', /Desde el panel/, 'panel');
+  assert.equal(leer('c14.md'), comentado, 'panel: Deshacer no devuelve el comentario tal como estaba (con su fecha y su cita)');
+  await visible(e.pagina.locator('#panel .grupo', { has: e.pagina.locator('a[title="c14.md"]') }), 'panel', 'el comentario otra vez en la lista');
+});
