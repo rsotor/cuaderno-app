@@ -269,7 +269,7 @@ async function abrirNota(ruta, lineaDestino) {
   const recarga = rutaActual === ruta && !$('#nota').hidden && lineaDestino == null, scrollAntes = $('#centro').scrollTop;
   if (rutaActual !== ruta) { vistaNota = null; ultimoMostrado = null; }
   rutaActual = ruta;
-  $('#panel').hidden = true; $('#nota').hidden = false;
+  $('#panel').hidden = true; $('#nota').hidden = false; delete $('#nota').dataset.vista;
   let n;
   try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonCopiar(ruta) + (n.generado ? '' : botonPapelera(ruta, ruta.split('/').pop()));   // una nota que regenera el profesor no se manda a la papelera desde aquí
@@ -299,9 +299,55 @@ async function abrirNota(ruta, lineaDestino) {
     acc.innerHTML = `<button type="button" tabindex="-1" data-accion="editar" aria-label="Editar este bloque" title="Editar (tecla E con el bloque enfocado)">${icono('lapiz')}</button><button type="button" tabindex="-1" data-accion="comentar" aria-label="Comentar este bloque" title="Comentar (tecla C con el bloque enfocado)">${icono('comentar')}</button>`;
     b.prepend(acc);
   });
+  $('#nota').dataset.vista = 'nota';   // una nota normal: el índice se puede mostrar (refrescarIndice)
   $('#centro').scrollTop = recarga ? scrollAntes : 0;
   if (lineaDestino != null) { const b = [...$('#nota').querySelectorAll('.bloque')].find(x => +x.dataset.desde <= lineaDestino && lineaDestino < +x.dataset.hasta); if (b) { b.scrollIntoView({ block: 'center' }); b.classList.add('resaltado'); setTimeout(() => b.classList.remove('resaltado'), 1500); } }
 }
+// ---------- el índice de la nota (dirección C de la revisión de diseño, Roberto 2026-10-09)
+// Los h2/h3 de la nota, fijos en el margen derecho de la hoja, con la sección actual marcada. Solo si cabe: hoja entera
+// (texto + márgenes) + hueco + índice sin encoger la hoja, en el ancho que le queda a #centro (sin barra lateral ni cajón).
+// Sin él con menos de 3 títulos y en todo lo que no sea una nota normal (paneles, examen, tarjetas, ficheros).
+const INDICE = { ancho: 200, hueco: 24, margen: 16, minimoTitulos: 3 };
+let tituloIndice = [];   // los elementos h2/h3 de la nota
+function refrescarIndice() {
+  const idx = $('#indice'), centro = $('#centro'), nota = $('#nota');
+  const titulos = nota.hidden || nota.dataset.vista !== 'nota' || nota.classList.contains('ancha') ? [] : [...nota.querySelectorAll('.bloque > h2, .bloque > h3')];
+  const abierto = !$('#cajon').hidden && $('#app').classList.contains('cajon-capa');   // el cajón tapa todo: no hay sitio
+  const hoja = parseFloat(getComputedStyle(centro).getPropertyValue('--texto')) + 2 * parseFloat(getComputedStyle(centro).getPropertyValue('--hoja-pad'));
+  const cabe = !abierto && centro.clientWidth >= hoja + INDICE.hueco + INDICE.ancho + 2 * INDICE.margen;
+  const mostrar = titulos.length >= INDICE.minimoTitulos && cabe;
+  centro.classList.toggle('con-indice', mostrar);
+  idx.hidden = !mostrar;
+  if (!mostrar) { tituloIndice = []; idx.innerHTML = ''; return; }
+  if (titulos.length !== tituloIndice.length || titulos.some((t, i) => t !== tituloIndice[i])) {
+    tituloIndice = titulos;
+    idx.innerHTML = `<p class="indice-titulo">En esta nota</p><ul>${titulos.map((t, i) => `<li class="${t.tagName.toLowerCase()}"><button type="button" data-i="${i}">${esc(t.textContent.trim())}</button></li>`).join('')}</ul>`;
+  }
+  const c = centro.getBoundingClientRect(), n = nota.getBoundingClientRect(), barra = $('.miga-barra').offsetHeight;
+  idx.style.left = `${Math.round(n.right + INDICE.hueco)}px`;
+  idx.style.top = `${Math.round(c.top + barra + 16)}px`;
+  idx.style.maxHeight = `${Math.max(120, Math.round(c.height - barra - 32))}px`;
+  marcarSeccion();
+}
+// La sección en la que estás: el último título que ya pasó de la barra de la miga (al final del todo, el último que se ve).
+function marcarSeccion() {
+  if (!tituloIndice.length) return;
+  const c = $('#centro'), borde = c.getBoundingClientRect().top + $('.miga-barra').offsetHeight + 40;
+  let actual = 0;
+  tituloIndice.forEach((t, i) => { if (t.getBoundingClientRect().top <= borde) actual = i; });
+  if (c.scrollTop + c.clientHeight >= c.scrollHeight - 2) { const v = c.getBoundingClientRect().bottom; tituloIndice.forEach((t, i) => { if (t.getBoundingClientRect().top < v - 24) actual = Math.max(actual, i); }); }
+  $('#indice').querySelectorAll('button').forEach((b, i) => { if (i === actual) b.setAttribute('aria-current', 'location'); else b.removeAttribute('aria-current'); });
+}
+let marcaPendiente = false;
+$('#centro').addEventListener('scroll', () => { if (marcaPendiente) return; marcaPendiente = true; requestAnimationFrame(() => { marcaPendiente = false; marcarSeccion(); }); }, { passive: true });
+$('#indice').addEventListener('click', e => {
+  const b = e.target.closest('button[data-i]'); if (!b) return;
+  const t = tituloIndice[+b.dataset.i]; if (!t) return;
+  t.scrollIntoView({ block: 'start' });
+  $('#indice').querySelectorAll('button').forEach(x => x.removeAttribute('aria-current')); b.setAttribute('aria-current', 'location');
+});
+new ResizeObserver(refrescarIndice).observe($('#centro'));   // la ventana, la barra lateral y el cajón (derecha, abajo o cerrado) cambian su tamaño
+new MutationObserver(refrescarIndice).observe($('#nota'), { childList: true, attributes: true, attributeFilter: ['hidden', 'data-vista', 'class'] });
 async function marcarCasilla(ruta, linea, marcada, trasFallo) {
   const original = lineasDe(await textoFichero(ruta))[linea];
   try { await api('/api/casilla', { ruta, linea, marcada, original }); return true; } catch (e) { if (trasFallo) trasFallo(e); return false; }
@@ -535,6 +581,7 @@ function aplicarCajon() {
   const capa = window.innerWidth <= 760 || maximoCajon(pos) < CAJON_MIN[pos];
   app.classList.toggle('cajon-abierto', abierto && !capa);
   app.classList.toggle('cajon-capa', abierto && capa);
+  refrescarIndice();
 }
 function abrirCajon() { $('#cajon').hidden = false; aplicarCajon(); }
 function cerrarCajon() { $('#cajon').hidden = true; aplicarCajon(); $('#btn-terminal').focus(); }

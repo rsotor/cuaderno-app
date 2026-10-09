@@ -11,7 +11,7 @@ nuevo entra en una nota o carpeta nueva, con su fila aquí y su test. Las rutas 
 | Nota mínima, destino de enlaces y del buscador | `conceptos/capital.md` | `tests/cuaderno.test.js`, `tests/navegador/lectura.test.js` |
 | Portada que regenera el profesor (`> Lo genera tu profesor`), alias escapado en tabla | `inicio.md` | `tests/navegador/lectura.test.js`, `tests/navegador/ficheros.test.js` |
 | Tareas propias, etiquetas, enlaces en una tarea | `tareas.md` | `tests/navegador/tareas.test.js` |
-| Nota larga (unas 700 palabras, 5 secciones): la lectura a 18 px, la columna de ~800 px y los caracteres por línea | `lectura/mercado-de-la-plaza.md` | `tests/navegador/medida.test.js` |
+| Nota larga (unas 700 palabras, 5 secciones): la lectura a 16 px, el texto de ~720 px en la hoja, los caracteres por línea y el índice de la nota | `lectura/mercado-de-la-plaza.md` | `tests/navegador/medida.test.js`, `tests/navegador/indice.test.js` |
 | Examen (formulario de preguntas) | `examenes/01-examen.md` | `tests/formulario.test.js`, `tests/navegador/examen.test.js` |
 | Tarjetas (flashcards) | `flashcards/01-tarjetas.md` | `tests/tarjetas.test.js`, `tests/navegador/tarjetas.test.js` |
 | Ficheros que no son notas: PDF, JSON, CSV, TXT, HTML con script, PNG; enlaces a ellos | `material/` | `tests/navegador/ficheros.test.js` |
@@ -57,3 +57,4 @@ test del índice comprueba que el fichero existe y que tiene un recorrido que em
 | 20 | Un curso del kit sin motor no guarda | `tests/guardar.test.js` | salida del kit sin motor: | con kit (sin motor) |
 | 21 | Tareas que la mencionan | `tests/navegador/menciones.test.js` | una persona: | con kit |
 | 22 | Adjuntos: vídeo, audio, al Finder, carpetas vacías | `tests/navegador/ficheros.test.js` | adjuntos: | sin kit |
+| 23 | La hoja (claro, oscuro, estrecho) y el índice de la nota, solo si cabe | `tests/navegador/indice.test.js` | índice: | sin kit |
