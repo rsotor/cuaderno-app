@@ -15,15 +15,26 @@ async function api(p, body) {
   const d = await r.json().catch(() => ({ error: `respuesta ${r.status}` }));
   if (!r.ok) {
     if (r.status === 404 && p.startsWith('/api/') && !avisoCerrado) $('#aviso-reinicio').hidden = false;   // una ruta que el servidor no conoce: es de antes
-    if (r.status === 403) avisar('Esta pestaña ha perdido el permiso: arranca la app desde la terminal y entra por la pestaña que abre.');
-    if (r.status === 409 && rutaActual) { avisar('Esta nota cambió en el disco mientras la tenías abierta. La he vuelto a cargar: repite el cambio.'); abrirNota(rutaActual); }
+    if (r.status === 403) avisarError('Esta pestaña ha perdido el permiso: arranca la app desde la terminal y entra por la pestaña que abre.');
+    if (r.status === 409 && rutaActual) { avisarError('Esta nota cambió en el disco mientras la tenías abierta. La he vuelto a cargar: repite el cambio.'); abrirNota(rutaActual); }
     throw Object.assign(new Error(d.error || `error ${r.status}`), { status: r.status });
   }
   return d;
 }
 const textoFichero = ruta => fetch(`/fichero/${encodeURI(ruta)}`).then(r => r.text());
 const lineasDe = texto => texto.split(/\r?\n/);
-function avisar(msg) { const d = document.createElement('div'); d.className = 'aviso-flotante'; d.setAttribute('role', 'status'); d.textContent = msg; document.body.append(d); setTimeout(() => d.remove(), 2200); }
+// Los avisos se apilan en una esquina. Uno informativo (Marcada, Ruta copiada) se va solo; un error no (hallazgo 12 de la
+// revisión de diseño, 2026-10-09): dice qué pasó en cristiano, se queda hasta cerrarlo y pliega el detalle técnico.
+const zonaAvisos = () => { let z = $('#avisos'); if (!z) { z = document.createElement('div'); z.id = 'avisos'; document.body.append(z); } return z; };
+function avisar(msg) { const d = document.createElement('div'); d.className = 'aviso-flotante'; d.setAttribute('role', 'status'); d.textContent = msg; zonaAvisos().append(d); setTimeout(() => d.remove(), 2200); }
+function avisarError(que, detalle) {
+  const d = document.createElement('div'); d.className = 'aviso-flotante error'; d.setAttribute('role', 'alert');
+  const texto = document.createElement('span'); texto.textContent = que; d.append(texto);
+  const t = detalle ? String(detalle).trim() : '';
+  if (t && t !== que) { const det = document.createElement('details'), sum = document.createElement('summary'), pre = document.createElement('pre'); sum.textContent = 'Ver detalle'; pre.textContent = t; det.append(sum, pre); d.append(det); }
+  const x = document.createElement('button'); x.type = 'button'; x.className = 'cerrar-aviso'; x.setAttribute('aria-label', 'Cerrar el aviso'); x.textContent = '×'; x.onclick = () => d.remove(); d.append(x);
+  zonaAvisos().append(d);
+}
 const nombreNota = p => p.split('/').pop().replace(/\.md$/, '');
 const icono = n => `<svg class="icono" aria-hidden="true"><use href="#i-${n}"/></svg>`;
 let titulos = {};   // ruta → título (# …) de cada nota, para enseñar títulos y no nombres de fichero
@@ -65,7 +76,7 @@ function abrirNuevaNota(titulo = '') {
   abrirModal('#nueva-nota', '#nueva-nota-nombre');
 }
 async function crearNota(titulo, carpeta) {
-  let r; try { r = await api('/api/nota/nueva', { titulo, carpeta }); } catch (e) { avisar(e.message); return false; }
+  let r; try { r = await api('/api/nota/nueva', { titulo, carpeta }); } catch (e) { avisarError('No se ha podido crear la nota.', e.message); return false; }
   cerrarModal('#nueva-nota'); $('#buscador').value = ''; buscar('');
   location.hash = `#/n/${encodeURI(r.ruta)}`;
   return true;
@@ -90,7 +101,7 @@ async function anadirTareaDesdeBuscador() {
   const texto = comandoTarea($('#buscador').value);
   if (!texto) return;
   const nota = notaParaTarea();
-  try { await api('/api/tarea', { texto: nota ? `${texto} [[${nota}]]` : texto }); } catch (e) { if (e.status !== 409) avisar(e.message); return; }
+  try { await api('/api/tarea', { texto: nota ? `${texto} [[${nota}]]` : texto }); } catch (e) { if (e.status !== 409) avisarError('No se ha podido añadir la tarea.', e.message); return; }
   avisar('Tarea añadida');
   $('#buscador').value = ''; buscar('');   // vacía y sale del estado «buscando»: vuelven Inicio/Tareas/Comentarios y el árbol
   refrescarContadores();
@@ -124,6 +135,14 @@ $('#buscador').addEventListener('keydown', e => {
   if (e.key === 'Escape') { e.preventDefault(); e.target.value = ''; buscar(''); }
 });
 $('#arbol').addEventListener('keydown', e => {
+  const t = e.target;
+  if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && t.matches('button[tabindex="-1"]')) {   // entre los botones de una fila; la izquierda del primero vuelve a la fila
+    const hermanos = [...t.parentElement.querySelectorAll('button')], i = hermanos.indexOf(t);
+    e.preventDefault();
+    if (e.key === 'ArrowRight') { if (hermanos[i + 1]) hermanos[i + 1].focus(); } else if (i > 0) hermanos[i - 1].focus(); else (t.closest('.fila') ? t.closest('.fila').querySelector('a.hoja') : t.closest('summary')).focus();
+    return;
+  }
+  if (e.key === 'ArrowRight' && t.matches('a.hoja, summary')) { const b = (t.closest('.fila') || t).querySelector('.acciones-fila button'); if (b) { e.preventDefault(); b.focus(); } return; }
   const a = e.target.closest('a.resultado'); if (!a || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
   e.preventDefault();
   const todos = [...$('#arbol').querySelectorAll('a.resultado')], i = todos.indexOf(a);
@@ -131,7 +150,7 @@ $('#arbol').addEventListener('keydown', e => {
   else if (e.key === 'ArrowUp') (todos[i - 1] || $('#buscador')).focus();
 });
 document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#buscador').focus(); $('#buscador').select(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); if (lateralPlegado() && window.innerWidth > 760) plegarLateral(false, { enfocar: false }); $('#buscador').focus(); $('#buscador').select(); }
   if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); alternarTerminal(); }
   if (e.key === 'Escape' && !$('#editor').hidden) cerrarEditor();
 });
@@ -141,10 +160,11 @@ const GESTOR = /Mac/i.test(navigator.platform) ? 'el Finder' : /Win/i.test(navig
 const botonMostrar = (ruta, nombre) => `<button type="button" class="mostrar" data-mostrar="${esc(ruta)}" title="Mostrar en ${GESTOR}" aria-label="Mostrar ${esc(String(nombre).replace(/<[^>]*>/g, ''))} en ${GESTOR}">${icono('carpeta')}</button>`;
 const botonOcultar = (ruta, nombre) => `<button type="button" class="ocultar" data-ocultar="${esc(ruta)}" title="Ocultar aquí (solo en la app; se recupera en Ajustes)" aria-label="Ocultar ${esc(String(nombre).replace(/<[^>]*>/g, ''))}">${icono('ojo-tachado')}</button>`;
 // En un fichero, además, la papelera, la última y algo separada (crítica 2026-10-08: sin confirmar, el hueco es lo que la protege).
-const botonesFila = (ruta, nombre, esFichero = false) => `<span class="acciones-fila">${botonOcultar(ruta, nombre)}${botonMostrar(ruta, nombre)}${esFichero ? botonPapelera(ruta, nombre) : ''}</span>`;
+// Los botones de la fila no son paradas de Tab (hallazgo 7, revisión de diseño 2026-10-09: cada carpeta eran tres): se llega a ellos con la flecha derecha desde la fila.
+const botonesFila = (ruta, nombre, esFichero = false) => `<span class="acciones-fila">${(botonOcultar(ruta, nombre) + botonMostrar(ruta, nombre) + (esFichero ? botonPapelera(ruta, nombre) : '')).replace(/<button /g, '<button tabindex="-1" ')}</span>`;
 // Ocultar (o volver a mostrar) una carpeta o un fichero del árbol y del buscador; solo en la app, por cuaderno.
 async function ocultar(ruta, si) {
-  try { await api('/api/ocultar', { ruta, ocultar: si }); } catch (e) { return avisar(e.message); }
+  try { await api('/api/ocultar', { ruta, ocultar: si }); } catch (e) { return avisarError(si ? 'No se ha podido ocultar.' : 'No se ha podido volver a mostrar.', e.message); }
   arbol = await api('/api/arbol');
   if (!$('#buscador').value.trim()) pintarArbol(arbol); else buscar($('#buscador').value);
   if (si) avisar(`«${ruta.split('/').pop()}» oculto aquí. Para verlo otra vez: Ajustes.`);
@@ -163,7 +183,7 @@ async function pintarOcultas() {
   $('#lista-ocultas').innerHTML = l.map(r => `<li><code>${esc(r)}</code><button type="button" class="secundario pequeno" data-mostrar-de-nuevo="${esc(r)}" aria-label="Mostrar ${esc(r)} otra vez">Mostrar</button></li>`).join('');
 }
 $('#lista-ocultas').addEventListener('click', e => { const b = e.target.closest('button[data-mostrar-de-nuevo]'); if (b) ocultar(b.dataset.mostrarDeNuevo, false); });
-async function mostrarEnCarpeta(ruta) { try { await api('/api/mostrar-en-carpeta', { ruta }); } catch (e) { avisar(e.message); } }
+async function mostrarEnCarpeta(ruta) { try { await api('/api/mostrar-en-carpeta', { ruta }); } catch (e) { avisarError(`No se ha podido mostrarlo en ${GESTOR}.`, e.message); } }
 document.addEventListener('click', e => {
   const b = e.target.closest('button[data-mostrar]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();   // dentro del summary de una carpeta: no la pliega
@@ -177,7 +197,7 @@ const PAPELERA = /Win/i.test(navigator.platform) ? 'la papelera de reciclaje' : 
 const rutaCompleta = ruta => { const c = cuaderno(); if (!c.base || !c.sep) throw new Error('Reinicia la app: el servidor es de una versión anterior y no da la ruta completa'); return c.base + c.sep + ruta.split('/').join(c.sep); };
 const botonCopiar = ruta => `<button type="button" class="copiar" data-copiar="${esc(ruta)}" title="Copiar la ruta del fichero" aria-label="Copiar la ruta de ${esc(ruta.split('/').pop())}">${icono('copiar')}</button>`;
 async function copiarRuta(ruta) {
-  let texto; try { texto = rutaCompleta(ruta); } catch (e) { return avisar(e.message); }
+  let texto; try { texto = rutaCompleta(ruta); } catch (e) { return avisarError('No se ha podido copiar la ruta.', e.message); }
   try { await navigator.clipboard.writeText(texto); } catch {
     const t = document.createElement('textarea'); t.value = texto; document.body.append(t); t.select(); document.execCommand('copy'); t.remove();
   }
@@ -186,7 +206,7 @@ async function copiarRuta(ruta) {
 document.addEventListener('click', e => { const b = e.target.closest('button[data-copiar]'); if (!b) return; e.preventDefault(); copiarRuta(b.dataset.copiar); });
 const botonPapelera = (ruta, nombre) => `<button type="button" class="papelera" data-papelera="${esc(ruta)}" title="Mandar a ${PAPELERA}" aria-label="Mandar ${esc(String(nombre).replace(/<[^>]*>/g, ''))} a ${PAPELERA}">${icono('papelera')}</button>`;
 async function mandarAPapelera(ruta) {
-  try { await api('/api/papelera', { ruta }); } catch (e) { avisar(e.message); return; }
+  try { await api('/api/papelera', { ruta }); } catch (e) { avisarError(`No se ha podido mandar a ${PAPELERA}.`, e.message); return; }
   avisar(`«${ruta.split('/').pop()}» está en ${PAPELERA}`);
   [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]);
   if (!$('#buscador').value.trim()) pintarArbol(arbol);
@@ -207,7 +227,7 @@ const RE_VIDEO = /^(mp4|m4v|webm|mov|ogv)$/, RE_AUDIO = /^(mp3|m4a|aac|wav|ogg|o
 let ultimoMostrado = null;   // la recarga en vivo vuelve a pintar el fichero: el Finder se abre una vez por visita
 async function abrirFichero(ruta, tipo) {
   const url = `/fichero/${encodeURI(ruta)}`, nombre = ruta.split('/').pop();
-  ancho(tipo === 'pdf');
+  ancho(!RE_TEXTO.test(tipo), tipo === 'pdf');   // sin hoja: PDF (a todo el ancho), imágenes, vídeo, audio y lo que la app no sabe enseñar (columna centrada); la hoja, solo para texto (Roberto, 2026-10-09)
   if (tipo === 'pdf') { $('#nota').innerHTML = `<iframe class="visor-pdf" src="${url}" title="${esc(nombre)}"></iframe>`; return; }
   if (/^(png|jpe?g|gif|webp|avif|svg)$/.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><img class="visor-imagen" src="${url}" alt="${esc(nombre)}">`; return; }
   if (RE_VIDEO.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><video class="visor-imagen" src="${url}" controls preload="metadata"></video>`; return; }
@@ -236,8 +256,8 @@ function tablaCsv(texto) {
   const num = v => /^-?\d+([.,]\d+)?$/.test(v.trim());
   return `<div class="tabla-csv"><table><thead><tr>${filas[0].map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${filas.slice(1).map(f => `<tr>${f.map(v => `<td${num(v) ? ' class="cifra"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
-// PDF y páginas HTML a todo el ancho: la miga se alinea con ellos, no con la columna de lectura.
-function ancho(si) { $('#nota').classList.toggle('ancha', si); $('.miga-barra').classList.toggle('ancha', si); }
+// Sin hoja, la misma columna centrada que la hoja; PDF y páginas HTML (todo=true) a todo el ancho, y la miga se alinea con ellos.
+function ancho(si, todo = false) { $('#nota').classList.toggle('ancha', si); $('#nota').classList.toggle('todo', si && todo); $('.miga-barra').classList.toggle('todo', si && todo); }
 
 // ---------- nota
 function sinPortada() {
@@ -249,11 +269,11 @@ async function abrirNota(ruta, lineaDestino) {
   const recarga = rutaActual === ruta && !$('#nota').hidden && lineaDestino == null, scrollAntes = $('#centro').scrollTop;
   if (rutaActual !== ruta) { vistaNota = null; ultimoMostrado = null; }
   rutaActual = ruta;
-  $('#panel').hidden = true; $('#nota').hidden = false;
+  $('#panel').hidden = true; $('#nota').hidden = false; delete $('#nota').dataset.vista;
   let n;
   try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonCopiar(ruta) + (n.generado ? '' : botonPapelera(ruta, ruta.split('/').pop()));   // una nota que regenera el profesor no se manda a la papelera desde aquí
-  ancho(!!n.esHtml);
+  ancho(!!n.esHtml, !!n.esHtml);
   if (n.esFichero) return abrirFichero(ruta, n.tipo);
   const tipo = n.frontmatter && n.frontmatter.tipo;
   if (vistaNota !== ruta && tipo === 'examen') return abrirExamen(ruta);
@@ -272,31 +292,86 @@ async function abrirNota(ruta, lineaDestino) {
   $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* se queda el texto */ } });
   // acciones por bloque: editar y comentar, dos iconos en el margen izquierdo; el bloque no cambia de color (Roberto,
   // 2026-10-08: el fondo al pasar el ratón distraía). Con teclado: Tab hasta el bloque y aparecen.
-  $('#nota').querySelectorAll('.bloque').forEach(b => {
-    b.tabIndex = 0;
+  // Un solo punto de Tab en toda la nota (hallazgo 7): flechas entre bloques, E edita y C comenta el bloque enfocado.
+  $('#nota').querySelectorAll('.bloque').forEach((b, i) => {
+    b.tabIndex = i === 0 ? 0 : -1;
     const acc = document.createElement('div'); acc.className = 'acciones';
-    acc.innerHTML = `<button type="button" data-accion="editar" aria-label="Editar este bloque" title="Editar">${icono('lapiz')}</button><button type="button" data-accion="comentar" aria-label="Comentar este bloque" title="Comentar">${icono('comentar')}</button>`;
+    acc.innerHTML = `<button type="button" tabindex="-1" data-accion="editar" aria-label="Editar este bloque" title="Editar (tecla E con el bloque enfocado)">${icono('lapiz')}</button><button type="button" tabindex="-1" data-accion="comentar" aria-label="Comentar este bloque" title="Comentar (tecla C con el bloque enfocado)">${icono('comentar')}</button>`;
     b.prepend(acc);
   });
+  $('#nota').dataset.vista = 'nota';   // una nota normal: el índice se puede mostrar (refrescarIndice)
   $('#centro').scrollTop = recarga ? scrollAntes : 0;
   if (lineaDestino != null) { const b = [...$('#nota').querySelectorAll('.bloque')].find(x => +x.dataset.desde <= lineaDestino && lineaDestino < +x.dataset.hasta); if (b) { b.scrollIntoView({ block: 'center' }); b.classList.add('resaltado'); setTimeout(() => b.classList.remove('resaltado'), 1500); } }
 }
+// ---------- el índice de la nota (dirección C de la revisión de diseño, Roberto 2026-10-09)
+// Los h2/h3 de la nota, fijos en el margen derecho de la hoja, con la sección actual marcada. Solo si cabe: hoja entera
+// (texto + márgenes) + hueco + índice sin encoger la hoja, en el ancho que le queda a #centro (sin barra lateral ni cajón).
+// Sin él con menos de 3 títulos y en todo lo que no sea una nota normal (paneles, examen, tarjetas, ficheros).
+const INDICE = { ancho: 200, hueco: 24, margen: 16, minimoTitulos: 3 };
+let tituloIndice = [];   // los elementos h2/h3 de la nota
+function refrescarIndice() {
+  const idx = $('#indice'), centro = $('#centro'), nota = $('#nota');
+  const titulos = nota.hidden || nota.dataset.vista !== 'nota' || nota.classList.contains('ancha') ? [] : [...nota.querySelectorAll('.bloque > h2, .bloque > h3')];
+  const abierto = !$('#cajon').hidden && $('#app').classList.contains('cajon-capa');   // el cajón tapa todo: no hay sitio
+  const hoja = parseFloat(getComputedStyle(centro).getPropertyValue('--texto')) + 2 * parseFloat(getComputedStyle(centro).getPropertyValue('--hoja-pad'));
+  const cabe = !abierto && centro.clientWidth >= hoja + INDICE.hueco + INDICE.ancho + 2 * INDICE.margen;
+  const mostrar = titulos.length >= INDICE.minimoTitulos && cabe;
+  centro.classList.toggle('con-indice', mostrar);
+  idx.hidden = !mostrar;
+  if (!mostrar) { tituloIndice = []; idx.innerHTML = ''; return; }
+  if (titulos.length !== tituloIndice.length || titulos.some((t, i) => t !== tituloIndice[i])) {
+    tituloIndice = titulos;
+    idx.innerHTML = `<p class="indice-titulo">En esta nota</p><ul>${titulos.map((t, i) => `<li class="${t.tagName.toLowerCase()}"><button type="button" data-i="${i}">${esc(t.textContent.trim())}</button></li>`).join('')}</ul>`;
+  }
+  const c = centro.getBoundingClientRect(), n = nota.getBoundingClientRect(), barra = $('.miga-barra').offsetHeight;
+  idx.style.left = `${Math.round(n.right + INDICE.hueco)}px`;
+  idx.style.top = `${Math.round(c.top + barra + 16)}px`;
+  idx.style.maxHeight = `${Math.max(120, Math.round(c.height - barra - 32))}px`;
+  marcarSeccion();
+}
+// La sección en la que estás: el último título que ya pasó de la barra de la miga (al final del todo, el último que se ve).
+function marcarSeccion() {
+  if (!tituloIndice.length) return;
+  const c = $('#centro'), borde = c.getBoundingClientRect().top + $('.miga-barra').offsetHeight + 40;
+  let actual = 0;
+  tituloIndice.forEach((t, i) => { if (t.getBoundingClientRect().top <= borde) actual = i; });
+  if (c.scrollTop + c.clientHeight >= c.scrollHeight - 2) { const v = c.getBoundingClientRect().bottom; tituloIndice.forEach((t, i) => { if (t.getBoundingClientRect().top < v - 24) actual = Math.max(actual, i); }); }
+  $('#indice').querySelectorAll('button').forEach((b, i) => { if (i === actual) b.setAttribute('aria-current', 'location'); else b.removeAttribute('aria-current'); });
+}
+let marcaPendiente = false;
+$('#centro').addEventListener('scroll', () => { if (marcaPendiente) return; marcaPendiente = true; requestAnimationFrame(() => { marcaPendiente = false; marcarSeccion(); }); }, { passive: true });
+$('#indice').addEventListener('click', e => {
+  const b = e.target.closest('button[data-i]'); if (!b) return;
+  const t = tituloIndice[+b.dataset.i]; if (!t) return;
+  t.scrollIntoView({ block: 'start' });
+  $('#indice').querySelectorAll('button').forEach(x => x.removeAttribute('aria-current')); b.setAttribute('aria-current', 'location');
+});
+new ResizeObserver(refrescarIndice).observe($('#centro'));   // la ventana, la barra lateral y el cajón (derecha, abajo o cerrado) cambian su tamaño
+new MutationObserver(refrescarIndice).observe($('#nota'), { childList: true, attributes: true, attributeFilter: ['hidden', 'data-vista', 'class'] });
 async function marcarCasilla(ruta, linea, marcada, trasFallo) {
   const original = lineasDe(await textoFichero(ruta))[linea];
   try { await api('/api/casilla', { ruta, linea, marcada, original }); return true; } catch (e) { if (trasFallo) trasFallo(e); return false; }
 }
 $('#nota').addEventListener('click', async e => {
   const t = e.target;
-  if (t.classList.contains('casilla-mencion')) { const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { avisar(err.message); abrirNota(rutaActual); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); avisar(t.checked ? 'Marcada' : 'Desmarcada'); refrescarContadores(); } return; }
+  if (t.classList.contains('casilla-mencion')) { const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { if (err.status !== 409) avisarError('No se ha podido marcar la tarea.', err.message); abrirNota(rutaActual); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); avisar(t.checked ? 'Marcada' : 'Desmarcada'); refrescarContadores(); } return; }
   if (t.classList.contains('casilla')) { const ok = await marcarCasilla(rutaActual, +t.dataset.linea, t.checked, () => { t.checked = !t.checked; }); if (ok) { avisar(t.checked ? 'Marcada' : 'Desmarcada'); refrescarContadores(); } return; }
   if (t.closest('.callout-titulo')) { const c = t.closest('.callout'); if (c && c.querySelector('.callout-titulo').dataset.plegable) c.classList.toggle('plegado'); return; }
   const btn = t.closest('button[data-accion]'); if (!btn) return;
   const b = btn.closest('.bloque'); const desde = +b.dataset.desde, hasta = +b.dataset.hasta;
   const original = lineasDe(await textoFichero(rutaActual)).slice(desde, hasta).join('\n');
-  if (btn.dataset.accion === 'editar') abrirEditor('Editar bloque', original, `líneas ${desde + 1}–${hasta}`, async texto => { await api('/api/bloque', { ruta: rutaActual, desde, hasta, texto, original }); avisar('Guardado'); abrirNota(rutaActual); });
-  if (btn.dataset.accion === 'comentar') abrirEditor('Comentar este bloque', '', 'se guarda en la nota, debajo del bloque', async texto => { if (!texto.trim()) return; await api('/api/comentario', { ruta: rutaActual, desde, hasta, texto, original }); avisar('Comentario guardado'); abrirNota(rutaActual); refrescarContadores(); });
+  if (btn.dataset.accion === 'editar') abrirEditor('Editar bloque', original, `líneas ${desde + 1}–${hasta}`, async texto => { await api('/api/bloque', { ruta: rutaActual, desde, hasta, texto, original }); avisar('Cambio escrito en la nota'); abrirNota(rutaActual); });
+  if (btn.dataset.accion === 'comentar') abrirEditor('Comentar este bloque', '', 'se guarda en la nota, debajo del bloque', async texto => { if (!texto.trim()) return; await api('/api/comentario', { ruta: rutaActual, desde, hasta, texto, original }); avisar('Comentario añadido a la nota'); abrirNota(rutaActual); refrescarContadores(); }, { boton: 'Comentar', verbo: 'comenta' });
 });
 $('#nota').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('callout-titulo')) e.target.click(); });
+$('#nota').addEventListener('focusin', e => { const b = e.target.closest('.bloque'); if (!b) return; $('#nota').querySelectorAll('.bloque[tabindex="0"]').forEach(x => { if (x !== b) x.tabIndex = -1; }); b.tabIndex = 0; });
+$('#nota').addEventListener('keydown', e => {
+  const b = e.target; if (!b.classList || !b.classList.contains('bloque') || e.ctrlKey || e.metaKey || e.altKey) return;
+  const bs = [...$('#nota').querySelectorAll('.bloque')], i = bs.indexOf(b);
+  if (e.key === 'ArrowDown' && bs[i + 1]) { e.preventDefault(); bs[i + 1].focus(); }
+  else if (e.key === 'ArrowUp' && bs[i - 1]) { e.preventDefault(); bs[i - 1].focus(); }
+  else if (e.key.toLowerCase() === 'e' || e.key.toLowerCase() === 'c') { const bt = b.querySelector(`[data-accion="${e.key.toLowerCase() === 'e' ? 'editar' : 'comentar'}"]`); if (bt) { e.preventDefault(); bt.click(); } }
+});
 
 // ---------- examen como formulario
 let vistaNota = null;   // ruta que el usuario quiere ver como nota normal aunque sea examen o flashcards
@@ -363,7 +438,7 @@ async function accionTarjeta(que) {
     try {
       await api('/api/casilla', { ruta: s.ruta, linea: sabia ? t.lineaSabia : t.lineaNoSabia, marcada: true, original: lineas[sabia ? t.lineaSabia : t.lineaNoSabia] });
       await api('/api/casilla', { ruta: s.ruta, linea: sabia ? t.lineaNoSabia : t.lineaSabia, marcada: false, original: lineas[sabia ? t.lineaNoSabia : t.lineaSabia] });
-    } catch (e) { if (e.status !== 409) avisar(e.message); return; }
+    } catch (e) { if (e.status !== 409) avisarError('No se ha podido escribir la respuesta en la nota.', e.message); return; }
     t.sabia = sabia;
     if (s.indice < s.tarjetas.length - 1) { s.indice++; s.destapada = false; } 
     pintarTarjeta();
@@ -380,10 +455,26 @@ document.addEventListener('keydown', e => {
 
 // ---------- editor modal
 let alGuardar = null, foco = null;
-function abrirEditor(titulo, texto, lineas, cb) { foco = document.activeElement; $('#editor-titulo').textContent = titulo; $('#editor-lineas').textContent = lineas; $('#editor-texto').value = texto; alGuardar = cb; $('#editor').hidden = false; $('#editor-texto').focus(); }
-function cerrarEditor() { $('#editor').hidden = true; alGuardar = null; if (foco) foco.focus(); }
+// «Guardar» es solo del repositorio (revisión de diseño 2026-10-09, hallazgo 3): el editor de un bloque escribe en la nota y lo dice con otro verbo.
+// Con un diálogo abierto, lo de detrás queda `inert` y el Tab da la vuelta dentro (hallazgo 8, WCAG 2.4.3): aria-modal no basta.
+const DIALOGOS = ['#editor', '#nueva-nota', '#guardar', '#resultado', '#ajustes'];
+const dialogoAbierto = () => DIALOGOS.map($).find(d => d && !d.hidden) || null;
+function sincronizarInerte() { const hay = !!dialogoAbierto(); for (const el of [$('#app'), $('.saltar'), $('#aviso-reinicio')]) el.inert = hay; }
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Tab') return;
+  const d = dialogoAbierto(); if (!d) return;
+  const f = [...d.querySelectorAll('a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')].filter(x => !x.disabled && x.offsetParent !== null);
+  if (!f.length) return;
+  const primero = f[0], ultimo = f[f.length - 1], ahora = document.activeElement;
+  if (!d.contains(ahora)) { e.preventDefault(); primero.focus(); }
+  else if (e.shiftKey && ahora === primero) { e.preventDefault(); ultimo.focus(); }
+  else if (!e.shiftKey && ahora === ultimo) { e.preventDefault(); primero.focus(); }
+});
+document.querySelector('.saltar').addEventListener('click', e => { e.preventDefault(); const destino = $('#panel').hidden ? $('#nota') : $('#panel'); destino.tabIndex = -1; destino.focus(); });   // un enlace a #nota cambiaría la ruta
+function abrirEditor(titulo, texto, lineas, cb, { boton = 'Aplicar', verbo = 'aplica' } = {}) { foco = document.activeElement; $('#editor-titulo').textContent = titulo; $('#editor-guardar').textContent = boton; $('#editor-pista').textContent = `Ctrl Enter ${verbo} · Esc cancela`; $('#editor-lineas').textContent = lineas; $('#editor-texto').value = texto; alGuardar = cb; $('#editor').hidden = false; sincronizarInerte(); $('#editor-texto').focus(); }
+function cerrarEditor() { $('#editor').hidden = true; sincronizarInerte(); alGuardar = null; if (foco) foco.focus(); }
 $('#editor-cancelar').onclick = cerrarEditor;
-$('#editor-guardar').onclick = async () => { const cb = alGuardar; const v = $('#editor-texto').value; cerrarEditor(); if (cb) { try { await cb(v); } catch (e) { if (e.status !== 409) avisar(e.message); } } };
+$('#editor-guardar').onclick = async () => { const cb = alGuardar; const v = $('#editor-texto').value; cerrarEditor(); if (cb) { try { await cb(v); } catch (e) { if (e.status !== 409) avisarError('No se ha podido escribir el cambio en la nota.', e.message); } } };
 $('#editor-texto').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') $('#editor-guardar').click(); });
 
 // ---------- paneles
@@ -416,10 +507,12 @@ async function abrirTareas() {
     + (notas.length ? `<label for="filtro-nota">Nota</label><select id="filtro-nota" name="nota">${opcion('', 'Todas', f.nota)}${notas.map(n => opcion(n, rutaDeNombre(n) ? tituloDe(rutaDeNombre(n)) : n, f.nota)).join('')}</select>` : '')
     + (etiquetas.length ? `<label for="filtro-etiqueta">Etiqueta</label><select id="filtro-etiqueta" name="etiqueta">${opcion('', 'Todas', f.etiqueta)}${etiquetas.map(e => opcion(e, `#${e}`, f.etiqueta)).join('')}</select>` : '')
     + `<label for="filtro-estado">Estado</label><select id="filtro-estado" name="estado">${opcion('todas', 'Todas', f.estado)}${opcion('pendientes', 'Pendientes', f.estado)}${opcion('hechas', 'Hechas', f.estado)}</select>`
-    + `<span class="pista" id="filtro-resumen" role="status"></span><button type="button" class="secundario pequeno" id="filtro-quitar" hidden>Quitar filtros</button></form>`;
+    + `<span class="pista" id="filtro-resumen" role="status"></span></form>`
+    + `<p class="filtrando" id="filtrando" hidden><span id="filtrando-texto"></span><button type="button" class="secundario pequeno" id="filtro-quitar" data-quitar-filtros>Quitar filtros</button></p>`;
   $('#panel').innerHTML = `<h1>Tareas</h1><p class="resumen">${hechas} de ${total} hechas. ${nota}</p><form class="nueva-tarea" id="nueva-tarea"><label class="oculto" for="tarea-nueva">Nueva tarea</label><input id="tarea-nueva" placeholder="Nueva tarea para mí…" autocomplete="off"><button type="submit">Añadir</button></form>${filtros}`
     + g.map(gr => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(gr.ruta)}" title="${esc(gr.ruta)}">${esc(tituloDe(gr.ruta))}</a>${gr.generado ? '<span class="solo-lectura">la escribe el profesor al guardar</span>' : ''}</h2>`
-      + gr.items.map(i => `<label class="item${i.hecha ? ' hecha' : ''}" data-hecha="${i.hecha ? 1 : 0}" data-enlaces="${esc(JSON.stringify(i.enlaces || []))}" data-etiquetas="${esc(JSON.stringify(i.etiquetas || []))}" data-notas="${esc(JSON.stringify(i.notas || []))}"><input type="checkbox" data-ruta="${esc(gr.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${gr.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('') + '</section>').join('');
+      + gr.items.map(i => `<label class="item${i.hecha ? ' hecha' : ''}" data-hecha="${i.hecha ? 1 : 0}" data-enlaces="${esc(JSON.stringify(i.enlaces || []))}" data-etiquetas="${esc(JSON.stringify(i.etiquetas || []))}" data-notas="${esc(JSON.stringify(i.notas || []))}"><input type="checkbox" data-ruta="${esc(gr.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${gr.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('') + '</section>').join('')
+    + `<div class="vacio-filtro" id="filtro-vacio" hidden><p id="filtro-vacio-texto"></p><button type="button" class="secundario" data-quitar-filtros>Quitar filtros</button></div>`;
   aplicarFiltrosTareas();
   if (borrador && $('#tarea-nueva')) $('#tarea-nueva').value = borrador;
   if (activo && $(`#${activo}`)) $(`#${activo}`).focus();
@@ -439,7 +532,14 @@ function aplicarFiltrosTareas() {
   });
   document.querySelectorAll('#panel .grupo').forEach(gr => { gr.hidden = ![...gr.querySelectorAll('.item')].some(it => !it.hidden); });
   const r = $('#filtro-resumen'); if (r) r.textContent = activos ? (visibles ? `${visibles} de ${total} tareas` : 'Ninguna tarea cumple los filtros') : '';
-  const q = $('#filtro-quitar'); if (q) q.hidden = !activos;
+  // Señal de que hay filtros (los recuerda el navegador por cuaderno: revisión de diseño 2026-10-09, hallazgo 6) y un estado vacío con salida.
+  const nombreNota = f.nota ? (rutaF ? tituloDe(rutaF) : f.nota) : '';
+  const partes = [f.nota && `nota «${nombreNota}»`, f.etiqueta && `#${f.etiqueta}`, f.estado !== 'todas' && (f.estado === 'hechas' ? 'hechas' : 'pendientes')].filter(Boolean);
+  const fi = $('#filtrando'); if (fi) { fi.hidden = !activos; $('#filtrando-texto').textContent = activos ? `Filtrando: ${partes.join(' · ')}` : ''; }
+  const vacio = $('#filtro-vacio'); if (vacio) {
+    vacio.hidden = !(activos && !visibles);
+    $('#filtro-vacio-texto').textContent = `Ninguna tarea${f.estado === 'hechas' ? ' hecha' : f.estado === 'pendientes' ? ' pendiente' : ''}${f.etiqueta ? ` con #${f.etiqueta}` : ''}${f.nota ? ` que mencione «${nombreNota}»` : ''}.`;
+  }
 }
 $('#panel').addEventListener('change', e => {
   const form = e.target.closest('#filtros-tareas'); if (!form) return;
@@ -448,9 +548,9 @@ $('#panel').addEventListener('change', e => {
   history.replaceState(null, '', `#/tareas${q.size ? `?${q}` : ''}`);
   aplicarFiltrosTareas(); marcarActiva();
 });
-$('#panel').addEventListener('click', e => { if (e.target.id === 'filtro-quitar') { recordarFiltros(''); history.replaceState(null, '', '#/tareas'); abrirTareas().then(() => { const s = $('#filtro-estado'); if (s) s.focus(); }); } });
+$('#panel').addEventListener('click', e => { if (e.target.closest('[data-quitar-filtros]')) { recordarFiltros(''); history.replaceState(null, '', '#/tareas'); abrirTareas().then(() => { const s = $('#filtro-estado'); if (s) s.focus(); }); } });
 $('#panel').addEventListener('submit', async e => { if (e.target.id !== 'nueva-tarea') return; e.preventDefault(); const i = e.target.querySelector('input'); if (!i.value.trim()) return; await api('/api/tarea', { texto: i.value }); i.value = ''; avisar('Tarea añadida'); abrirTareas(); refrescarContadores(); });
-$('#panel').addEventListener('change', async e => { const t = e.target; if (t.type !== 'checkbox') return; const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { avisar(err.message); abrirTareas(); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); refrescarContadores(); } });
+$('#panel').addEventListener('change', async e => { const t = e.target; if (t.type !== 'checkbox') return; const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { if (err.status !== 409) avisarError('No se ha podido marcar la tarea.', err.message); abrirTareas(); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); refrescarContadores(); } });
 async function abrirComentarios() {
   $('#nota').hidden = true; $('#panel').hidden = false; rutaActual = null;
   $('#miga').innerHTML = '<strong>Comentarios</strong>';
@@ -469,7 +569,7 @@ async function refrescarContadores() {
 const CAJON_DEFECTO = { derecha: 420, abajo: 320 }, CAJON_MIN = { derecha: 320, abajo: 180 }, NOTA_MIN = { derecha: 480, abajo: 240 }, LATERAL = 280;
 const posicionCajon = () => info.configuracion.panel === 'abajo' ? 'abajo' : 'derecha';
 // El tamaño máximo que cabe en esta ventana para esa posición (lo que queda tras la barra lateral y el mínimo de la nota).
-const maximoCajon = pos => (pos === 'derecha' ? window.innerWidth - LATERAL : window.innerHeight) - NOTA_MIN[pos];
+const maximoCajon = pos => (pos === 'derecha' ? window.innerWidth - anchoLateral() : window.innerHeight) - NOTA_MIN[pos];
 // El valor guardado está en píxeles y otra ventana u otro monitor pueden dejarlo fuera de rango: se acota al usarlo.
 const acotarCajon = (valor, pos) => Math.round(Math.min(Math.max(Number(valor) || CAJON_DEFECTO[pos], CAJON_MIN[pos]), Math.max(maximoCajon(pos), CAJON_MIN[pos])));
 const tamanoCajon = pos => acotarCajon(pos === 'derecha' ? info.configuracion.panel_ancho : info.configuracion.panel_alto, pos);
@@ -481,6 +581,7 @@ function aplicarCajon() {
   const capa = window.innerWidth <= 760 || maximoCajon(pos) < CAJON_MIN[pos];
   app.classList.toggle('cajon-abierto', abierto && !capa);
   app.classList.toggle('cajon-capa', abierto && capa);
+  refrescarIndice();
 }
 function abrirCajon() { $('#cajon').hidden = false; aplicarCajon(); }
 function cerrarCajon() { $('#cajon').hidden = true; aplicarCajon(); $('#btn-terminal').focus(); }
@@ -542,7 +643,7 @@ function crearSesion(modo) {
   const fit = new FitAddon.FitAddon(); term.loadAddon(fit); term.open(elemento);
   const s = { id: n, modo, titulo: modo === 'profesor' ? 'Profesor' : (n === 1 ? 'Terminal' : `Terminal ${n}`), term, fit, ws: null, elemento, cerrada: false };
   term.attachCustomKeyEventHandler(e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === '`') return false;   // Ctrl ` es de la app: abre y cierra el cajón
+    if ((e.ctrlKey || e.metaKey) && (e.key === '`' || e.key === '\\')) return false;   // Ctrl ` es de la app (abre y cierra el cajón); Ctrl \ la barra lateral
     // xterm manda lo mismo con Enter que con Shift+Enter, y Claude Code o Codex envían el mensaje. Shift u Option+Enter
     // mandan \n (Ctrl J), su salto de línea en cualquier terminal; en un shell es como Enter (Roberto, 2026-10-09).
     if (e.key === 'Enter' && (e.shiftKey || e.altKey) && !e.ctrlKey && !e.metaKey) {
@@ -595,7 +696,7 @@ $('#btn-nueva-sesion').onclick = () => abrirTerminal('nueva');
 
 // ---------- cuadernos (pantalla de inicio)
 const hace = iso => { if (!iso) return 'nunca'; const d = (Date.now() - new Date(iso)) / 864e5; if (d < 1 / 24) return 'hace un momento'; if (d < 1) return `hace ${Math.round(d * 24)} h`; if (d < 30) return `hace ${Math.round(d)} día${Math.round(d) === 1 ? '' : 's'}`; return `el ${new Date(iso).toLocaleDateString('es')}`; };
-const textoGit = g => !g ? 'sin repositorio' : `guardado ${hace(g.ultimo)}${g.cambios ? `, ${g.cambios} sin guardar` : ''}${g.sinSubir ? `, ${g.sinSubir} sin subir` : ''}`;
+const textoGit = g => !g ? 'sin repositorio' : `guardado ${hace(g.ultimo)}${g.cambios ? `, ${g.cambios} ${g.cambios === 1 ? 'cambio' : 'cambios'} por guardar` : ''}${g.sinSubir ? `, ${g.sinSubir} sin subir` : ''}`;
 async function abrirCuadernos() {
   rutaActual = null; $('#nota').hidden = true; $('#panel').hidden = false;
   $('#miga').innerHTML = '<strong>Cuadernos</strong>';
@@ -606,7 +707,7 @@ async function abrirCuadernos() {
       : '<section class="grupo"><p>Todavía no has abierto ningún cuaderno.</p></section>');
 }
 async function abrirCarpeta(ruta) {
-  try { info = await api('/api/abrir', { ruta }); } catch (e) { avisar(e.message); return; }
+  try { info = await api('/api/abrir', { ruta }); } catch (e) { avisarError('No se ha podido abrir esa carpeta.', e.message); return; }
   cerrarSesiones();   // las terminales eran del cuaderno anterior (el servidor ya ha matado sus ptys)
   await cargarCuaderno();
   location.hash = cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/';
@@ -619,15 +720,25 @@ $('#panel').addEventListener('click', async e => {
 $('#panel').addEventListener('submit', e => { if (e.target.id !== 'abrir-carpeta') return; e.preventDefault(); const v = e.target.querySelector('input').value.trim(); if (v) abrirCarpeta(v); });
 
 // ---------- guardar / traer / deshacer
-function abrirModal(id, primero) { foco = document.activeElement; $(id).hidden = false; if (primero) $(primero).focus(); }
-function cerrarModal(id) { $(id).hidden = true; if (foco) foco.focus(); }
+function abrirModal(id, primero) { foco = document.activeElement; $(id).hidden = false; sincronizarInerte(); if (primero) $(primero).focus(); }
+function cerrarModal(id) { $(id).hidden = true; sincronizarInerte(); if (foco) foco.focus(); }
 function mostrarResultado(titulo, r, { confirmar = null } = {}) {
+  // Si falla: primero qué pasó en una frase, y la salida de la herramienta plegada en «Ver detalle» (hallazgo 12).
   $('#resultado-titulo').textContent = titulo; $('#resultado-texto').textContent = r.salida || (r.codigo ? 'Ha fallado sin decir por qué.' : 'Hecho.');
+  const humano = r.codigo ? fraseDeFallo(titulo, r.salida) : '';
+  $('#resultado-humano').textContent = humano; $('#resultado-humano').hidden = !humano;
+  $('#resultado-detalle').open = !humano; $('#resultado-detalle').classList.toggle('sin-plegar', !humano);
   $('#resultado-profesor').hidden = !(r.codigo && cuaderno().profesor);
   $('#resultado-confirmar').hidden = !confirmar; alConfirmar = confirmar;
   abrirModal('#resultado', confirmar ? '#resultado-confirmar' : '#resultado-cerrar');
 }
 let alConfirmar = null;
+const FALLOS = { 'Guardar': 'No se pudo guardar', 'Traer': 'No se pudo traer lo que cambió en otro sitio', 'Deshacer': 'No se pudo deshacer', 'Deshacer el último guardado': 'No se pudo deshacer' };
+function fraseDeFallo(titulo, salida) {
+  const base = FALLOS[titulo] || `No se pudo completar «${titulo}»`;
+  if (/MODULE_NOT_FOUND|Cannot find module/.test(salida || '')) return `${base}: falta una herramienta del kit de este cuaderno.`;
+  return `${base}. El detalle técnico está abajo, por si hay que enseñárselo al profesor.`;
+}
 $('#resultado-cerrar').onclick = () => cerrarModal('#resultado');
 $('#resultado-profesor').onclick = () => { cerrarModal('#resultado'); abrirTerminal('profesor'); };
 $('#resultado-confirmar').onclick = async () => { const fn = alConfirmar; cerrarModal('#resultado'); if (fn) await fn(); };
@@ -662,10 +773,30 @@ function aplicarApariencia(c) { const r = document.documentElement; r.dataset.te
 function abrirAjustes() {
   const c = info.configuracion;
   $('#ajustes-tema').value = c.tema; $('#ajustes-letra').value = c.letra; $('#ajustes-fuente').value = c.fuente; $('#ajustes-panel').value = posicionCajon(); $('#ajustes-comando').value = c.comando_agente || '';
-  foco = document.activeElement; $('#ajustes').hidden = false; $('#ajustes-tema').focus(); pintarOcultas();
+  foco = document.activeElement; $('#ajustes').hidden = false; sincronizarInerte(); $('#ajustes-tema').focus(); pintarOcultas();
 }
-function cerrarAjustes() { $('#ajustes').hidden = true; if (foco) foco.focus(); }
+function cerrarAjustes() { $('#ajustes').hidden = true; sincronizarInerte(); if (foco) foco.focus(); }
 $('#btn-ajustes').onclick = abrirAjustes;
+// Barra lateral plegable en escritorio (Roberto, 2026-10-09): un botón en la barra, otro en la miga para volver a abrirla, Ctrl+\ o Cmd+\
+// y el estado recordado en este navegador. A ≤ 760 px sigue su menú de siempre (menuLateral); allí el plegado de escritorio no cuenta.
+const CLAVE_LATERAL = 'cuaderno-lateral-plegado';
+const lateralPlegado = () => $('#app').classList.contains('lateral-plegado');
+const anchoLateral = () => (lateralPlegado() && window.innerWidth > 760 ? 0 : LATERAL);
+function plegarLateral(plegar, { enfocar = true, recordar = true } = {}) {
+  $('#app').classList.toggle('lateral-plegado', plegar);
+  $('#btn-plegar').setAttribute('aria-expanded', String(!plegar)); $('#btn-desplegar').setAttribute('aria-expanded', String(!plegar));
+  if (recordar) { try { if (plegar) localStorage.setItem(CLAVE_LATERAL, '1'); else localStorage.removeItem(CLAVE_LATERAL); } catch { /* sin almacenamiento: no se recuerda */ } }
+  aplicarCajon();   // el cajón se acota con el ancho que queda y el índice de la nota recalcula
+  if (enfocar && window.innerWidth > 760) $(plegar ? '#btn-desplegar' : '#btn-plegar').focus();
+}
+$('#btn-plegar').onclick = () => plegarLateral(true);
+$('#btn-desplegar').onclick = () => plegarLateral(false);
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key !== '\\' || window.innerWidth <= 760) return;
+  if (e.target.closest && e.target.closest('#cajon')) return;   // en la terminal, Ctrl \ es SIGQUIT: no se toca
+  e.preventDefault(); plegarLateral(!lateralPlegado());
+});
+try { if (localStorage.getItem(CLAVE_LATERAL) === '1') { $('#app').classList.add('lateral-plegado'); $('#btn-plegar').setAttribute('aria-expanded', 'false'); } } catch { /* sin almacenamiento */ }   // el cajón y el índice se acotan solos al arrancar (aplicarCajon)
 function menuLateral(abrir) { const l = $('#lateral'); l.classList.toggle('abierto', abrir); $('#btn-menu').setAttribute('aria-expanded', String(abrir)); if (!abrir && window.innerWidth <= 760) $('#btn-menu').focus(); }
 $('#btn-menu').onclick = () => menuLateral(!$('#lateral').classList.contains('abierto'));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#lateral').classList.contains('abierto')) menuLateral(false); });

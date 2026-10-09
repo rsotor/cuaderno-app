@@ -4,7 +4,7 @@
 // Con kit: agrupar las casillas de todas las notas es lo que añade el kit (iniciativas/mudanza/pendientes.md).
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { arrancar, visible, oculto, conTexto, ficheroCumple } = require('./ayuda');
+const { arrancar, hasta, visible, oculto, conTexto, ficheroCumple } = require('./ayuda');
 
 let e;
 test.before(async () => { e = await arrancar({ kit: true }); });
@@ -59,4 +59,9 @@ test('el filtro por nota del panel Tareas cuenta también las que la mencionan p
   await oculto(e.pagina.locator('#panel .item', { hasText: 'Embalar la cocina' }), 'tareas · nota', 'una tarea de otra nota');
 });
 
-async function hastaTexto(selector, re) { await conTexto(e.pagina.locator(selector), re, 'ana', 'la tarea marcada, ya al final de la sección'); }
+// Lee sin esperar al nodo (la recarga en vivo lo repinta y, mientras, no existe): reintenta hasta que cumpla
+async function hastaTexto(selector, re) {
+  let texto = '';
+  await hasta(async () => { texto = await e.pagina.evaluate(s => { const n = document.querySelector(s); return n ? n.textContent : null; }, selector) || ''; return re.test(texto); },
+    'ana', `la tarea marcada, ya al final de la sección: se esperaba ${re} en ${selector}`);
+}

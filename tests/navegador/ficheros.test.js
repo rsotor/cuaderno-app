@@ -8,7 +8,13 @@ const path = require('node:path');
 const { arrancar, hasta, visible, conTexto } = require('./ayuda');
 
 let e;
+// Hoja de lectura (texto) o sin ella (PDF, HTML, imagen, vídeo, audio y lo que no se sabe enseñar), Roberto, 2026-10-09.
+const sinHoja = () => e.pagina.evaluate(() => getComputedStyle(document.querySelector('#nota')).backgroundColor === 'rgba(0, 0, 0, 0)' && document.querySelector('#nota').classList.contains('ancha'));
+const conHoja = () => e.pagina.evaluate(() => getComputedStyle(document.querySelector('#nota')).backgroundColor !== 'rgba(0, 0, 0, 0)' && !document.querySelector('#nota').classList.contains('ancha'));
 const hoja = nombre => e.pagina.locator('#arbol a.hoja', { hasText: nombre });
+// Columna de lectura: centro de #nota y x del primer título (Roberto, 2026-10-09: sin hoja, la misma columna centrada que una nota).
+const columna = () => e.pagina.evaluate(() => { const b = document.querySelector('#nota').getBoundingClientRect(), h = document.querySelector('#nota h1').getBoundingClientRect(), m = document.querySelector('#miga').getBoundingClientRect(); return { centro: b.x + b.width / 2, titulo: h.x, miga: m.x }; });
+const referencia = async () => { await e.ir('#/n/material/material.md'); return columna(); };   // una nota con hoja: la medida de la columna buena
 const abrirDelArbol = async nombre => {
   const carpeta = e.pagina.locator('#arbol details', { has: e.pagina.locator('summary', { hasText: 'material' }) });
   if (!(await carpeta.evaluate(d => d.open))) await carpeta.locator('summary .nombre').click();
@@ -41,12 +47,17 @@ test('PDF: se ve en el visor del navegador, a todo el ancho', async () => {
   const r = await e.pagina.evaluate(src => fetch(src).then(x => x.headers.get('content-type')), await visor.getAttribute('src'));
   assert.equal(r, 'application/pdf', 'pdf: no se sirve como PDF');
   assert.ok((await visor.boundingBox()).height > 600, 'pdf: el visor no ocupa la ventana');
+  assert.ok(await sinHoja(), 'pdf: sale con la hoja de lectura');
+  const ancho = await e.pagina.evaluate(() => ({ visor: document.querySelector('#nota iframe.visor-pdf').getBoundingClientRect().width, centro: document.querySelector('#centro').clientWidth }));
+  // El visor ocupa #centro menos los 40 px de margen a cada lado (como la miga); lo que queda es todo el ancho disponible.
+  assert.ok(ancho.visor >= ancho.centro - 84 && ancho.visor <= ancho.centro, `pdf: el visor mide ${ancho.visor} px en una columna de ${ancho.centro}; debe ocupar el ancho de #centro`);
 });
 
 test('JSON con sangría; un JSON roto sale tal cual; CSV y TXT como texto; ninguno es editable', async () => {
   await e.ir('#/');
   await abrirDelArbol('gastos-octubre.json');
   await conTexto(e.pagina.locator('#nota pre.fichero-texto'), /\n  "ingresos": 1800,\n/, 'json', 'el JSON con sangría de dos espacios');
+  assert.ok(await conHoja(), 'json: el texto sale sin la hoja de lectura');
   fs.writeFileSync(path.join(e.c.base, 'material', 'roto.json'), '{"a": 1,,}');
   await visible(hoja('roto.json'), 'json', 'el JSON roto en el árbol (recarga en vivo)');
   await abrirDelArbol('roto.json');
@@ -59,6 +70,7 @@ test('JSON con sangría; un JSON roto sale tal cual; CSV y TXT como texto; ningu
   await conTexto(e.pagina.locator('#nota .como-texto pre'), /^concepto,categoria,importe\nAlquiler/, 'csv', 'el texto tal cual tras «Ver como texto»');
   await abrirDelArbol('apuntes-de-clase.txt');
   await conTexto(e.pagina.locator('#nota pre.fichero-texto'), /fondo de emergencia/, 'txt', 'el texto');
+  assert.ok(await conHoja(), 'txt: el texto sale sin la hoja de lectura');
   assert.equal(await e.pagina.locator('#nota .bloque, #nota [data-accion="editar"]').count(), 0, 'txt: un fichero de texto sale con acciones de editar');
 });
 
@@ -106,6 +118,14 @@ test('imagen: sale en el árbol y se ve a su tamaño, sin pasarse de la columna'
   const img = await visible(e.pagina.locator('#nota img.visor-imagen'), 'imagen', 'la imagen');
   await hasta(() => img.evaluate(i => i.complete && i.naturalWidth === 300), 'imagen', 'la imagen no carga');
   assert.equal(await img.evaluate(i => i.clientWidth), 300, 'la imagen no sale a su tamaño (sin contar el borde)');
+  assert.ok(await sinHoja(), 'imagen: sale con la hoja de lectura');
+  assert.ok(await img.evaluate(i => i.getBoundingClientRect().width <= document.querySelector('#centro').clientWidth), 'imagen: se pasa del ancho de #centro');
+  const col = await columna(), caja = await img.boundingBox();
+  const ref = await referencia();
+  assert.ok(Math.abs(col.centro - ref.centro) <= 4, `imagen: la columna está en x=${col.centro} y una nota con hoja en ${ref.centro}`);
+  assert.ok(Math.abs(col.titulo - ref.titulo) <= 4, `imagen: el título empieza en x=${col.titulo}; en una nota, en ${ref.titulo}`);
+  assert.ok(Math.abs(col.miga - ref.titulo) <= 4, `imagen: la miga empieza en x=${col.miga}; el título, en ${ref.titulo}`);
+  assert.ok(Math.abs(caja.x + caja.width / 2 - col.centro) <= 4, `imagen: sale en x=${caja.x + caja.width / 2}, no centrada en la columna (${col.centro})`);
   await e.ir('#/n/material/material.md');
   await e.pagina.locator('#nota a.wiki', { hasText: 'reparto-50-30-20.png' }).click();
   await visible(e.pagina.locator('#nota img.visor-imagen'), 'enlace', 'la imagen tras pulsar [[reparto-50-30-20.png]]');
@@ -151,6 +171,7 @@ test('la miga de una nota que regenera el profesor (inicio.md) no ofrece la pape
 
 test('adjuntos: audio y vídeo con su reproductor; lo que la app no sabe enseñar lleva al Finder; una carpeta con solo un .gitkeep sale y dice que está vacía', async () => {
   fs.writeFileSync(path.join(e.c.base, 'adjuntos', 'grabacion.mp4'), 'vídeo de mentira: basta para el reproductor');
+  const ref = await referencia();   // antes de abrir nada: abrir un fichero sin hoja vuelve a enseñarlo en el Finder al cambiar de nota
   await e.ir('#/');
   const abrir = async nombre => {
     const carpeta = e.pagina.locator('#arbol details[data-carpeta="adjuntos"]');
@@ -159,11 +180,20 @@ test('adjuntos: audio y vídeo con su reproductor; lo que la app no sabe enseña
   };
   await abrir('nota-de-voz.wav');
   assert.match(await (await visible(e.pagina.locator('#nota audio[controls]'), 'audio', 'el reproductor')).getAttribute('src'), /\/fichero\/adjuntos\/nota-de-voz\.wav$/);
+  assert.ok(await sinHoja(), 'audio: sale con la hoja de lectura');
+  const colAudio = await columna(), audioCaja = await e.pagina.locator('#nota audio').boundingBox();
+  assert.ok(Math.abs(colAudio.centro - ref.centro) <= 4 && Math.abs(colAudio.titulo - ref.titulo) <= 4, `audio: la columna está en x=${colAudio.centro} y una nota con hoja en ${ref.centro}`);
+  assert.ok(Math.abs(audioCaja.x + audioCaja.width / 2 - colAudio.centro) <= 4, 'audio: no sale centrado en la columna');
   await abrir('grabacion.mp4');
   await hasta(() => e.pagina.locator('#nota video[controls]').count(), 'vídeo', 'no aparece el reproductor');   // de mentira: no tiene tamaño que ver
+  assert.ok(await sinHoja(), 'vídeo: sale con la hoja de lectura');
   const antes = e.lanzado.length;
   await abrir('presupuesto.xlsx');
   await conTexto(e.pagina.locator('#nota'), /no sabe enseñar/, 'xlsx', 'el aviso de que la app no lo enseña');
+  assert.ok(await sinHoja(), 'xlsx: el aviso sale con la hoja de lectura');
+  const colX = await columna();
+  assert.ok(Math.abs(colX.centro - ref.centro) <= 4, `xlsx: la columna está en x=${colX.centro}; una nota con hoja, en ${ref.centro}`);
+  assert.ok(Math.abs(colX.titulo - ref.titulo) <= 4, `xlsx: el título empieza en x=${colX.titulo}; en una nota, en ${ref.titulo}`);
   await hasta(() => e.lanzado.length === antes + 1, 'xlsx', 'no lo señala en el Finder al abrirlo');
   assert.deepEqual(e.lanzado.at(-1).args, ['-R', path.join(e.c.base, 'adjuntos', 'presupuesto.xlsx')]);
   await e.pagina.click('#nota button[data-mostrar]');

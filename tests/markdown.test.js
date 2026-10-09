@@ -23,8 +23,10 @@ test('callouts: tipo, título, plegable', () => {
 
 test('casillas llevan la línea del fichero y marcado', () => {
   const html = md.render('Intro\n\n- [ ] una\n- [x] dos\n');
-  assert.match(html, /<li class="tarea"><input type="checkbox" class="casilla" data-linea="2"> una/);
-  assert.match(html, /<input type="checkbox" class="casilla" data-linea="3" checked> dos/);
+  // Cambio de especificación decidido (revisión de diseño 2026-10-09, hallazgo 10; plan vivo §6): la línea entera es la
+  // etiqueta de la casilla, para que clicar el texto marque y la casilla tenga nombre accesible.
+  assert.match(html, /<li class="tarea"><label class="casilla-linea"><input type="checkbox" class="casilla" data-linea="2"> una<\/label>/);
+  assert.match(html, /<input type="checkbox" class="casilla" data-linea="3" checked> dos<\/label>/);
 });
 
 test('matemáticas en línea y en bloque se entregan a KaTeX sin tocar', () => {

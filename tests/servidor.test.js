@@ -320,7 +320,7 @@ test('rutas de lectura y de nota nueva: títulos, recorrido y crear una nota', a
     const t = await (await s.pedir('/api/titulos')).json();
     assert.equal(t['conceptos/capital.md'], 'Capital'); assert.equal(t['material/calculadora-50-30-20.html'], 'Calculadora 50/30/20');
     const r = await (await s.pedir('/api/recorrido')).json();
-    assert.equal(r.notas, 19); assert.deepEqual(r.fallos, []);
+    assert.equal(r.notas, 20); assert.deepEqual(r.fallos, []);   // 20: con la nota larga de lectura/ (2026-10-09)
     const n = await (await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).json();
     assert.equal(n.ruta, 'conceptos/Idea nueva.md'); assert.equal(s.c.leer('conceptos/Idea nueva.md'), '# Idea nueva\n\n');   // el título y una línea en blanco para escribir debajo
     assert.equal((await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).status, 400, 'una nota repetida no da error');

@@ -136,7 +136,7 @@ test('títulos: el # de cada nota, sin wikilinks; las tareas llevan el Markdown 
 
 test('recorrido: cuenta notas, enlaces rotos y fallos', con({}, (c, cu) => {
   const r = cu.recorrido();
-  assert.equal(r.notas, 19);   // las 8 del curso demo, las 8 de cuaderno-ejemplo (render/, estructura/) y las 3 de las menciones (personas/, iniciativas/mudanza/); sus enlaces resuelven todos: el único roto sigue siendo el de interes.md
+  assert.equal(r.notas, 20);   // las 8 del curso demo, las 8 de cuaderno-ejemplo (render/, estructura/), las 3 de las menciones (personas/, iniciativas/mudanza/) y la nota larga de lectura/ (2026-10-09: una nota nueva en el ejemplo, no un valor arreglado); sus enlaces resuelven todos: el único roto sigue siendo el de interes.md
   assert.deepEqual(r.rotos, [{ ruta: 'conceptos/interes.md', destino: 'no-existe' }]);
   assert.deepEqual(r.fallos, []);
 }));

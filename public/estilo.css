@@ -1,6 +1,6 @@
 /* cuaderno-app · hoja de estilos. Tema: papel, tinta y un subrayador. Los tokens van por tema; el contenido manda. */
 :root {
-  --papel: #fbfbfc; --fondo: #f2f3f5; --lateral: #eaecef; --tinta: #1b1b1f; --tinta-suave: #5a5e66; --linea: #dcdfe4;
+  --papel: #fbfbfc; --fondo: #f2f3f5; --mesa: #e6e8ec; --lateral: #e6e8ec; --tinta: #1b1b1f; --tinta-suave: #5a5e66; --linea: #dcdfe4;
   --acento: #1e5a96; --acento-suave: #e3ecfa; --sobre-acento: #ffffff; --ok: #15803d; --aviso: #7a4a00; --mal: #b91c1c;
   --terminal-fondo: #1b1d23; --marca: #fff3a8;
   --c-info: var(--acento); --c-question: #6d28d9; --c-warning: var(--aviso); --c-danger: var(--mal); --c-success: var(--ok);
@@ -10,28 +10,32 @@
   --serif: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --mono: "JetBrains Mono", "Fira Code", Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --sombra: 0 10px 30px rgba(20, 20, 30, .12);
+  --borde-cajon: #000;
+  color-scheme: light;   /* controles nativos (casillas, selects, barras) del tema: hallazgo 9 */
 }
 @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) {
-  --papel: #1c1e23; --fondo: #141518; --lateral: #181a1f; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
+  --papel: #1c1e23; --fondo: #141518; --mesa: #0e0f12; --lateral: #0e0f12; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
   --acento: #8cc8f0; --acento-suave: #22303c; --sobre-acento: #141518; --ok: #86efac; --aviso: #e0a040; --mal: #fca5a5;
   --terminal-fondo: #0f1014; --marca: #5a4d12;
   --c-question: #c4b5fd; --c-quote: #9ca3af; --c-example: #67e8f9; --c-tip: #5eead4; --c-comment: #fb923c;
-  --sombra: 0 10px 30px rgba(0, 0, 0, .45);
+  --sombra: 0 10px 30px rgba(0, 0, 0, .45); --borde-cajon: #2c2f36;   /* la mesa y el cajón son casi del mismo negro: la línea los separa (crítica 2026-10-09, 2) */
+  color-scheme: dark;
 } }
 :root[data-tema="oscuro"] {
-  --papel: #1c1e23; --fondo: #141518; --lateral: #181a1f; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
+  --papel: #1c1e23; --fondo: #141518; --mesa: #0e0f12; --lateral: #0e0f12; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
   --acento: #8cc8f0; --acento-suave: #22303c; --sobre-acento: #141518; --ok: #86efac; --aviso: #e0a040; --mal: #fca5a5;
   --terminal-fondo: #0f1014; --marca: #5a4d12;
   --c-question: #c4b5fd; --c-quote: #9ca3af; --c-example: #67e8f9; --c-tip: #5eead4; --c-comment: #fb923c;
-  --sombra: 0 10px 30px rgba(0, 0, 0, .45);
+  --sombra: 0 10px 30px rgba(0, 0, 0, .45); --borde-cajon: #2c2f36;   /* la mesa y el cajón son casi del mismo negro: la línea los separa (crítica 2026-10-09, 2) */
+  color-scheme: dark;
 }
 :root[data-letra="pequeña"] body { font-size: 14px; }
 :root[data-letra="grande"] body { font-size: 17px; }
-:root[data-fuente="serif"] #nota { font-family: var(--serif); line-height: 1.65; }
+:root[data-fuente="serif"] #nota { font-family: var(--serif); line-height: 1.7; }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--tinta); font: 15px/1.6 var(--fuente); }
+html, body { margin: 0; height: 100%; background: var(--mesa); color: var(--tinta); font: 15px/1.6 var(--fuente); }
 :focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
 @media (prefers-reduced-motion: no-preference) { .bloque, .respuesta-tarjeta { transition: background-color .15s ease; } .bloque .acciones { transition: opacity .12s ease; } }
 .oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -69,7 +73,7 @@ body:has(#aviso-reinicio:not([hidden])) #app { flex: 1; min-height: 0; height: a
 /* ---------- disposición */
 #app { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-rows: 1fr auto; height: 100vh; }
 #lateral { grid-row: 1 / 3; background: var(--lateral); border-right: 1px solid var(--linea); display: flex; flex-direction: column; min-height: 0; }
-.marca { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px 8px; }
+.marca { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 14px 16px 8px; }
 .marca a { display: flex; gap: 8px; align-items: center; font-weight: 650; color: inherit; text-decoration: none; border-radius: var(--radio); min-height: 26px; }
 .marca small { font-size: 12.5px; color: var(--tinta-suave); }
 .guardar-barra { display: flex; gap: 6px; margin-top: 8px; }
@@ -78,8 +82,8 @@ body:has(#aviso-reinicio:not([hidden])) #app { flex: 1; min-height: 0; height: a
 #lateral.sin-cuaderno #buscador, #lateral.sin-cuaderno .paginas, #lateral.sin-cuaderno #btn-terminal, #lateral.sin-cuaderno .guardar-barra, #lateral.sin-repo .guardar-barra { display: none; }
 #buscador { margin: 8px 12px; padding: 8px 10px; }
 .paginas { display: flex; flex-direction: column; padding: 4px 8px; }
-.paginas a, .paginas button, #arbol a { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radio); color: var(--tinta); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.paginas a:hover, .paginas button:hover, #arbol a:hover, #arbol summary:hover { background: rgba(127,127,127,.12); }
+.paginas a, .paginas button, #arbol a { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radio); color: var(--tinta-suave); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* barra apagada (dirección C): el texto en tinta suave, ≥ 4,5:1 sobre la mesa */
+.paginas a:hover, .paginas button:hover, #arbol a:hover, #arbol summary:hover { background: rgba(127,127,127,.12); color: var(--tinta); }
 .paginas a.activa, #arbol a.activa { background: var(--acento-suave); color: var(--acento); }
 .paginas .icono { color: var(--tinta-suave); } .paginas a.activa .icono { color: var(--acento); }
 .contador { font-size: 12px; color: var(--tinta-suave); margin-left: auto; }
@@ -87,7 +91,7 @@ body:has(#aviso-reinicio:not([hidden])) #app { flex: 1; min-height: 0; height: a
 /* Árbol: la carpeta lleva un chevron que gira al abrirse; la página, nada (la sangría ya la coloca bajo su carpeta).
    Mismo color para las dos; la carpeta, algo más de peso. Cada nivel entra 16 px. */
 #arbol details details, #arbol details .hoja { margin-left: 16px; }
-#arbol summary { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 5px 6px; color: var(--tinta); font-weight: 500; border-radius: var(--radio); list-style: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#arbol summary { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 5px 6px; color: var(--tinta-suave); font-weight: 500; border-radius: var(--radio); list-style: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #arbol summary::-webkit-details-marker { display: none; }
 #arbol summary .num { opacity: .7; font-variant-numeric: tabular-nums; }
 #arbol summary::before { content: ""; flex: none; width: 14px; height: 14px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; opacity: .75; }
@@ -118,23 +122,25 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 #miga .papelera { margin-left: 18px; }   /* lejos de copiar: un clic de más no manda nada a la papelera */
 #miga :is(.mostrar, .copiar, .papelera) .icono { width: 15px; height: 15px; }
 /* ficheros que no son notas */
-#nota.ancha { max-width: none; }
-.miga-barra.ancha { padding-left: 40px; }
+#nota:focus-visible, #panel:focus-visible { outline: none; }   /* a donde lleva «Saltar al contenido» */
+#nota.ancha.todo { max-width: none; margin-left: 0; margin-right: 0; }
+.miga-barra.todo { padding-left: 40px; }
 #nota .tabla-csv { overflow-x: auto; }
 #nota .tabla-csv td.cifra { text-align: right; font-variant-numeric: tabular-nums; }
 #nota .como-texto { margin-top: 14px; }
 #nota .como-texto summary { cursor: pointer; color: var(--tinta-suave); font-size: 13.5px; margin-bottom: 8px; }
+#nota audio { display: block; margin: 0 auto; }   /* el reproductor, centrado como la imagen */
 #nota .visor-pdf { width: 100%; height: calc(100vh - 70px); border: 1px solid var(--linea); border-radius: var(--radio-bloque); background: #fff; }
-#nota .visor-imagen { display: block; max-width: 100%; height: auto; border: 1px solid var(--linea); border-radius: 2px; background: repeating-conic-gradient(rgba(127,127,127,.12) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }   /* el damero deja ver la transparencia */
-#nota .fichero-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio-bloque); padding: 14px 16px; margin: 0; }
+#nota .visor-imagen { display: block; margin: 0 auto; max-width: 100%; height: auto; border: 1px solid var(--linea); border-radius: 2px; background: repeating-conic-gradient(rgba(127,127,127,.12) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }   /* el damero deja ver la transparencia */
+#nota .fichero-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: rgba(127,127,127,.08); border: 1px solid var(--linea); border-radius: var(--radio-bloque); padding: 14px 16px; margin: 0; }
 #arbol .hoja small { color: var(--tinta-suave); font-size: 12px; margin-left: auto; padding-left: 8px; }   /* dos notas con el mismo título: el fichero las distingue */
 #lateral.buscando .paginas { display: none; }   /* buscando, los resultados necesitan el sitio */
 #arbol .tramo { margin: 10px 10px 2px; font-size: 12px; font-weight: 600; color: var(--tinta-suave); }   /* sin mayúsculas ni eyebrow (crítica del 2026-10-07) */
 #arbol .tramo small { font-weight: 400; margin-left: 6px; }
-#arbol .resultado { padding: 6px 10px; display: block; }
+#arbol .resultado { padding: 6px 10px; display: block; color: var(--tinta); }   /* el título del resultado, en tinta: la barra apagada no le quita la jerarquía sobre su fragmento (crítica 2026-10-09, 1) */
 #arbol .resultado.linea { padding: 4px 10px 4px 20px; font-size: 13px; line-height: 1.35; color: var(--tinta-suave); white-space: normal; }   /* las líneas, bajo el título de su nota */
 #arbol .grupo { margin-bottom: 6px; }
-.paginas button { background: none; border: 0; font: inherit; cursor: pointer; width: 100%; justify-content: flex-start; text-align: left; margin: 0; color: var(--tinta); }   /* como los enlaces de encima: alineado a la izquierda, sin borde */
+.paginas button { background: none; border: 0; font: inherit; cursor: pointer; width: 100%; justify-content: flex-start; text-align: left; margin: 0; color: var(--tinta-suave); }   /* como los enlaces de encima: alineado a la izquierda, sin borde */
 #arbol .vacio b { color: var(--tinta); }
 #nueva-nota input, #nueva-nota select { width: 100%; }
 #arbol .resultado small { display: block; color: var(--tinta-suave); white-space: normal; font-size: 12px; line-height: 1.35; }
@@ -144,19 +150,27 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .pie-lateral button { flex: 1; white-space: nowrap; }
 .pie-lateral #btn-ajustes { flex: 0 0 auto; }
 
-#centro { overflow: auto; min-height: 0; min-width: 0; padding: 0 0 40px; }
-.miga-barra { position: sticky; top: 0; background: var(--fondo); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px max(40px, calc((100% - 76ch - 80px) / 2 + 40px)); }   /* empieza donde empieza la columna de #nota */
+#centro { overflow: auto; min-height: 0; min-width: 0; padding: 0 0 40px; background: var(--mesa); --hoja-pad: 56px; --texto: 800px; }   /* la mesa: un poco más hundida que la hoja (Roberto, 2026-10-09, dirección A) */
+.miga-barra { position: sticky; top: 0; background: var(--mesa); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px max(calc(var(--hoja-pad) + 8px), calc((100% - var(--texto) - 2 * var(--hoja-pad)) / 2 + var(--hoja-pad))); }   /* empieza donde empieza el texto de la hoja */
 #miga { font-size: 13px; color: var(--tinta-suave); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #btn-menu { display: none; padding: 6px 8px; }
-#nota, #panel { max-width: calc(76ch + 80px); margin: 0 auto; padding: 8px 40px 40px; }   /* 76 ch ≈ 90 caracteres por línea: en pantalla grande la columna no se queda estrecha (Roberto, 2026-10-08) */
+/* La hoja (dirección A, Roberto 2026-10-09): el texto mide como mucho 800 px (decisión de Roberto, 2026-10-09: «sé que no es lo mejor, pero para mí sí») y la hoja, el texto más sus márgenes interiores
+   (56 px a cada lado: 912 px). Letra de 16 px con la «Media»; en em para que el ajuste «Letra» siga mandando. */
+#nota, #panel { max-width: calc(var(--texto) + 2 * var(--hoja-pad)); margin: 8px auto 0; padding: 20px var(--hoja-pad) 40px; background: var(--papel); border: 1px solid var(--linea); border-radius: 10px; }
+#nota { font-size: 1.0667em; line-height: 1.65; }
+#nota.ancha { background: none; border: 0; border-radius: 0; }   /* sin hoja: la misma columna centrada (imagen, vídeo, audio, lo que la app no sabe enseñar; Roberto, 2026-10-09) */
+#nota.ancha.todo { margin-top: 0; padding: 8px 40px 40px; }   /* a todo el ancho: PDF y páginas HTML */
+#centro.con-indice .miga-barra:not(.todo) { padding-left: calc(max(16px, (100% - var(--texto) - 2 * var(--hoja-pad) - 224px) / 2) + var(--hoja-pad)); }
+#centro.con-indice #nota, #centro.con-indice #panel { margin-left: max(16px, calc((100% - var(--texto) - 2 * var(--hoja-pad) - 224px) / 2)); margin-right: 0; }   /* hoja + índice, como un grupo centrado */
 #nota h1, #panel h1 { font-size: 28px; line-height: 1.15; margin: 6px 0 18px; font-weight: 700; letter-spacing: -.01em; }
-#nota h2 { font-size: 21px; margin: 40px 0 8px; border-bottom: 1px solid var(--linea); padding-bottom: 4px; }
+#nota h2 { font-size: 22px; line-height: 1.25; margin: 38px 0 10px; scroll-margin-top: 56px; border-bottom: 1px solid var(--linea); padding-bottom: 4px; }
 #nota .bloque:has(> h2) + .bloque > :nth-child(2) { margin-top: 0; }   /* el bloque que sigue a un título se pega a él (el primer hijo es .acciones) */
-#nota h3 { font-size: 17px; margin: 24px 0 8px; }
-#nota a { color: var(--acento); padding: 3px 0; }   /* objetivo ≥ 24 px de alto sin cambiar la línea */
+#nota h3 { font-size: 18px; line-height: 1.3; margin: 26px 0 8px; scroll-margin-top: 56px; }
+#nota a, :where(#panel) a { color: var(--acento); }   /* los enlaces sin estilo salían con el azul del navegador: 1,94:1 en oscuro (hallazgo 9) */
+#nota a { padding: 3px 0; }   /* objetivo ≥ 24 px de alto sin cambiar la línea */
 #nota a.wiki { text-decoration: none; border-bottom: 1px dotted var(--acento); }
 #nota a.wiki.roto { color: var(--mal); border-bottom-style: dashed; }
-#nota table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 14px; }
+#nota table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: .85em; line-height: 1.5; }
 #nota th, #nota td { border: 1px solid var(--linea); padding: 6px 10px; text-align: left; }
 #nota th { background: rgba(127,127,127,.08); }
 #nota code { background: rgba(127,127,127,.12); padding: 1px 5px; border-radius: 4px; }
@@ -165,6 +179,7 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 #nota blockquote:not(.callout) { margin: 10px 0; padding: 2px 16px; border-left: 3px solid var(--linea); color: var(--tinta-suave); }
 #nota li.tarea { list-style: none; margin-left: -20px; }
 #nota li.tarea input { margin-right: 8px; transform: translateY(2px); }
+#nota .casilla-linea { display: block; cursor: pointer; }   /* toda la línea marca (hallazgo 10) */
 #nota .ejercicio { width: 100%; height: calc(100vh - 70px); border: 1px solid var(--linea); border-radius: var(--radio-bloque); background: #fff; }
 .math[data-display="1"] { text-align: center; margin: 12px 0; overflow-x: auto; }
 .cambiar-vista { display: flex; justify-content: flex-end; margin: 0 0 -6px; }
@@ -235,6 +250,11 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .filtros select { padding: 5px 8px; min-height: 32px; max-width: 100%; background: var(--fondo); color: var(--tinta); margin-right: 6px; }
 .filtros .pista { margin-left: auto; margin-right: 0; }
 .item .etiqueta { vertical-align: 1px; }
+/* hay filtros puestos (a veces recordados de otro día): se ve encima de la lista, con la salida a mano */
+.filtrando { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; padding: 6px 10px; border-left: 3px solid var(--acento); background: var(--acento-suave); color: var(--tinta); font-size: 14px; border-radius: 0 var(--radio) var(--radio) 0; }
+.filtrando button { margin-left: auto; }
+.vacio-filtro { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 36px 0; color: var(--tinta-suave); text-align: center; }
+.vacio-filtro p { margin: 0; font-size: 15px; }
 
 /* examen como formulario */
 .examen fieldset.pregunta { border: 0; border-top: 1px solid var(--linea); padding: 8px 0 14px; margin: 10px 0; }
@@ -270,8 +290,8 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 #app.cajon-abierto[data-panel="derecha"] { grid-template-columns: 280px minmax(0, 1fr) var(--panel-ancho); }
 #app.cajon-abierto[data-panel="abajo"] { grid-template-rows: 1fr var(--panel-alto); }
 #cajon { min-width: 0; min-height: 0; overflow: hidden; background: var(--terminal-fondo); display: flex; flex-direction: column; }
-#app[data-panel="derecha"] #cajon { grid-column: 3; grid-row: 1 / 3; border-left: 1px solid #000; }
-#app[data-panel="abajo"] #cajon { grid-column: 2; grid-row: 2; border-top: 1px solid #000; }
+#app[data-panel="derecha"] #cajon { grid-column: 3; grid-row: 1 / 3; border-left: 1px solid var(--borde-cajon); }
+#app[data-panel="abajo"] #cajon { grid-column: 2; grid-row: 2; border-top: 1px solid var(--borde-cajon); }
 #app.cajon-capa #cajon { position: fixed; inset: 0; z-index: 10; border: none; }
 /* el asa: 6 px visibles en el borde interior, 12 px de zona activa; el acento al pasar, arrastrar o enfocar */
 #cajon { position: relative; }
@@ -319,7 +339,18 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 .ajustes label { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .ajustes select, .ajustes input { padding: 6px 8px; background: var(--fondo); min-width: 180px; }
 .resultado-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; background: var(--fondo); border: 1px solid var(--linea); border-radius: var(--radio); padding: 10px 12px; margin: 0; max-height: 50vh; overflow: auto; }
-.aviso-flotante { position: fixed; bottom: 18px; right: 18px; background: var(--tinta); color: var(--fondo); padding: 8px 14px; border-radius: var(--radio); font-size: 13px; z-index: 30; }
+.resultado-humano { margin: 0; font-weight: 600; }
+.resultado-detalle > summary { cursor: pointer; color: var(--tinta-suave); font-size: 13px; margin-bottom: 8px; }
+.resultado-detalle.sin-plegar > summary { display: none; }
+#avisos { position: fixed; bottom: 18px; right: 18px; z-index: 30; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: min(420px, calc(100vw - 36px)); }
+.aviso-flotante { background: var(--tinta); color: var(--fondo); padding: 8px 14px; border-radius: var(--radio); font-size: 13px; }
+/* un error se queda hasta cerrarlo; el detalle técnico, plegado */
+.aviso-flotante.error { position: relative; padding-right: 38px; border-left: 4px solid var(--mal); font-size: 14px; line-height: 1.4; box-shadow: var(--sombra); }
+.aviso-flotante.error details { margin-top: 6px; font-size: 12.5px; }
+.aviso-flotante.error summary { cursor: pointer; opacity: .85; }
+.aviso-flotante.error pre { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; font: 12px/1.45 var(--mono); }
+.aviso-flotante .cerrar-aviso { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; min-height: 0; padding: 0; background: none; border: 0; color: inherit; font-size: 20px; line-height: 1; border-radius: 50%; }
+.aviso-flotante .cerrar-aviso:hover { background: color-mix(in srgb, currentColor 22%, transparent); }
 
 /* estrecho: la barra lateral se despliega sobre el contenido con un botón; nada se corta */
 @media (max-width: 760px) {
@@ -328,7 +359,9 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
   #lateral.abierto { transform: none; visibility: visible; }
   @media (prefers-reduced-motion: no-preference) { #lateral { transition: transform .2s ease, visibility .2s; } }
   #btn-menu { display: inline-flex; }
-  #nota, #panel { padding: 8px 16px 40px; }
+  #centro { --hoja-pad: 16px; }
+  #nota, #panel { padding: 8px 16px 40px; margin: 0 auto; background: none; border: 0; border-radius: 0; }   /* la hoja se funde con el fondo: sin márgenes que roben sitio */
+  html, body, #centro, .miga-barra { background: var(--papel); }
   .miga-barra { padding: 8px 12px 6px; }
   .bloque { margin: 0; padding: 0 4px; }
   .bloque .acciones { position: static; flex-direction: row; justify-content: flex-end; display: none; }
@@ -338,3 +371,29 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 
 /* Una carpeta sin nada que enseñar (recién creada, con solo un .gitkeep): sale, y dice que está vacía. */
 #arbol .carpeta-vacia { margin: 2px 0 4px 26px; font-size: 13px; color: var(--tinta-suave); }
+
+/* Zona intermedia: la hoja se estrecha sus márgenes antes de quitarle sitio al texto */
+@media (max-width: 1100px) and (min-width: 761px) { #centro { --hoja-pad: 32px; } #nota, #panel { margin-left: 12px; margin-right: 12px; } }
+
+/* Índice de la nota (dirección C): en el margen derecho de la hoja, solo si cabe (public/app.js, refrescarIndice) */
+#indice { position: fixed; z-index: 1; width: 200px; overflow-y: auto; font-size: 13px; line-height: 1.35; overscroll-behavior: contain; }
+#indice .indice-titulo { margin: 0 0 6px 10px; font-size: 12px; font-weight: 600; color: var(--tinta-suave); }
+#indice ul { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--linea); }
+#indice li.h3 { padding-left: 12px; }
+#indice button { display: block; width: 100%; text-align: left; border: 0; border-left: 2px solid transparent; margin-left: -1px; border-radius: 0 var(--radio) var(--radio) 0; background: none; padding: 4px 8px 4px 10px; min-height: 26px; color: var(--tinta-suave); font-size: 13px; }
+#indice button:hover { color: var(--tinta); background: rgba(127,127,127,.1); }
+#indice button[aria-current="location"] { color: var(--acento); border-left-color: var(--acento); font-weight: 600; }
+
+/* Barra lateral plegable en escritorio (Roberto, 2026-10-09): plegada, #centro gana su ancho; el botón para volver vive en la miga */
+.marca .plegar { position: absolute; top: 12px; right: 10px; padding: 4px 7px; min-height: 30px; background: none; border-color: transparent; color: var(--tinta-suave); }
+.marca .plegar:hover { color: var(--tinta); background: rgba(127,127,127,.12); }
+#btn-desplegar { display: none; position: absolute; left: 12px; top: 6px; padding: 6px 8px; z-index: 3; }
+@media (min-width: 761px) {
+  #app.lateral-plegado { grid-template-columns: 0 minmax(0, 1fr); }
+  #app.lateral-plegado.cajon-abierto[data-panel="derecha"] { grid-template-columns: 0 minmax(0, 1fr) var(--panel-ancho); }
+  #app.lateral-plegado #lateral { display: none; }
+  #app.lateral-plegado #centro { grid-column: 2; grid-row: 1; }
+  #app.lateral-plegado #btn-desplegar { display: inline-flex; }
+  #app.lateral-plegado .miga-barra { min-height: 44px; }
+}
+@media (max-width: 760px) { .marca .plegar { display: none; } }
