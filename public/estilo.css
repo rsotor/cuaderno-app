@@ -10,6 +10,7 @@
   --serif: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --mono: "JetBrains Mono", "Fira Code", Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --sombra: 0 10px 30px rgba(20, 20, 30, .12);
+  color-scheme: light;   /* controles nativos (casillas, selects, barras) del tema: hallazgo 9 */
 }
 @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) {
   --papel: #1c1e23; --fondo: #141518; --lateral: #181a1f; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
@@ -17,6 +18,7 @@
   --terminal-fondo: #0f1014; --marca: #5a4d12;
   --c-question: #c4b5fd; --c-quote: #9ca3af; --c-example: #67e8f9; --c-tip: #5eead4; --c-comment: #fb923c;
   --sombra: 0 10px 30px rgba(0, 0, 0, .45);
+  color-scheme: dark;
 } }
 :root[data-tema="oscuro"] {
   --papel: #1c1e23; --fondo: #141518; --lateral: #181a1f; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
@@ -24,6 +26,7 @@
   --terminal-fondo: #0f1014; --marca: #5a4d12;
   --c-question: #c4b5fd; --c-quote: #9ca3af; --c-example: #67e8f9; --c-tip: #5eead4; --c-comment: #fb923c;
   --sombra: 0 10px 30px rgba(0, 0, 0, .45);
+  color-scheme: dark;
 }
 :root[data-letra="pequeña"] body { font-size: 14px; }
 :root[data-letra="grande"] body { font-size: 17px; }
@@ -118,6 +121,7 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 #miga .papelera { margin-left: 18px; }   /* lejos de copiar: un clic de más no manda nada a la papelera */
 #miga :is(.mostrar, .copiar, .papelera) .icono { width: 15px; height: 15px; }
 /* ficheros que no son notas */
+#nota:focus-visible, #panel:focus-visible { outline: none; }   /* a donde lleva «Saltar al contenido» */
 #nota.ancha { max-width: none; }
 .miga-barra.ancha { padding-left: 40px; }
 #nota .tabla-csv { overflow-x: auto; }
@@ -154,7 +158,8 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 #nota h2 { font-size: 24px; line-height: 1.25; margin: 44px 0 10px; border-bottom: 1px solid var(--linea); padding-bottom: 4px; }
 #nota .bloque:has(> h2) + .bloque > :nth-child(2) { margin-top: 0; }   /* el bloque que sigue a un título se pega a él (el primer hijo es .acciones) */
 #nota h3 { font-size: 19px; line-height: 1.3; margin: 28px 0 8px; }
-#nota a { color: var(--acento); padding: 3px 0; }   /* objetivo ≥ 24 px de alto sin cambiar la línea */
+#nota a, :where(#panel) a { color: var(--acento); }   /* los enlaces sin estilo salían con el azul del navegador: 1,94:1 en oscuro (hallazgo 9) */
+#nota a { padding: 3px 0; }   /* objetivo ≥ 24 px de alto sin cambiar la línea */
 #nota a.wiki { text-decoration: none; border-bottom: 1px dotted var(--acento); }
 #nota a.wiki.roto { color: var(--mal); border-bottom-style: dashed; }
 #nota table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: .85em; line-height: 1.5; }
@@ -166,6 +171,7 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 #nota blockquote:not(.callout) { margin: 10px 0; padding: 2px 16px; border-left: 3px solid var(--linea); color: var(--tinta-suave); }
 #nota li.tarea { list-style: none; margin-left: -20px; }
 #nota li.tarea input { margin-right: 8px; transform: translateY(2px); }
+#nota .casilla-linea { display: block; cursor: pointer; }   /* toda la línea marca (hallazgo 10) */
 #nota .ejercicio { width: 100%; height: calc(100vh - 70px); border: 1px solid var(--linea); border-radius: var(--radio-bloque); background: #fff; }
 .math[data-display="1"] { text-align: center; margin: 12px 0; overflow-x: auto; }
 .cambiar-vista { display: flex; justify-content: flex-end; margin: 0 0 -6px; }
@@ -236,6 +242,11 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .filtros select { padding: 5px 8px; min-height: 32px; max-width: 100%; background: var(--fondo); color: var(--tinta); margin-right: 6px; }
 .filtros .pista { margin-left: auto; margin-right: 0; }
 .item .etiqueta { vertical-align: 1px; }
+/* hay filtros puestos (a veces recordados de otro día): se ve encima de la lista, con la salida a mano */
+.filtrando { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; padding: 6px 10px; border-left: 3px solid var(--acento); background: var(--acento-suave); color: var(--tinta); font-size: 14px; border-radius: 0 var(--radio) var(--radio) 0; }
+.filtrando button { margin-left: auto; }
+.vacio-filtro { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 36px 0; color: var(--tinta-suave); text-align: center; }
+.vacio-filtro p { margin: 0; font-size: 15px; }
 
 /* examen como formulario */
 .examen fieldset.pregunta { border: 0; border-top: 1px solid var(--linea); padding: 8px 0 14px; margin: 10px 0; }
@@ -320,7 +331,18 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 .ajustes label { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .ajustes select, .ajustes input { padding: 6px 8px; background: var(--fondo); min-width: 180px; }
 .resultado-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; background: var(--fondo); border: 1px solid var(--linea); border-radius: var(--radio); padding: 10px 12px; margin: 0; max-height: 50vh; overflow: auto; }
-.aviso-flotante { position: fixed; bottom: 18px; right: 18px; background: var(--tinta); color: var(--fondo); padding: 8px 14px; border-radius: var(--radio); font-size: 13px; z-index: 30; }
+.resultado-humano { margin: 0; font-weight: 600; }
+.resultado-detalle > summary { cursor: pointer; color: var(--tinta-suave); font-size: 13px; margin-bottom: 8px; }
+.resultado-detalle.sin-plegar > summary { display: none; }
+#avisos { position: fixed; bottom: 18px; right: 18px; z-index: 30; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: min(420px, calc(100vw - 36px)); }
+.aviso-flotante { background: var(--tinta); color: var(--fondo); padding: 8px 14px; border-radius: var(--radio); font-size: 13px; }
+/* un error se queda hasta cerrarlo; el detalle técnico, plegado */
+.aviso-flotante.error { position: relative; padding-right: 38px; border-left: 4px solid var(--mal); font-size: 14px; line-height: 1.4; box-shadow: var(--sombra); }
+.aviso-flotante.error details { margin-top: 6px; font-size: 12.5px; }
+.aviso-flotante.error summary { cursor: pointer; opacity: .85; }
+.aviso-flotante.error pre { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; font: 12px/1.45 var(--mono); }
+.aviso-flotante .cerrar-aviso { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; min-height: 0; padding: 0; background: none; border: 0; color: inherit; font-size: 20px; line-height: 1; border-radius: 50%; }
+.aviso-flotante .cerrar-aviso:hover { background: color-mix(in srgb, currentColor 22%, transparent); }
 
 /* estrecho: la barra lateral se despliega sobre el contenido con un botón; nada se corta */
 @media (max-width: 760px) {

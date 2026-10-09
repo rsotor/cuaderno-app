@@ -126,6 +126,8 @@ function crearRender(resolverWiki) {
           c.meta = { marcada: m[1] !== ' ', linea: t.map[0] };
           inl.content = inl.content.slice(m[0].length);
           ts.splice(i + 2, 0, c);
+          // La línea entera es la etiqueta de la casilla: clicar el texto marca, y la casilla tiene nombre accesible.
+          if (ts[i + 4]?.type === 'paragraph_close') ts.splice(i + 4, 0, new state.Token('casilla_fin', '', 0));
         }
       }
     }
@@ -136,8 +138,9 @@ function crearRender(resolverWiki) {
   };
   md.renderer.rules.casilla = (t, i) => {
     const { marcada, linea } = t[i].meta;
-    return `<input type="checkbox" class="casilla" data-linea="${linea}"${marcada ? ' checked' : ''}> `;
+    return `<label class="casilla-linea"><input type="checkbox" class="casilla" data-linea="${linea}"${marcada ? ' checked' : ''}> `;
   };
+  md.renderer.rules.casilla_fin = () => '</label>';
 
   // --- Bloques editables: cada bloque de nivel 0 se envuelve con sus líneas de origen.
   md.core.ruler.push('bloques', (state) => {
