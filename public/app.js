@@ -5,13 +5,17 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 let arbol = [], rutaActual = null, info = { cuaderno: null, configuracion: {} };
 const cuaderno = () => info.cuaderno;
 
+// El aviso de «la app se ha actualizado» se cierra y no vuelve en esta pestaña (Roberto, 2026-10-09).
+let avisoCerrado = false;
+$('#aviso-cerrar').addEventListener('click', () => { avisoCerrado = true; $('#aviso-reinicio').hidden = true; });
+
 // Toda llamada a la API: GET sin cuerpo, POST con JSON. Un 409 significa que la nota cambió debajo: se recarga.
 async function api(p, body) {
   const r = await fetch(p, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : undefined);
   const d = await r.json().catch(() => ({ error: `respuesta ${r.status}` }));
   if (!r.ok) {
-    if (r.status === 404 && p.startsWith('/api/')) $('#aviso-reinicio').hidden = false;   // una ruta que el servidor no conoce: es de antes
-    if (r.status === 403) avisar('El servidor se ha reiniciado y esta pestaña ya no vale: abre la dirección nueva que imprime la terminal.');
+    if (r.status === 404 && p.startsWith('/api/') && !avisoCerrado) $('#aviso-reinicio').hidden = false;   // una ruta que el servidor no conoce: es de antes
+    if (r.status === 403) avisar('Esta pestaña ha perdido el permiso: arranca la app desde la terminal y entra por la pestaña que abre.');
     if (r.status === 409 && rutaActual) { avisar('Esta nota cambió en el disco mientras la tenías abierta. La he vuelto a cargar: repite el cambio.'); abrirNota(rutaActual); }
     throw Object.assign(new Error(d.error || `error ${r.status}`), { status: r.status });
   }
@@ -420,7 +424,7 @@ $('#panel').addEventListener('change', e => {
   aplicarFiltrosTareas(); marcarActiva();
 });
 $('#panel').addEventListener('click', e => { if (e.target.id === 'filtro-quitar') { history.replaceState(null, '', '#/tareas'); abrirTareas().then(() => { const s = $('#filtro-estado'); if (s) s.focus(); }); } });
-$('#panel').addEventListener('submit', async e => { if (e.target.id !== 'nueva-tarea') return; e.preventDefault(); const i = e.target.querySelector('input'); if (!i.value.trim()) return; await api('/api/tarea', { texto: i.value }); avisar('Tarea añadida'); abrirTareas(); refrescarContadores(); });
+$('#panel').addEventListener('submit', async e => { if (e.target.id !== 'nueva-tarea') return; e.preventDefault(); const i = e.target.querySelector('input'); if (!i.value.trim()) return; await api('/api/tarea', { texto: i.value }); i.value = ''; avisar('Tarea añadida'); abrirTareas(); refrescarContadores(); });
 $('#panel').addEventListener('change', async e => { const t = e.target; if (t.type !== 'checkbox') return; const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { avisar(err.message); abrirTareas(); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); refrescarContadores(); } });
 async function abrirComentarios() {
   $('#nota').hidden = true; $('#panel').hidden = false; rutaActual = null;
@@ -512,7 +516,16 @@ function crearSesion(modo) {
   const term = new Terminal({ fontFamily: variable('--mono'), fontSize: 13.5, lineHeight: 1.25, cursorBlink: true, cursorStyle: 'bar', scrollback: 5000, allowProposedApi: true, theme: temaTerminal() });
   const fit = new FitAddon.FitAddon(); term.loadAddon(fit); term.open(elemento);
   const s = { id: n, modo, titulo: modo === 'profesor' ? 'Profesor' : (n === 1 ? 'Terminal' : `Terminal ${n}`), term, fit, ws: null, elemento, cerrada: false };
-  term.attachCustomKeyEventHandler(e => !((e.ctrlKey || e.metaKey) && e.key === '`'));   // Ctrl ` es de la app: abre y cierra el cajón
+  term.attachCustomKeyEventHandler(e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === '`') return false;   // Ctrl ` es de la app: abre y cierra el cajón
+    // xterm manda lo mismo con Enter que con Shift+Enter, y Claude Code o Codex envían el mensaje. Shift u Option+Enter
+    // mandan \n (Ctrl J), su salto de línea en cualquier terminal; en un shell es como Enter (Roberto, 2026-10-09).
+    if (e.key === 'Enter' && (e.shiftKey || e.altKey) && !e.ctrlKey && !e.metaKey) {
+      if (e.type === 'keydown') { e.preventDefault(); if (s.ws && s.ws.readyState === 1 && !s.cerrada) s.ws.send('\n'); }
+      return false;
+    }
+    return true;
+  });
   term.onData(d => { if (s.cerrada) { if (d === '\r') { s.term.reset(); conectar(s); } return; } if (s.ws && s.ws.readyState === 1) s.ws.send(d); else if (s.ws && s.ws.readyState === 0) s.pendiente += d; });
   conectar(s); sesiones.push(s);
   return s;
@@ -640,7 +653,7 @@ $('#ajustes form').addEventListener('change', async () => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ajustes').hidden) cerrarAjustes(); });
 
 function pintarEstado() {
-  $('#aviso-reinicio').hidden = !info.desactualizada;
+  $('#aviso-reinicio').hidden = !info.desactualizada || avisoCerrado;
   const c = cuaderno();
   $('#lateral').classList.toggle('sin-cuaderno', !c);
   $('#nombre-curso').textContent = c ? c.nombre : 'Cuaderno';

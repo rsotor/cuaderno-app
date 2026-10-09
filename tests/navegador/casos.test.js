@@ -108,6 +108,11 @@ test('Tareas sin kit: el panel solo enseña tareas.md (no las casillas de otras 
   await e.pagina.keyboard.type('+ Una tarea sin kit');
   await e.pagina.keyboard.press('Enter');
   await ficheroCumple(e.c, 'tareas.md', /\r?\n- \[ \] Una tarea sin kit\r?\n/, 'tareas');   // CRLF en Windows: git lo convierte al deshacer en el recorrido de Guardar
+  await hasta(async () => (await e.pagina.inputValue('#buscador')) === '', 'tareas', 'la tarea se queda escrita en el buscador tras añadirla');
+  // Y desde el campo del panel: se vacía aunque el panel conserve su borrador al repintar.
+  await e.pagina.fill('#tarea-nueva', 'Otra desde el panel'); await e.pagina.press('#tarea-nueva', 'Enter');
+  await ficheroCumple(e.c, 'tareas.md', /- \[ \] Otra desde el panel/, 'tareas');
+  await hasta(async () => (await e.pagina.inputValue('#tarea-nueva')) === '', 'tareas', 'la tarea se queda escrita en el campo del panel tras añadirla');
 });
 
 // Al final: cambia el cuaderno abierto en el servidor, y los recorridos de antes cuentan con el del principio.
