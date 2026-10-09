@@ -54,4 +54,8 @@ test('aviso de reinicio: oculto normalmente; sale si una llamada a la app da 404
   assert.equal(await e.pagina.locator('#aviso-reinicio').isVisible(), false, 'el aviso sale sin motivo');
   await e.pagina.evaluate(() => api('/api/no-existe').catch(() => {}));
   await visible(e.pagina.locator('#aviso-reinicio'), 'aviso', 'el aviso de reiniciar tras un 404 de la API');
+  await e.pagina.click('#aviso-cerrar');
+  await oculto(e.pagina.locator('#aviso-reinicio'), 'aviso', 'la × no cierra el aviso');
+  await e.pagina.evaluate(() => api('/api/no-existe').catch(() => {}));
+  assert.equal(await e.pagina.locator('#aviso-reinicio').isVisible(), false, 'el aviso cerrado vuelve a salir');
 });

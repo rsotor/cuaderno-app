@@ -1,13 +1,17 @@
 'use strict';
 // Cuaderno: abre una carpeta de notas en el navegador.
-//   node server.js [carpeta-del-cuaderno] [puerto]
-// Sin carpeta, arranca en la pantalla de cuadernos (los recientes y "abrir carpeta").
+//   node server.js [carpeta-del-cuaderno] [puerto] [-n]
+// Sin carpeta, arranca en la pantalla de cuadernos (los recientes y "abrir carpeta"). Abre una pestaña del navegador
+// ya dentro de la app; con -n (--no-abrir), no.
 const path = require('node:path');
 const fs = require('node:fs');
 const { crearServidor } = require('./servidor');
+const sistema = require('./sistema');
 
-const carpeta = process.argv[2] && !/^\d+$/.test(process.argv[2]) ? path.resolve(process.argv[2]) : null;
-const puerto = Number(process.argv[3] || (/^\d+$/.test(process.argv[2] || '') ? process.argv[2] : 7331));
+const noAbrir = process.argv.slice(2).some(a => a === '-n' || a === '--no-abrir');
+const argumentos = process.argv.slice(2).filter(a => !a.startsWith('-'));
+const carpeta = argumentos[0] && !/^\d+$/.test(argumentos[0]) ? path.resolve(argumentos[0]) : null;
+const puerto = Number(argumentos[1] || (/^\d+$/.test(argumentos[0] || '') ? argumentos[0] : 7331));
 let pty = null;
 try {
   pty = require('node-pty');
@@ -30,4 +34,7 @@ server.listen(puerto, '127.0.0.1', () => {
     console.log(`Cuaderno · ${kit.base} · ${que}${kit.tipo === 'kit' && !kit.comando ? ' · sin comando de profesor' : ''}`);
   } else console.log('Cuaderno · sin carpeta: elige uno en la pantalla de cuadernos');
   console.log(`Abre: ${server.url()}`);
+  // La pestaña entra con el código y vuelve a la dirección de arriba; con -n, el código se imprime para la primera vez.
+  if (noAbrir) console.log(`Primera vez en este navegador: ${server.urlEntrada()}`);
+  else sistema.abrirUrl({ url: server.urlEntrada() });
 });

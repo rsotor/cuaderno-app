@@ -30,6 +30,17 @@ function mostrar({ abs, carpeta, plataforma = process.platform, lanzar = lanzarS
   lanzar(cmd, args, { cwd: carpeta ? abs : path.dirname(abs), env: process.env });
 }
 
+// Abrir una dirección en el navegador por defecto (al arrancar: la pestaña entra con su código y el usuario no lo ve).
+function comandoAbrirUrl({ url, plataforma = process.platform }) {
+  if (plataforma === 'darwin') return { cmd: 'open', args: [url] };
+  if (plataforma === 'win32') return { cmd: 'explorer', args: [url] };
+  return { cmd: 'xdg-open', args: [url] };
+}
+function abrirUrl({ url, plataforma = process.platform, lanzar = lanzarSuelto }) {
+  const { cmd, args } = comandoAbrirUrl({ url, plataforma });
+  lanzar(cmd, args, { env: process.env });
+}
+
 // Mandar un fichero a la papelera del sistema, de donde se recupera (Roberto, 2026-10-08: sin pedir confirmación). Sin
 // dependencias: la orden de cada sistema. macOS `trash` (la trae el sistema desde macOS 15) o, si no está, el Finder por
 // AppleScript; Windows, la papelera de reciclaje por PowerShell (la ruta va en una variable de entorno, sin comillas que
@@ -53,4 +64,4 @@ function aPapelera({ abs, plataforma = process.platform, env = process.env, exis
 }
 function ejecutarEsperando(cmd, args, opciones) { execFileSync(cmd, args, { ...opciones, stdio: ['ignore', 'ignore', 'pipe'], timeout: 15000, windowsHide: true }); }
 
-module.exports = { comandoMostrar, mostrar, existeEnPath, comandoPapelera, aPapelera };
+module.exports = { comandoMostrar, mostrar, comandoAbrirUrl, abrirUrl, existeEnPath, comandoPapelera, aPapelera };

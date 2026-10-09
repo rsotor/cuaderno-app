@@ -37,7 +37,7 @@ function ptyFalso() {
   };
 }
 
-// Arranca servidor + navegador y abre la app con el token de la URL (fija la cookie y redirige a /).
+// Arranca servidor + navegador y abre la app con el código de la URL, como server.js (fija la cookie y redirige a /).
 // `pty` (ptyFalso(), normalmente) da terminal a los recorridos que la necesitan; sin él, la pestaña dice que no hay.
 async function arrancar({ pty = null, ...opciones } = { kit: false }) {   // por defecto, la base: sin kit (AGENTS.md, principio 3)
   const c = crearCuaderno(opciones);
@@ -47,7 +47,7 @@ async function arrancar({ pty = null, ...opciones } = { kit: false }) {   // por
     ejecutar: (cmd, args) => { ejecutado.push({ cmd, args }); fs.rmSync(args.at(-1)); },   // la papelera, simulada: el fichero desaparece
     plataforma: 'darwin' });   // fija: el resultado no depende del sistema que corre los tests (cada uno, en sistema.test.js)
   await new Promise(r => server.listen(0, '127.0.0.1', r));
-  const base = `http://127.0.0.1:${server.address().port}`;
+  const base = `http://localhost:${server.address().port}`;   // la dirección de la app; la cookie es de este nombre
   let navegador;
   try { navegador = await chromium.launch(process.env.CUADERNO_CHROMIUM ? { executablePath: process.env.CUADERNO_CHROMIUM } : {}); } catch (e) {
     // Sin navegador no hay recorrido; se cierra lo abierto para que el proceso termine y el fallo se lea.
@@ -60,7 +60,7 @@ async function arrancar({ pty = null, ...opciones } = { kit: false }) {   // por
   const cobertura = process.env.CUADERNO_COBERTURA_PANTALLA;
   if (cobertura) await pagina.coverage.startJSCoverage({ resetOnNavigation: false });
   pagina.on('pageerror', e => { console.error('[error en la página]', e.message); });
-  await pagina.goto(server.url());
+  await pagina.goto(server.urlEntrada());
   // Va a una ruta de la app (#/tareas, #/n/…) con la página recién cargada: nada de la pantalla anterior se queda.
   const ir = async hash => { await pagina.goto(`${base}/${hash}`); await pagina.reload(); await pagina.locator('#miga strong').waitFor(); };   // la miga se rellena al pintar cualquier pantalla
   const cerrar = async () => {

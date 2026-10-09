@@ -114,6 +114,10 @@ test('un solo botón, Terminal; el profesor (desde un Guardar que falla) convive
   await e.pagina.keyboard.type('hola');
   await hasta(() => pty.procesos[base].escrito.includes('hola'), 'terminal', `lo tecleado no llega a la pty (llegó «${pty.procesos[base].escrito}»)`);
   await conTexto(filas(), /hola/, 'terminal', 'el eco en la pantalla');
+  // Shift y Option+Enter: salto de línea (\n) para Claude Code o Codex, no el \r de Enter que envía el mensaje.
+  const antes = pty.procesos[base].escrito.length;
+  await e.pagina.keyboard.press('Shift+Enter'); await e.pagina.keyboard.press('Alt+Enter'); await e.pagina.keyboard.press('Enter');
+  await hasta(() => pty.procesos[base].escrito.slice(antes) === '\n\n\r', 'terminal', `Shift/Option+Enter no mandan \\n (llegó ${JSON.stringify(pty.procesos[base].escrito.slice(antes))})`);
   // Un Guardar que falla ofrece «Abrir con el profesor»: la única puerta al profesor que queda fuera del botón Terminal.
   await e.pagina.evaluate(() => mostrarResultado('Guardar', { codigo: 1, salida: 'conflicto' }));
   await e.pagina.click('#resultado-profesor');

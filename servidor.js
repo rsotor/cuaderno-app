@@ -1,7 +1,8 @@
 'use strict';
 // El servidor local: la API que usa el navegador, los ficheros estáticos, la terminal por WebSocket y la recarga en
 // vivo. Escuchar en 127.0.0.1 no basta para estar a salvo (cualquier web abierta en el navegador puede llamar a
-// localhost): cada arranque genera un token que viaja en la URL una vez, se queda en una cookie y se exige en todo.
+// localhost): un código por usuario viaja en la URL una vez (la pestaña que abre server.js), se queda en una cookie y
+// se exige en todo. La dirección que ve el usuario es siempre http://localhost:<puerto>, sin código (Roberto, 2026-10-09).
 // Un servidor tiene como mucho un cuaderno abierto; la pantalla de cuadernos lo cambia.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -120,16 +121,18 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
     const p = url.pathname;
     try {
       if (!hostPropio(req, puerto)) { res.writeHead(403); return res.end('host no permitido'); }
-      // Entrada con el token de la URL: se guarda en la cookie y se vuelve a / sin él.
+      // Una sola dirección: la página entra siempre por localhost (la cookie es de un nombre; con dos, habría que entrar dos veces).
+      if (p === '/' && req.headers.host === `127.0.0.1:${puerto}`) { res.writeHead(302, { location: `http://localhost:${puerto}${req.url}` }); return res.end(); }
+      // Entrada con el código de la URL: se guarda en la cookie y se vuelve a / sin él.
       if (p === '/' && url.searchParams.has('t')) {
-        if (!iguales(url.searchParams.get('t'), token)) { res.writeHead(403); return res.end('token incorrecto'); }
-        // Un año: el código ya no cambia en cada arranque, así que la cookie vale también tras reiniciar el navegador.
+        if (!iguales(url.searchParams.get('t'), token)) { res.writeHead(403); return res.end('código incorrecto'); }
+        // Un año: el código no cambia entre arranques, así que la cookie vale también tras reiniciar el navegador.
         res.writeHead(302, { 'set-cookie': `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`, location: '/' });
         return res.end();
       }
       if (!autorizado(req, token)) {
         res.writeHead(403, { 'content-type': 'text/html; charset=utf-8' });
-        return res.end('<!doctype html><meta charset="utf-8"><title>Cuaderno</title><p style="font:16px system-ui;margin:40px">Abre la app desde la dirección que ha impreso la terminal (lleva un código que cambia en cada arranque).</p>');
+        return res.end('<!doctype html><meta charset="utf-8"><title>Cuaderno</title><p style="font:16px system-ui;margin:40px;max-width:36em">Este navegador aún no ha entrado en la app. Arráncala desde la terminal (<code>node server.js</code>): abre esta pestaña ya dentro, y desde entonces basta con esta dirección.</p>');
       }
       if (!origenPropio(req, puerto)) { res.writeHead(403); return res.end('origen no permitido'); }
 
@@ -264,7 +267,8 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
   server.token = token;
   server.estado = estado;
   server.abrir = abrir;
-  server.url = () => `http://127.0.0.1:${server.address().port}/?t=${token}`;
+  server.url = () => `http://localhost:${server.address().port}/`;   // la que se enseña y se guarda en marcadores
+  server.urlEntrada = () => `${server.url()}?t=${token}`;   // la que abre server.js: fija la cookie y vuelve a la de arriba
   return server;
 }
 
