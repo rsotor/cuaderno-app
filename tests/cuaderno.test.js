@@ -223,3 +223,48 @@ test('las imágenes salen en el índice como ficheros', con({}, (c, cu) => {
   assert.deepEqual(cu.listar().filter(p => p.startsWith('material/foto.')), ['material/foto.gif', 'material/foto.jpeg', 'material/foto.jpg', 'material/foto.svg', 'material/foto.webp']);
   assert.deepEqual(cu.nota('material/reparto-50-30-20.png'), { ruta: 'material/reparto-50-30-20.png', tipo: 'png', esFichero: true });
 }));
+
+test('escribirNota conserva el salto final (o su falta), las líneas en blanco finales, el CRLF y el BOM', con({}, (c, cu) => {
+  const abs = rel => path.join(c.base, rel);
+  fs.writeFileSync(abs('sin-final.md'), '# A\n\ntexto');
+  cu.escribirNota('sin-final.md', '# A\n\notro', '# A\n\ntexto');
+  assert.equal(c.leer('sin-final.md'), '# A\n\notro');
+  fs.writeFileSync(abs('blancos.md'), '# B\n\n\n');
+  cu.escribirNota('blancos.md', '# B\n\nx\n\n\n', '# B\n\n\n');
+  assert.equal(c.leer('blancos.md'), '# B\n\nx\n\n\n');
+  assert.throws(() => cu.escribirNota('blancos.md', 'y', '# B\n\nx\n\n'), ErrorConflicto, 'la comparación es estricta con los blancos finales');
+  fs.writeFileSync(abs('bom.md'), '\uFEFF# C\r\n\r\nuno\r\n');
+  cu.escribirNota('bom.md', '# C\n\ndos\n', '# C\n\nuno\n');   // el navegador manda el original sin BOM y con LF
+  assert.equal(c.leer('bom.md'), '\uFEFF# C\r\n\r\ndos\r\n');
+}));
+
+test('escribirNota en un fichero CRLF vuelve CRLF, sin ningún LF suelto', con({ crlf: true }, (c, cu) => {
+  const antes = c.leer('conceptos/capital.md');
+  assert.ok(antes.includes('\r\n'));
+  cu.escribirNota('conceptos/capital.md', 'uno\ndos\r\ntres\n', antes);
+  const despues = c.leer('conceptos/capital.md');
+  assert.equal(despues, 'uno\r\ndos\r\ntres\r\n');
+  assert.ok(!/(^|[^\r])\n/.test(despues));
+}));
+
+test('escribirNota: finales mezclados dan 422, un original distinto 409 y una ruta o texto malos 400', con({}, (c, cu) => {
+  fs.writeFileSync(path.join(c.base, 'mezcla.md'), 'a\r\nb\nc\n');
+  assert.throws(() => cu.escribirNota('mezcla.md', 'x', null), e => e instanceof ErrorPeticion && e.status === 422);
+  assert.equal(c.leer('mezcla.md'), 'a\r\nb\nc\n');
+  assert.throws(() => cu.escribirNota('tareas.md', 'x', 'otro texto'), ErrorConflicto);
+  assert.throws(() => cu.escribirNota('tareas.md', 42, null), e => e instanceof ErrorPeticion && e.status === 400);
+  assert.throws(() => cu.escribirNota('../fuera.md', 'x', null), ErrorPeticion);
+  cu.escribirNota('tareas.md', 'sin comprobar', null);   // sin original no se comprueba
+  assert.equal(c.leer('tareas.md'), 'sin comprobar');
+}));
+
+test('renderizar pinta igual que nota(): callout, fórmula e imagen relativa', con({}, (c, cu) => {
+  const md = '> [!note] Aviso\n> cuerpo\n\n$$x^2 + 1$$\n\n![dibujo](img.png)\n';
+  fs.mkdirSync(path.join(c.base, 'carpeta'));
+  fs.writeFileSync(path.join(c.base, 'carpeta', 'n.md'), md);
+  const esperado = cu.nota('carpeta/n.md').html;
+  assert.ok(esperado.includes('/fichero/carpeta/img.png'));
+  assert.equal(cu.renderizar(md, 'carpeta/n.md'), esperado);
+  assert.equal(typeof cu.renderizar('hola', ''), 'string');
+  assert.equal(typeof cu.renderizar('hola'), 'string');
+}));

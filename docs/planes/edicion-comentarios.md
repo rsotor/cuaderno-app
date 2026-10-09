@@ -5,7 +5,7 @@
 ## 0. Estado del bloque
 
 **Ahora**
-- Plan escrito, pendiente de la revisión de Roberto. Rondas: abogado del diablo sobre el diseño (2026-10-09, 5
+- Plan aprobado por Roberto (2026-10-09). **Tarea 1 hecha** (rama `edicion-comentarios`): `escribirNota`, `POST /api/nota/escribir`, `POST /api/render`, tests de Node. Rondas: abogado del diablo sobre el diseño (2026-10-09, 5
   objeciones, las 5 asumidas, §3); crítica de diseño + auditoría de accesibilidad sobre el spike (2026-10-09, 29
   hallazgos: 2 críticos, 14 mayores, 4 medios, 9 menores; sus 8 puntos «para el plan» están repartidos en las
   tareas, §5); abogado del diablo sobre el plan escrito (2026-10-09, 5 objeciones, las 5 aplicadas: comentar no se
@@ -13,7 +13,7 @@
   finales mezclados; la unicidad de la cita la decide la app sobre el DOM; la franja de conflicto compara el texto, no
   el nombre que llega por `/cambios`).
 
-**Después:** tarea 1 en cuanto Roberto apruebe el plan.
+**Después:** tarea 2 (CodeMirror sin bundler) en cuanto Roberto dé el ok a la 1.
 
 **Inbox del bloque** (fuera de v1, con uso real se decide)
 - Rebasar automáticamente lo escrito sobre la nota nueva cuando los cambios no se solapan (hoy: franja + «Sobrescribir» o «Copiar mi texto y recargar»).

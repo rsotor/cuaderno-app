@@ -7,7 +7,7 @@ const { crearRender, leerFrontmatter } = require('./markdown');
 const { crearFiltro } = require('./ignorar');
 
 class ErrorConflicto extends Error { constructor(msg) { super(msg); this.status = 409; } }
-class ErrorPeticion extends Error { constructor(msg) { super(msg); this.status = 400; } }
+class ErrorPeticion extends Error { constructor(msg, status = 400) { super(msg); this.status = status; } }
 
 const quitarAcentos = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const escaparRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -292,6 +292,25 @@ class Cuaderno {
     this.comprobarOriginal(ls, desde, hasta, original);
     ls.splice(desde, hasta - desde, ...String(texto).replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n'));
     this.escribir(abs, ls, this.finDeLinea(src));
+  }
+  // La nota entera (editor del navegador). Comparación estricta con `original` (sin BOM, CRLF→LF, nada más); el texto
+  // manda: no se añade ni se quita el salto final. Conserva el EOL y el BOM del fichero; con finales mezclados, 422.
+  escribirNota(rel, texto, original) {
+    const abs = this.dentro(rel);
+    if (typeof texto !== 'string') throw new ErrorPeticion('falta el texto de la nota');
+    const src = fs.readFileSync(abs, 'utf8');
+    const bom = src.startsWith('\uFEFF');
+    const sinBom = bom ? src.slice(1) : src;
+    if (sinBom.includes('\r\n') && /(^|[^\r])\n/.test(sinBom)) throw new ErrorPeticion('la nota tiene saltos de línea mezclados', 422);
+    const norm = s => String(s).replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+    if (original != null && norm(original) !== norm(sinBom)) throw new ErrorConflicto('la nota cambió desde que la abriste; vuelve a cargarla');
+    const eol = this.finDeLinea(sinBom);
+    fs.writeFileSync(abs, (bom ? '\uFEFF' : '') + norm(texto).replace(/\n/g, eol));
+    this.invalidar();
+  }
+  // Pinta un fragmento de Markdown como la lectura (mismo render que `nota`), para el editor.
+  renderizar(texto, rel = '') {
+    return this.md.render(String(texto == null ? '' : texto).replace(/\r\n/g, '\n'), { ruta: String(rel || '') });
   }
   marcarCasilla(rel, linea, marcada, textoOriginal) {
     const abs = this.dentro(rel), src = fs.readFileSync(abs, 'utf8');

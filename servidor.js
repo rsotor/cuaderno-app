@@ -222,6 +222,8 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
           return json(res, { ...r, corregido: r.codigo === 0 });
         }
         if (p === '/api/bloque') { cu.escribirBloque(b.ruta, b.desde, b.hasta, b.texto, b.original); return json(res, { ok: true }); }
+        if (p === '/api/nota/escribir') { cu.escribirNota(b.ruta, b.texto, b.original); return json(res, { ok: true }); }
+        if (p === '/api/render') return json(res, { html: cu.renderizar(b.texto, b.ruta) });
         if (p === '/api/casilla') { cu.marcarCasilla(b.ruta, b.linea, !!b.marcada, b.original); return json(res, { ok: true }); }
         if (p === '/api/comentario') { cu.comentar(b.ruta, b.desde, b.hasta, b.texto, b.original); return json(res, { ok: true }); }
         if (p === '/api/tarea') { cu.nuevaTarea(b.texto); return json(res, { ok: true }); }
