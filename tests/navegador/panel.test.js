@@ -124,6 +124,8 @@ test('un solo botón, Terminal; el profesor (desde un Guardar que falla) convive
   await hasta(() => pty.procesos.length === base + 2, 'terminal', 'Profesor no abre su propia pty');
   assert.equal(pty.procesos[base + 1].cmd, 'claude', `terminal: Profesor lanza «${pty.procesos[base + 1].cmd}», no el comando del adaptador`);
   await conTexto(e.pagina.locator('.sesion-pestana.activa'), /Profesor/, 'terminal', 'la pestaña activa');
+  // El canal del Profesor abre algo después de que el servidor lance su pty; si se cambia de pestaña antes, abre oculto (mide 0) y no manda tamaño.
+  await hasta(() => pty.procesos[base + 1].redimensiones.length > 0, 'terminal', 'el Profesor, a la vista, no manda su tamaño a la pty');
   assert.equal(pty.procesos[base].muerto, false, 'terminal: abrir al profesor ha matado el shell');
   await e.pagina.click('.sesion-pestana:not(.activa) [data-activar]');
   await conTexto(e.pagina.locator('.sesion-pestana.activa'), /^Terminal/, 'terminal', 'volver a la pestaña del shell');
