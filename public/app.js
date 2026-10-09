@@ -267,15 +267,18 @@ function sinPortada() {
 // La tabla de propiedades (frontmatter) de la lectura; el editor pinta la misma, de solo lectura.
 const htmlPropiedades = fm => fm ? `<dl class="propiedades">${Object.entries(fm).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${Array.isArray(v) ? v.map(x => `<span class="etiqueta">${esc(x)}</span>`).join('') : esc(v)}</dd>`).join('')}</dl>` : '';
 let propiedadesActual = '';   // las de la nota que se ve, para el editor
-async function abrirNota(ruta, lineaDestino) {
+let turnoNota = 0, notaPintada = null;   // la última petición de nota es la que pinta; y lo último pintado, para no repintar lo mismo
+async function abrirNota(ruta, lineaDestino, { desdeCambios = false } = {}) {
   soltarEdicion();   // pintar una nota (otra, o esta recién escrita) cierra el editor que hubiera
+  const turno = ++turnoNota;   // si mientras llega la respuesta se pide otra nota (o esta otra vez), esta ya no pinta: lo viejo no pisa lo nuevo
   // La misma nota otra vez (recarga en vivo, un comentario recién escrito) conserva el scroll; una nota nueva empieza arriba.
-  const recarga = rutaActual === ruta && !$('#nota').hidden && lineaDestino == null, scrollAntes = $('#centro').scrollTop;
-  if (rutaActual !== ruta) { vistaNota = null; ultimoMostrado = null; }
+  const recarga = rutaActual === ruta && !$('#nota').hidden && lineaDestino == null;
+  if (rutaActual !== ruta) { vistaNota = null; ultimoMostrado = null; notaPintada = null; }
   rutaActual = ruta;
   $('#panel').hidden = true; $('#nota').hidden = false; delete $('#nota').dataset.vista;
   let n;
-  try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
+  try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { if (turno !== turnoNota) return; $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
+  if (turno !== turnoNota) return;
   $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonCopiar(ruta) + (n.generado ? '' : botonPapelera(ruta, ruta.split('/').pop()));   // una nota que regenera el profesor no se manda a la papelera desde aquí
   ancho(!!n.esHtml, !!n.esHtml);
   propiedadesActual = htmlPropiedades(n.frontmatter);
@@ -290,9 +293,13 @@ async function abrirNota(ruta, lineaDestino) {
   const back = n.backlinks.length ? `<nav class="backlinks" aria-label="Notas que enlazan aquí">Enlazan aquí: ${n.backlinks.map(b => `<a class="wiki" href="#/n/${encodeURI(b)}" title="${esc(b)}">${esc(tituloDe(b))}</a>`).join('')}</nav>` : '';
   // «Tareas que la mencionan»: las casillas de otras notas que la enlazan o la nombran con #etiqueta, junto a los backlinks.
   let menciones = []; try { menciones = await api(`/api/tareas-de?p=${encodeURIComponent(ruta)}`); } catch { /* sin esta sección, la nota se lee igual */ }
-  if (rutaActual !== ruta || edicion) return;   // mientras llegaba la respuesta se abrió otra nota, o se pulsó «Editar» (el editor no se pisa)
+  if (rutaActual !== ruta || edicion || turno !== turnoNota) return;   // mientras llegaba la respuesta se abrió otra nota (o esta otra vez), o se pulsó «Editar» (el editor no se pisa)
   const tareasMencion = menciones.length ? `<section class="menciones" aria-label="Tareas que la mencionan"><h2>Tareas que la mencionan <a class="wiki ver-en-tareas" href="#/tareas?nota=${encodeURIComponent(nombreNota(ruta))}">Ver en Tareas</a></h2>${menciones.map(i => `<label class="item${i.hecha ? ' hecha' : ''}"><input type="checkbox" class="casilla-mencion" data-ruta="${esc(i.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${i.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('')}</section>` : '';
-  $('#nota').innerHTML = n.html + tareasMencion + back;
+  const html = n.html + tareasMencion + back;
+  if (desdeCambios && recarga && html === notaPintada) { $('#nota').dataset.vista = 'nota'; return; }   // la recarga en vivo avisa de cualquier toque al fichero (también de lo que escribe la propia app): si la nota sale igual, no se repinta
+  notaPintada = html;
+  const scrollAntes = $('#centro').scrollTop;   // el de ahora: el lector pudo bajar mientras llegaba la respuesta
+  $('#nota').innerHTML = html;
   const h1 = $('#nota .bloque > h1');
   if (props) (h1 ? h1.closest('.bloque') : $('#nota')).insertAdjacentHTML(h1 ? 'afterend' : 'afterbegin', props);
   $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* se queda el texto */ } });
@@ -458,6 +465,7 @@ document.addEventListener('keydown', e => {
 // ---------- editor de la nota entera (CodeMirror, public/live.js; Roberto, 2026-10-09)
 // «Editar» (botón de la miga o tecla E) cambia la hoja por el editor con el texto del fichero tal cual; «Aplicar» lo
 // escribe entero (/api/nota/escribir) y vuelve a la lectura, en el mismo bloque. Hasta aplicar no se toca el fichero.
+let escribiendo = false;   // Aplicar está escribiendo la nota
 let edicion = null;   // { ruta, original (como lo sirve /fichero), texto0 (el mismo, con LF), linea (donde estaba el lector), hash (la ruta de la nota) }
 let live = null;      // el módulo public/live.js, la primera vez que se edita
 const teclaAplicar = MAC ? '⌘ Enter' : 'Ctrl Enter';
@@ -521,10 +529,13 @@ async function aplicarEdicion() {
   if (!edicion) return;
   const { ruta, original } = edicion, texto = live.texto();
   if (texto === original.replace(/\r\n/g, '\n')) return salirEdicion();   // nada que escribir
-  try { await api('/api/nota/escribir', { ruta, texto, original }); }
-  catch (e) { if (e.status === 409) return mostrarFranja('conflicto'); return avisarError('No se ha podido escribir la nota.', e.message); }
-  avisar('Nota escrita');
-  await salirEdicion();
+  escribiendo = true;   // la recarga en vivo que provoca esta escritura no repinta ni compara: salirEdicion repinta al acabar
+  try {
+    try { await api('/api/nota/escribir', { ruta, texto, original }); }
+    catch (e) { if (e.status === 409) return mostrarFranja('conflicto'); return avisarError('No se ha podido escribir la nota.', e.message); }
+    avisar('Nota escrita');
+    await salirEdicion();
+  } finally { escribiendo = false; }
   refrescarContadores();
 }
 $('#btn-editar').onclick = entrarEdicion;
@@ -1000,7 +1011,7 @@ window.addEventListener('hashchange', () => {
 });
 
 // ---------- recarga en vivo
-try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && !Comentar.ocupado() && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
+try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (escribiendo) { /* lo está escribiendo la propia app: aplicarEdicion repinta al acabar */ } else if (rutaActual && !Comentar.ocupado() && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual, null, { desdeCambios: true }); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
 
 (async () => {
   info = await api('/api/info');

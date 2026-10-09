@@ -55,6 +55,8 @@ async function arrancar({ pty = null, ...opciones } = { kit: false }) {   // por
   }
   const pagina = await navegador.newPage({ viewport: { width: 1280, height: 800 } });
   pagina.setDefaultTimeout(ESPERA);
+  // Para reproducir lo que solo falla en una máquina lenta (la CI de macOS): CUADERNO_CPU_FRENADO=6 frena la CPU de la página 6 veces.
+  if (process.env.CUADERNO_CPU_FRENADO) { const cdp = await pagina.context().newCDPSession(pagina); await cdp.send('Emulation.setCPUThrottlingRate', { rate: +process.env.CUADERNO_CPU_FRENADO }); }
   // Cobertura del código de la pantalla (public/app.js), solo si se pide (npm run cobertura:pantalla): V8 cuenta qué
   // funciones y bloques corren en los recorridos. Es un informe, no un suelo.
   const cobertura = process.env.CUADERNO_COBERTURA_PANTALLA;

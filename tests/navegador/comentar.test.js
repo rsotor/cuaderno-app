@@ -71,7 +71,7 @@ test('comentar con el teclado: Shift+flechas y c', async () => {
   const bloque = bloqueDe('capital inicial');
   await bloque.locator('p').dblclick({ position: { x: 60, y: 8 } });   // selecciona «capital»
   for (let i = 0; i < 8; i++) await e.pagina.keyboard.press('Shift+ArrowRight');   // y se amplía con el teclado: «capital inicial»
-  assert.equal(await e.pagina.evaluate(() => getSelection().toString()), 'capital inicial');
+  assert.equal((await e.pagina.evaluate(() => getSelection().toString())).trim(), 'capital inicial');   // en Windows el doble clic incluye el espacio final de la palabra
   await e.pagina.keyboard.press('c');
   await visible(e.pagina.locator('#comentar-caja'), 'teclado', 'la caja con la tecla c');
   assert.equal(await e.pagina.evaluate(() => document.activeElement.id), 'comentar-texto', 'teclado: el foco no está en el texto de la caja');

@@ -627,3 +627,28 @@ test('feedback de uso: las barras con fondo translúcido y sombra, el marco de f
   assert.match(e1.activa, /rgba\(0, 0, 0, 0\)|transparent/, 'la línea activa tiene fondo');
   await salirDescartando();
 });
+
+// Una recarga en vivo (el vigilante de ficheros avisa con retraso, hasta un segundo en macOS) empieza a pedir la nota
+// cuando el lector aún está arriba y la pinta cuando ya ha bajado: no debe devolverlo a donde estaba al empezar
+// (CI de macOS: el recorrido «editar la nota» bajaba, y la recarga lo subía justo antes de entrar a editar).
+test('recarga en vivo: repintar la nota conserva el scroll de ahora, no el de cuando empezó a pedirla', async () => {
+  const ruta = path.join(e.c.base, 'larga-scroll.md');
+  fs.writeFileSync(ruta, larga());
+  await e.ir('#/n/larga-scroll.md');
+  await visible(e.pagina.locator('#nota .bloque', { hasText: 'Párrafo 60.' }), 'scroll', 'el último párrafo');
+  await e.pagina.waitForTimeout(1500);   // que pasen los avisos de lo que acaba de escribir el recorrido
+  let retener = false;
+  await e.pagina.route('**/api/nota?*', async r => { if (!retener) return r.continue(); const resp = await r.fetch(); await new Promise(x => setTimeout(x, 1500)); await r.fulfill({ response: resp }); });
+  retener = true;
+  const pedida = e.pagina.waitForRequest(r => r.url().includes('/api/nota?'));
+  fs.appendFileSync(ruta, '\nUna línea más al final.\n');
+  await pedida;   // la recarga está pidiendo la nota (con la respuesta retenida): se baja mientras tanto
+  await e.pagina.locator('#nota .bloque', { hasText: 'Párrafo 30.' }).scrollIntoViewIfNeeded();
+  const y = await e.pagina.evaluate(() => document.querySelector('#centro').scrollTop);
+  assert.ok(y > 500, `scroll: no se ha bajado (${y})`);
+  retener = false;
+  await conTexto(e.pagina.locator('#nota'), /Una línea más al final/, 'scroll', 'la nota repintada con la línea nueva');
+  const despues = await e.pagina.evaluate(() => document.querySelector('#centro').scrollTop);
+  assert.ok(Math.abs(despues - y) < 40, `scroll: la recarga lo ha movido de ${y} a ${despues}`);
+  await e.pagina.unroute('**/api/nota?*');
+});
