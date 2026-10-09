@@ -56,3 +56,15 @@ test('ajustar solo toca la apariencia y el comando; recientes van del más nuevo
   assert.equal(config.leer().tema, 'oscuro');
   fs.rmSync(process.env.CUADERNO_CONFIG_DIR, { recursive: true, force: true });
 });
+
+test('cuadernoAlArrancar: la carpeta pasada manda; si no, el reciente más nuevo que exista; -e o nada, pantalla de cuadernos', () => {
+  const recientes = [{ ruta: '/a', abierto: '2026-01-01' }, { ruta: '/b', abierto: '2026-03-01' }, { ruta: '/c', abierto: '2026-02-01' }];
+  const todas = () => true, sinB = r => r !== '/b';
+  assert.deepEqual(config.cuadernoAlArrancar('/x', recientes, todas), { carpeta: '/x', origen: 'argumento' });
+  assert.deepEqual(config.cuadernoAlArrancar(null, recientes, todas), { carpeta: '/b', origen: 'reciente' });
+  assert.deepEqual(config.cuadernoAlArrancar(null, recientes, sinB), { carpeta: '/c', origen: 'reciente' });
+  assert.deepEqual(config.cuadernoAlArrancar(null, recientes, () => { throw new Error('x'); }), { carpeta: null, origen: null });
+  assert.deepEqual(config.cuadernoAlArrancar(null, [], todas), { carpeta: null, origen: null });
+  assert.deepEqual(config.cuadernoAlArrancar(null, recientes, todas, true), { carpeta: null, origen: null });
+  assert.deepEqual(config.cuadernoAlArrancar('/x', recientes, todas, true), { carpeta: '/x', origen: 'argumento' });
+});

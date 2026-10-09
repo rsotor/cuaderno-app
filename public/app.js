@@ -387,7 +387,13 @@ $('#editor-texto').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKe
 const enTareas = () => location.hash.split('?')[0] === '#/tareas';
 const filtrosTareas = () => { const q = new URLSearchParams(location.hash.split('?')[1] || ''); return { nota: q.get('nota') || '', etiqueta: q.get('etiqueta') || '', estado: ['pendientes', 'hechas'].includes(q.get('estado')) ? q.get('estado') : 'todas' }; };
 const rutaDeNombre = nombre => arbol.find(p => p.replace(/\.md$/, '') === nombre) || arbol.find(p => nombreNota(p) === nombre) || null;
+// Los filtros se recuerdan por cuaderno en este navegador (Roberto, 2026-10-09: «cambio de página y tengo que volver a
+// seleccionar»): ir a Tareas sin filtros en la dirección recupera los últimos. Si el navegador no guarda, no pasa nada.
+const claveFiltros = () => `cuaderno:filtros-tareas:${cuaderno() ? cuaderno().ruta : ''}`;
+function recordarFiltros(q) { try { if (q) localStorage.setItem(claveFiltros(), q); else localStorage.removeItem(claveFiltros()); } catch { /* sin almacenamiento */ } }
+function filtrosRecordados() { try { return localStorage.getItem(claveFiltros()) || ''; } catch { return ''; } }
 async function abrirTareas() {
+  if (location.hash === '#/tareas' && filtrosRecordados()) history.replaceState(null, '', `#/tareas?${filtrosRecordados()}`);
   $('#nota').hidden = true; $('#panel').hidden = false; rutaActual = null;
   $('#miga').innerHTML = '<strong>Tareas</strong>';
   const g = await api('/api/tareas');
@@ -416,6 +422,7 @@ async function abrirTareas() {
 // Filtra en el sitio (sin repintar: el foco se queda en el control) y deja los filtros en el hash sin añadir historial.
 function aplicarFiltrosTareas() {
   const f = filtrosTareas();
+  recordarFiltros(location.hash.split('?')[1] || '');
   const activos = !!(f.nota || f.etiqueta || f.estado !== 'todas');
   let visibles = 0, total = 0;
   document.querySelectorAll('#panel .item').forEach(it => {
@@ -435,7 +442,7 @@ $('#panel').addEventListener('change', e => {
   history.replaceState(null, '', `#/tareas${q.size ? `?${q}` : ''}`);
   aplicarFiltrosTareas(); marcarActiva();
 });
-$('#panel').addEventListener('click', e => { if (e.target.id === 'filtro-quitar') { history.replaceState(null, '', '#/tareas'); abrirTareas().then(() => { const s = $('#filtro-estado'); if (s) s.focus(); }); } });
+$('#panel').addEventListener('click', e => { if (e.target.id === 'filtro-quitar') { recordarFiltros(''); history.replaceState(null, '', '#/tareas'); abrirTareas().then(() => { const s = $('#filtro-estado'); if (s) s.focus(); }); } });
 $('#panel').addEventListener('submit', async e => { if (e.target.id !== 'nueva-tarea') return; e.preventDefault(); const i = e.target.querySelector('input'); if (!i.value.trim()) return; await api('/api/tarea', { texto: i.value }); i.value = ''; avisar('Tarea añadida'); abrirTareas(); refrescarContadores(); });
 $('#panel').addEventListener('change', async e => { const t = e.target; if (t.type !== 'checkbox') return; const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { avisar(err.message); abrirTareas(); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); refrescarContadores(); } });
 async function abrirComentarios() {

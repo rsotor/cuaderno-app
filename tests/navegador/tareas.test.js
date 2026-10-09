@@ -92,10 +92,20 @@ test('filtros: por nota enlazada, por etiqueta y por estado; van en el hash y so
   await oculto(item('Pedir apuntes'), 'tareas tras recargar', 'una tarea pendiente con el filtro «hechas»');
   await visible(e.pagina.locator('.paginas a.activa', { hasText: 'Tareas' }), 'tareas tras recargar', 'el enlace Tareas activo con filtros en el hash');
 
+  // Recordados: salir a otra pantalla y volver por la barra lateral recupera el filtro.
+  const volverATareas = async () => { await e.ir('#/'); await e.pagina.locator('.paginas a', { hasText: 'Tareas' }).click(); };
+  await volverATareas();
+  await hashCumple(e.pagina, /^#\/tareas\?estado=hechas$/, 'tareas recordadas');
+  assert.equal(await e.pagina.locator('#filtro-estado').inputValue(), 'hechas', 'tareas recordadas: el select no recuperó «hechas»');
+
   await e.pagina.locator('#filtro-quitar').click();
   await hashCumple(e.pagina, /^#\/tareas$/, 'tareas');
   await visible(item('Pedir apuntes'), 'tareas sin filtros', 'todas las tareas de vuelta');
   await oculto(e.pagina.locator('#filtro-quitar'), 'tareas sin filtros', 'el botón «Quitar filtros»');
+
+  await volverATareas();   // tras «Quitar filtros», nada que recordar
+  await hashCumple(e.pagina, /^#\/tareas$/, 'tareas olvidadas');
+  assert.equal(await e.pagina.locator('#filtro-estado').inputValue(), 'todas', 'tareas olvidadas: quedó un filtro de estado');
 });
 
 test('a 390 px el panel con filtros no desborda', async () => {
