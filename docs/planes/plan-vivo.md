@@ -4,7 +4,7 @@
 
 ## 0. Estado
 
-**Última actualización:** 2026-10-09, revisión de diseño (tandas 1 y 2: lectura a 16 px, hoja, índice de la nota, copy, teclado, errores) tras una sola dirección (`localhost:7331`) y el feedback de uso por tareas `#feedback`.
+**Última actualización:** 2026-10-09 (tarde), bloque «edición y comentarios» hecho en su rama más la tanda de feedback de uso; antes ese día, revisión de diseño (tandas 1 y 2: lectura a 16 px, hoja, índice de la nota, copy, teclado, errores) tras una sola dirección (`localhost:7331`) y el feedback de uso por tareas `#feedback`.
 
 **Ahora**
 - **Revisión de diseño 2026-10-09 (`docs/diseno/revision-2026-10-09.md`), tandas 1 y 2 hechas en la rama `diseno-tanda-1` (PR «feat: revisión de diseño 2026-10-09…»):** tanda 1 como antes (hallazgos 2, 3, 6, 7, 8, 9, 10 y 12; filas 21 y 22 del ejemplo; 1 y 4 van a *edición*, 5 y 11 a *acciones rápidas*). **Tanda 2, con las decisiones de Roberto del 2026-10-09:** letra de la nota a **16 px** («18 queda muy grande»); **dirección A «Hoja»** (la nota y los paneles sobre una hoja de superficie, la mesa más hundida en claro y oscuro; texto de como mucho 800 px, hoja de 912 con sus márgenes (decisión de Roberto, 2026-10-09, sobre el 720 anterior); a ≤ 760 px se funde con el fondo); **azul sin cambiar** (6,9:1 sobre la hoja en claro, 9,2:1 en oscuro: ya pasa AA con holgura); **B «subrayador» no**; **C «Foco»**: barra lateral apagada (tinta suave, ≥ 4,5:1) e **índice de la nota** (h2/h3, marca la sección actual, clicable) en el margen derecho **solo si cabe sin encoger la hoja** (con ≥ 3 títulos, ventana de ~1448 px o más sin cajón; recalcula al redimensionar y al abrir, cerrar o mover el cajón). Crítica de diseño: `docs/diseno/critica-2026-10-09-diseno.md` (5 objeciones: 2 aplicadas, 3 razonadas). Pendiente: los «Menores» del documento que no se han tocado; el primer uso de Roberto de la hoja y el índice.
@@ -22,7 +22,7 @@
   **Pendiente:** la prueba a mano de Roberto con VoiceOver (pasos al final de ese documento) y la PR
   «feat: editor de la nota en live preview y comentarios por selección».
 
-**Después:** **PR del bloque «edición y comentarios»** cuando Roberto dé el ok tras VoiceOver (CI en verde en los tres sistemas). **Mañana (2026-10-10), con Roberto:** el botón «Abrir en Claude / Codex» como paso intermedio del chat (fase 12). Pendiente aparte: su primer uso real con el curso de inversión (`run-cuaderno-app ~/Documents/personal/formacion/inversion-multimercado`), en su Mac y en el Windows de su padre. Luego la fase 12 completa desde `chat-diseno.md` y la fase 11 (arranque sin terminal).
+**Después:** **PR del bloque «edición y comentarios»** (rama `edicion-comentarios`, subida el 2026-10-09; texto en `docs/planes/pr-edicion-comentarios.md`, local): se abre cuando Roberto dé el ok tras su prueba con VoiceOver (`docs/diseno/accesibilidad-2026-10-09-edicion-comentarios.md`, «Prueba a mano de Roberto»); CI en verde en los tres sistemas. **Siguiente bloque (decisión de Roberto, 2026-10-09): app de escritorio con Electron, sin firma, para uso propio.** Sus palabras: «al final es una app para mí y mi pareja, no quiero venderlo ni nada, como mucho hacer público el repo»; «tenerlo en navegador me mata»; hay «un par de cosas que podríamos hacer mejor con atajos de app». Qué cambia: §6 fila Plataforma (ventana propia con Chromium y el servidor Node dentro; atajos sin reservar salvo los del sistema), §8 saca «Electron» de Fuera (Tauri sigue fuera: 3-4 semanas y render distinto por sistema), la fase 11 (servicio + icono) deja de hacer falta porque la app arranca su servidor. Coste estimado: 2-3 días (ventana + `npm run app`; empaquetado con `electron-builder` sin firma, `.dmg` y `.exe`, CI en los dos sistemas; unos 200 MB, normal en Electron). Se abre con el skill `plan` (camino acotado: spike de un día y luego tareas) y una ronda de abogado del diablo; primer insumo, el «par de cosas» de Roberto. **Electron antes que cualquier cambio de UX** (Roberto, 2026-10-09): el feedback de uso nace ya en la app; solo entran antes fallos que frenen. Pendientes que siguen: logo nuevo (propuestas en la rama del worktree de logo, `docs/diseno/logo/`, a elegir por Roberto), el botón «Abrir en Claude / Codex» (fase 12), el primer uso real con el curso de inversión en su Mac y en el Windows de su padre, y la fase 12 completa desde `chat-diseno.md`.
 
 **Inbox**
 - Índice de la nota en móvil (crítica de diseño 2026-10-09, objeción 4): a 390 px una nota larga no tiene salto de sección; un desplegable bajo la miga sería otro diseño. Decidir con uso real.
@@ -223,7 +223,7 @@ Cada fase termina usable y guardada.
 
 ## 8. Fuera
 
-Electron o Tauri · WYSIWYG que re-serialice (hasta el 2026-10-09 la línea decía «editor WYSIWYG»: el editor de la nota es ahora un live preview que no reescribe el fichero, §6) · sincronización, cuentas o nube (el repo ya es la sync) · grafo de notas ·
+Tauri (Electron sale de aquí el 2026-10-09: siguiente bloque, §0) · WYSIWYG que re-serialice (hasta el 2026-10-09 la línea decía «editor WYSIWYG»: el editor de la nota es ahora un live preview que no reescribe el fichero, §6) · sincronización, cuentas o nube (el repo ya es la sync) · grafo de notas ·
 móvil como objetivo · instalar o pagar el agente · cualquier lógica del curso dentro de la app.
 
 ## 9. Cómo sabremos
