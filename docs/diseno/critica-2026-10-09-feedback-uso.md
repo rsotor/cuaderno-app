@@ -38,5 +38,11 @@ Arreglo mínimo: `color: var(--tinta-suave)` (5,9:1) y `margin-left: 26px`; opci
 ## Veredicto
 **Atender antes del commit: la 1** (contraste, una línea de CSS) **y la 3** (especificidad; bug visible en la primera nota con menciones). **La 2, la 4 y la 5** son pequeñas y entran en esta tanda si cuestan poco; si no, al Inbox sin bloquear. La 2 es la que más cambia la sensación de uso.
 
-## Qué se hizo con cada objeción
-TODO: se rellena al atenderlas o razonarlas.
+## Atendidas
+Las 5, 2026-10-09. Capturas del después (copia temporal del ejemplo): `despues-feedback-uso-2026-10-09-aviso-{claro,oscuro}-atendido.png` y `…-menciones-{claro,oscuro}-atendido.png`.
+
+1. **Contraste del aviso, hecha.** `color: var(--sobre-acento)` (el token que ya existe) en lugar de `#fff`; el fondo de `code`/`kbd` sale de `color-mix` con el color del texto. Medido: claro 7,48:1, oscuro 8,06:1 (antes 2,26:1).
+2. **Aviso empuja la cabecera, hecha.** Sale del `position: fixed`: va en el flujo (`position: relative`) y, mientras está a la vista, el `body` pasa a columna y `#app` ocupa el resto (sin scroll de página: 800 de 800 px). El × va `position: absolute` a la derecha, con `padding-right` en el aviso para que el texto no lo pise.
+3. **Estilo de «Tareas que la mencionan», hecha.** `#nota .menciones h2` (gana a `#nota h2`): 14 px, sin borde ni margen superior (medido 14 px / 0 / 0). Cambio de Roberto encima: se quita el enlace de cada tarea a su nota y queda un solo «Ver en Tareas» junto al título, a `#/tareas?nota=<nombre>`; el selector Nota del panel añade ese valor si ninguna tarea la enlaza directamente (las que entran solo por etiqueta o carpeta), para que no salga «Todas» con el filtro puesto.
+4. **×, hecha.** 32×32 px (medido) y `border-radius: 50%`; el hover redondo sale de `color-mix`.
+5. **«Vacía», hecha.** `var(--tinta-suave)` (5,50:1 sobre el fondo del lateral) y `margin-left: 26px`: empieza en x = 50, como sus hermanos. Opcional sin hacer: atenuar el nombre de la carpeta vacía plegada (no cambia nada que el alumno necesite para actuar).

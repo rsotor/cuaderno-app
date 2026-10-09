@@ -15,17 +15,30 @@ const mencion = texto => e.pagina.locator('#nota .menciones .item', { hasText: t
 test('una persona: ve las tareas que la enlazan o la etiquetan (#Ana), marca una y queda [x] en el fichero', async () => {
   await e.ir('#/n/personas/ana.md');
   await conTexto(e.pagina.locator('#nota h1'), /^Ana$/, 'ana', 'el título');
-  await conTexto(e.pagina.locator('#nota .menciones h2'), /^Tareas que la mencionan$/, 'ana', 'la sección al final de la nota');
+  await conTexto(e.pagina.locator('#nota .menciones h2'), /^Tareas que la mencionan\s+Ver en Tareas$/, 'ana', 'la sección al final de la nota, con su enlace');
   await visible(mencion('Llamar a ana por las llaves'), 'ana', 'la tarea que enlaza [[ana]]');
   await visible(mencion('Pedir la caja de herramientas').locator('.etiqueta', { hasText: '#Ana' }), 'ana', 'la tarea con #Ana y su etiqueta pintada');
   await oculto(mencion('Embalar la cocina'), 'ana', 'una tarea de otra nota');
-  await visible(mencion('Llamar').locator('a.origen', { hasText: 'Agenda de pendientes' }), 'ana', 'el enlace pequeño a la nota donde vive');
+  assert.equal(await e.pagina.locator('#nota .menciones .item a.origen').count(), 0, 'ana: cada tarea ya no enlaza a su nota');
   assert.equal(await e.pagina.locator('#nota .menciones .item').count(), 2, 'ana: salen más tareas de las que la mencionan');
   await mencion('Llamar a ana').locator('input').check();
   await ficheroCumple(e.c, 'iniciativas/mudanza/pendientes.md', /\n- \[x\] Llamar a \[\[ana\]\] por las llaves\n/, 'ana');
   // Recarga en vivo: la nota se repinta con la tarea hecha, después de las pendientes.
   await hastaTexto('#nota .menciones .item:last-of-type', /Llamar a ana/);
   await visible(e.pagina.locator('#nota .menciones .item.hecha', { hasText: 'Llamar a ana' }), 'ana', 'la tarea tachada tras marcarla');
+});
+
+test('«Ver en Tareas» lleva al panel filtrado por esta página, con las que la enlazan y las que la etiquetan, y manda sobre los filtros recordados', async () => {
+  await e.ir('#/tareas?estado=hechas');   // un filtro recordado que no debe colarse
+  await e.ir('#/n/personas/ana.md');
+  await e.pagina.locator('#nota .menciones h2 a', { hasText: 'Ver en Tareas' }).click();
+  await e.pagina.waitForFunction(() => location.hash === '#/tareas?nota=ana');
+  assert.equal(await e.pagina.evaluate(() => location.hash), '#/tareas?nota=ana', 'ver en tareas: la dirección no es la de la página');
+  await visible(e.pagina.locator('#panel .item', { hasText: 'Pedir la caja de herramientas' }), 'ver en tareas', 'la tarea con #Ana');
+  await visible(e.pagina.locator('#panel .item', { hasText: 'Llamar a ana' }), 'ver en tareas', 'la tarea que enlaza [[ana]]');
+  await oculto(e.pagina.locator('#panel .item', { hasText: 'Embalar la cocina' }), 'ver en tareas', 'una tarea de otra nota');
+  assert.equal(await e.pagina.locator('#filtro-estado').inputValue(), 'todas', 'ver en tareas: se coló el filtro de estado recordado');
+  assert.equal(await e.pagina.locator('#filtro-nota').inputValue(), 'ana', 'ver en tareas: el selector de nota no muestra esta página');
 });
 
 test('una carpeta: el brief recibe las de #mudanza, pendientes primero y hechas después; la propia nota no las repite', async () => {

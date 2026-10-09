@@ -57,10 +57,14 @@ input, select, textarea { font: inherit; color: var(--tinta); background: var(--
 input[type="checkbox"], input[type="radio"] { accent-color: var(--acento); width: 16px; height: 16px; }
 
 /* aviso fijo: la app cambió en el disco y este servidor es el de antes */
-#aviso-reinicio { position: fixed; top: 0; left: 0; right: 0; z-index: 40; background: var(--aviso); color: #fff; padding: 8px 16px; font-size: 14px; text-align: center; }
-#aviso-cerrar { margin-left: 12px; background: none; border: 0; color: inherit; font-size: 18px; line-height: 1; cursor: pointer; padding: 0 6px; border-radius: 3px; }
-#aviso-cerrar:hover, #aviso-cerrar:focus-visible { background: rgba(0,0,0,.2); }
-#aviso-reinicio code, #aviso-reinicio kbd { background: rgba(0,0,0,.2); padding: 0 4px; border-radius: 3px; }
+#aviso-reinicio { position: relative; flex: none; z-index: 40; background: var(--aviso); color: var(--sobre-acento); padding: 8px 52px 8px 16px; font-size: 14px; text-align: center; }
+#aviso-cerrar { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; padding: 0; display: grid; place-items: center; background: none; border: 0; color: inherit; font-size: 20px; line-height: 1; cursor: pointer; border-radius: 50%; }
+#aviso-cerrar:hover, #aviso-cerrar:focus-visible { background: color-mix(in srgb, currentColor 22%, transparent); transform: translateY(-50%); }
+#aviso-cerrar:active { transform: translateY(-50%); }
+#aviso-reinicio code, #aviso-reinicio kbd { background: color-mix(in srgb, currentColor 18%, transparent); color: inherit; padding: 0 4px; border-radius: 3px; }
+/* con el aviso a la vista, empuja la app en vez de taparla */
+body:has(#aviso-reinicio:not([hidden])) { display: flex; flex-direction: column; }
+body:has(#aviso-reinicio:not([hidden])) #app { flex: 1; min-height: 0; height: auto; }
 
 /* ---------- disposición */
 #app { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-rows: 1fr auto; height: 100vh; }
@@ -202,9 +206,9 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .backlinks a { margin-right: 12px; }
 /* «Tareas que la mencionan»: el pie de la nota, con el aspecto de los backlinks y las filas del panel Tareas */
 .menciones { margin-top: 48px; padding-top: 12px; border-top: 1px solid var(--linea); font-size: 14px; }
-.menciones h2 { margin: 0 0 4px; font-size: 14px; font-weight: 650; color: var(--tinta-suave); border: 0; }
+#nota .menciones h2 { margin: 0 0 4px; padding: 0; font-size: 14px; font-weight: 650; color: var(--tinta-suave); border: 0; display: flex; align-items: baseline; gap: 12px; }
+#nota .menciones h2 a { font-weight: 400; font-size: 13px; }
 .menciones .item { font-size: 15px; }
-.menciones .origen { margin-left: auto; flex: none; font-size: 13px; color: var(--tinta-suave); }
 .menciones + .backlinks { margin-top: 16px; }
 
 /* paneles (tareas, comentarios, cuadernos): listas con reglas, no cajas */
@@ -333,4 +337,4 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 }
 
 /* Una carpeta sin nada que enseñar (recién creada, con solo un .gitkeep): sale, y dice que está vacía. */
-#arbol .carpeta-vacia { margin: 2px 0 4px 22px; font-size: 13px; color: var(--tenue, #888); }
+#arbol .carpeta-vacia { margin: 2px 0 4px 26px; font-size: 13px; color: var(--tinta-suave); }
