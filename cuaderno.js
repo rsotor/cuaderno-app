@@ -17,15 +17,15 @@ const RE_CASILLA = /^(\s*- \[)([ xX])(\] .*)$/;
 const RE_ETIQUETA = /(^|[\s(])#(\p{L}[\p{L}\p{N}_\-/]*)/gu;
 const RE_WIKI = /\[\[([^\]|]*?)(?:\\?\|[^\]]*)?\]\]/g;
 const sinCodigo = texto => texto.replace(/`[^`]*`/g, m => ' '.repeat(m.length));
-// Lo que lista el índice: las notas (Markdown y páginas HTML) y los ficheros que la app sabe enseñar (PDF, imágenes,
-// datos y texto). Los ficheros salen en el árbol y en el buscador por su nombre; la búsqueda en el texto, los backlinks
-// y las tareas siguen siendo solo de notas. Un fichero solo se enlaza con su extensión: [[datos.json]].
-const RE_LISTADO = /\.(md|html|pdf|json|txt|csv|png|jpe?g|gif|webp|avif|svg)$/i;
+// Lo que lista el índice: todos los ficheros del cuaderno menos los ocultos (punto delante, node_modules, ignorados),
+// como el Finder (Roberto, 2026-10-09). Los que no son notas salen en el árbol y en el buscador por su nombre; la
+// app enseña los que sabe y del resto lleva a su carpeta. La búsqueda en el texto, los backlinks y las tareas siguen
+// siendo solo de notas. Un fichero solo se enlaza con su extensión: [[datos.json]].
 // Una carpeta que empieza por «_» (_meta, _archive, _plantillas) es de trastienda: no sale en el árbol ni en el
 // buscador, pero sigue en el índice, así que sus notas se pueden enlazar y abrir (Roberto, 2026-10-08).
 const enCarpetaOculta = p => p.split('/').slice(0, -1).some(s => s.startsWith('_'));
 const esNota = p => /\.(md|html)$/i.test(p);
-const tipoDe = p => (p.match(/\.([a-z]+)$/i) || [, ''])[1].toLowerCase();
+const tipoDe = p => (p.match(/\.([a-z0-9]+)$/i) || [, ''])[1].toLowerCase();
 function etiquetasDe(texto) { const e = []; for (const m of sinCodigo(texto).matchAll(RE_ETIQUETA)) if (!e.includes(m[2])) e.push(m[2]); return e; }
 
 class Cuaderno {
@@ -56,12 +56,13 @@ class Cuaderno {
 
   // ---------- índice
   listar() {
-    if (!this.indice) this.indice = this.recorrer(this.base, []);
+    if (!this.indice) { this.vacias = []; this.indice = this.recorrer(this.base, []); }
     return this.indice;
   }
   invalidar() { this.indice = null; this.cacheTitulos = null; }
-  // Lo que enseña el árbol: el índice sin las carpetas de trastienda.
-  arbol() { return this.listar().filter(p => !enCarpetaOculta(p)); }
+  // Lo que enseña el árbol: el índice sin las carpetas de trastienda, más las carpetas sin nada que enseñar (una recién
+  // creada, con solo un .gitkeep), que salen como «carpeta/»: en el Finder se ven, así que aquí también.
+  arbol() { const todos = this.listar(); return [...todos, ...this.vacias.map(c => c + '/')].filter(p => !enCarpetaOculta(p)); }
   // El título (# …) de cada nota, para que la app enseñe títulos y no nombres de fichero.
   titulos() {
     if (this.cacheTitulos) return this.cacheTitulos;
@@ -84,8 +85,8 @@ class Cuaderno {
     for (const e of entradas.sort((a, b) => a.name.localeCompare(b.name, 'es'))) {
       const abs = path.join(dir, e.name);
       if (this.ignorado(abs, e.isDirectory())) continue;
-      if (e.isDirectory()) this.recorrer(abs, acc);
-      else if (RE_LISTADO.test(e.name)) acc.push(this.relativa(abs));
+      if (e.isDirectory()) { const antes = acc.length, vacias = this.vacias.length; this.recorrer(abs, acc); if (acc.length === antes && this.vacias.length === vacias) this.vacias.push(this.relativa(abs)); }
+      else if (e.isFile()) acc.push(this.relativa(abs));
     }
     return acc;
   }

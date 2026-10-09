@@ -349,3 +349,19 @@ test('ningún GET de la API escribe en el cuaderno', async () => {
     assert.equal(foto(), antes);
   } finally { await s.cerrar(); }
 });
+
+test('un fichero del cuaderno se sirve por trozos (Range): vídeo y audio se reproducen y se puede saltar', async () => {
+  const s = await arrancar();
+  try {
+    fs.writeFileSync(path.join(s.c.base, 'clip.mp4'), '0123456789');
+    const r = await s.pedir('/fichero/clip.mp4', { headers: { range: 'bytes=2-5' } });
+    assert.equal(r.status, 206);
+    assert.equal(r.headers.get('content-range'), 'bytes 2-5/10');
+    assert.equal(r.headers.get('content-type'), 'video/mp4');
+    assert.equal(await r.text(), '2345');
+    assert.equal(await (await s.pedir('/fichero/clip.mp4', { headers: { range: 'bytes=-3' } })).text(), '789');
+    assert.equal((await s.pedir('/fichero/clip.mp4', { headers: { range: 'bytes=20-' } })).status, 416);
+    const entero = await s.pedir('/fichero/clip.mp4');
+    assert.equal(entero.status, 200); assert.equal(entero.headers.get('accept-ranges'), 'bytes'); assert.equal(await entero.text(), '0123456789');
+  } finally { await s.cerrar(); }
+});

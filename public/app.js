@@ -37,11 +37,13 @@ $('#arbol').addEventListener('toggle', e => { const d = e.target; if (d.dataset 
 function pintarArbol(lista) {
   lista = lista.filter(p => p !== 'tareas.md');   // tareas.md se ve en el panel Tareas, no dos veces
   const raiz = {};
-  for (const p of lista) { let n = raiz; const partes = p.split('/'); partes.forEach((s, i) => { if (i === partes.length - 1) (n.__f ??= []).push(p); else n = (n[s] ??= {}); }); }
+  // «carpeta/» es una carpeta sin nada que enseñar: sale, vacía, como en el Finder.
+  for (const p of lista) { let n = raiz; const partes = p.split('/'); partes.forEach((s, i) => { if (i < partes.length - 1) n = (n[s] ??= {}); else if (s) (n.__f ??= []).push(p); }); }
+  // Cada fichero, por su nombre (sin .md): la carpeta ya se ve encima y el título es de la nota (Roberto, 2026-10-09).
   // Plegadas por defecto (Roberto, 2026-10-09); abiertas las que abrió la persona (no se le cierran al repintar, en la
   // recarga en vivo) y las que llevan a la nota abierta (marcarActiva).
-  const pintar = (n, abierto, prefijo = '') => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details data-carpeta="${esc(prefijo + k)}"${carpetasAbiertas.has(prefijo + k) ? ' open' : ''}><summary title="${esc(k)}"><span class="nombre">${nombreCarpeta(k)}</span>${botonesFila(prefijo + k, k)}</summary>${pintar(n[k], false, `${prefijo}${k}/`)}</details>`).join('')
-    + (n.__f || []).map(p => { const t = tituloDe(p), repetido = (n.__f || []).some(q => q !== p && tituloDe(q) === t); return `<div class="fila"><a class="hoja${p.endsWith('.md') ? '' : ' fichero'}" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}"><span class="nombre">${esc(t)}</span>${repetido ? `<small>${esc(p.split('/').pop())}</small>` : ''}</a>${botonesFila(p, t, true)}</div>`; }).join('');
+  const pintar = (n, abierto, prefijo = '') => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details data-carpeta="${esc(prefijo + k)}"${carpetasAbiertas.has(prefijo + k) ? ' open' : ''}><summary title="${esc(k)}"><span class="nombre">${nombreCarpeta(k)}</span>${botonesFila(prefijo + k, k)}</summary>${pintar(n[k], false, `${prefijo}${k}/`) || '<p class="carpeta-vacia">Vacía</p>'}</details>`).join('')
+    + (n.__f || []).map(p => { const t = nombreNota(p); return `<div class="fila"><a class="hoja${p.endsWith('.md') ? '' : ' fichero'}" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}"><span class="nombre">${esc(t)}</span></a>${botonesFila(p, t, true)}</div>`; }).join('');
   $('#arbol').innerHTML = lista.length ? pintar(raiz, true) : '<p class="vacio">No hay notas en esta carpeta.</p>';
   pintarCarpetas(lista);
   marcarActiva();
@@ -198,13 +200,23 @@ document.addEventListener('click', e => {
 });
 
 // ---------- ficheros que no son notas: PDF en el visor del navegador; imágenes a su tamaño (como mucho, el de la columna);
-// JSON, CSV y texto tal cual, solo lectura
+// vídeo y audio con su reproductor; JSON, CSV y texto tal cual, solo lectura. Lo que el navegador no sabe enseñar
+// (un .docx, un .zip) lleva al fichero en su carpeta, en el Finder (Roberto, 2026-10-09).
 const TOPE_TEXTO = 1e6;
+const RE_VIDEO = /^(mp4|m4v|webm|mov|ogv)$/, RE_AUDIO = /^(mp3|m4a|aac|wav|ogg|oga|flac)$/, RE_TEXTO = /^(json|csv|txt)$/;
+let ultimoMostrado = null;   // la recarga en vivo vuelve a pintar el fichero: el Finder se abre una vez por visita
 async function abrirFichero(ruta, tipo) {
   const url = `/fichero/${encodeURI(ruta)}`, nombre = ruta.split('/').pop();
   ancho(tipo === 'pdf');
   if (tipo === 'pdf') { $('#nota').innerHTML = `<iframe class="visor-pdf" src="${url}" title="${esc(nombre)}"></iframe>`; return; }
   if (/^(png|jpe?g|gif|webp|avif|svg)$/.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><img class="visor-imagen" src="${url}" alt="${esc(nombre)}">`; return; }
+  if (RE_VIDEO.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><video class="visor-imagen" src="${url}" controls preload="metadata"></video>`; return; }
+  if (RE_AUDIO.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><audio src="${url}" controls preload="metadata"></audio>`; return; }
+  if (!RE_TEXTO.test(tipo)) {
+    $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><p class="resumen">La app no sabe enseñar este fichero: te lo señalo en ${GESTOR}, para abrirlo con su programa.</p><p><button type="button" class="secundario" data-mostrar="${esc(ruta)}">${icono('carpeta')} Mostrar en ${GESTOR}</button></p>`;
+    if (ultimoMostrado !== ruta) { ultimoMostrado = ruta; mostrarEnCarpeta(ruta); }
+    return;
+  }
   let texto;
   try { const r = await fetch(url); if (!r.ok) throw new Error(`respuesta ${r.status}`); texto = await r.text(); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   const cortado = texto.length > TOPE_TEXTO;
@@ -235,7 +247,7 @@ function sinPortada() {
 async function abrirNota(ruta, lineaDestino) {
   // La misma nota otra vez (recarga en vivo, un comentario recién escrito) conserva el scroll; una nota nueva empieza arriba.
   const recarga = rutaActual === ruta && !$('#nota').hidden && lineaDestino == null, scrollAntes = $('#centro').scrollTop;
-  if (rutaActual !== ruta) { vistaNota = null; }
+  if (rutaActual !== ruta) { vistaNota = null; ultimoMostrado = null; }
   rutaActual = ruta;
   $('#panel').hidden = true; $('#nota').hidden = false;
   let n;

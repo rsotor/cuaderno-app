@@ -325,3 +325,6 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
   .bloque:focus-within > .acciones { display: flex; opacity: 1; pointer-events: auto; }   /* sin margen ni ratón: al tocar el bloque */
   #nota table { display: block; overflow-x: auto; }
 }
+
+/* Una carpeta sin nada que enseñar (recién creada, con solo un .gitkeep): sale, y dice que está vacía. */
+#arbol .carpeta-vacia { margin: 2px 0 4px 22px; font-size: 13px; color: var(--tenue, #888); }

@@ -160,17 +160,32 @@ test('editar y comentar una lista: el original con línea en blanco final no es 
   assert.match(c.leer('sesiones/01-01-01-sesion.md'), /- \[x\] Hecho ya\n- \[ \] Otra\n$/);
 }));
 
-test('ficheros que no son notas: el árbol lista PDF, JSON, CSV y TXT (no un .docx); el buscador los encuentra por nombre, no por dentro', con({}, (c, cu) => {
+test('ficheros que no son notas: el árbol lista todos, como el Finder (también un .docx), menos los ocultos; el buscador los encuentra por nombre, no por dentro', con({}, (c, cu) => {
   fs.writeFileSync(path.join(c.base, 'material', 'apuntes.docx'), 'no soy texto');
+  fs.writeFileSync(path.join(c.base, 'material', '.DS_Store'), 'oculto');
   cu.invalidar();
   const l = cu.listar();
-  for (const f of ['material/extracto-octubre.pdf', 'material/gastos-octubre.json', 'material/gastos-octubre.csv', 'material/apuntes-de-clase.txt', 'material/calculadora-50-30-20.html']) assert.ok(l.includes(f), `falta ${f} en el árbol`);
-  assert.ok(!l.includes('material/apuntes.docx'), 'un .docx no sale en el árbol');
+  for (const f of ['material/extracto-octubre.pdf', 'material/gastos-octubre.json', 'material/gastos-octubre.csv', 'material/apuntes-de-clase.txt', 'material/calculadora-50-30-20.html', 'material/apuntes.docx']) assert.ok(l.includes(f), `falta ${f} en el árbol`);
+  assert.ok(!l.includes('material/.DS_Store'), 'un fichero oculto sale en el árbol');
   const r = cu.buscar('extracto');
   assert.deepEqual(r.ficheros, ['material/extracto-octubre.pdf'], 'el PDF sale por su nombre');
   assert.ok(!cu.buscar('Supermercado').lineas.some(x => !x.ruta.endsWith('.md')), 'la búsqueda en el texto no entra en el JSON ni el CSV');
   assert.equal(cu.titulos()['material/calculadora-50-30-20.html'], 'Calculadora 50/30/20', 'una página HTML se titula con su <title>');
   assert.equal(cu.titulos()['material/extracto-octubre.pdf'], undefined);
+}));
+
+test('carpetas sin nada que enseñar (vacías o con solo un .gitkeep) salen en el árbol como «carpeta/»; las de «_», no', con({}, (c, cu) => {
+  fs.mkdirSync(path.join(c.base, 'adjuntos', 'nueva'), { recursive: true });
+  fs.writeFileSync(path.join(c.base, 'adjuntos', 'nueva', '.gitkeep'), '');
+  fs.mkdirSync(path.join(c.base, 'vacia'));
+  fs.mkdirSync(path.join(c.base, '_trastienda'));
+  cu.invalidar();
+  const a = cu.arbol();
+  assert.ok(a.includes('adjuntos/nueva/'), 'la carpeta con solo un .gitkeep no sale');
+  assert.ok(a.includes('vacia/'), 'la carpeta vacía no sale');
+  assert.ok(!a.includes('adjuntos/'), 'la carpeta que contiene otra sale además como vacía');
+  assert.ok(!a.includes('_trastienda/'), 'una carpeta de trastienda sale en el árbol');
+  assert.ok(!cu.listar().some(p => p.endsWith('/')), 'las carpetas vacías entran en el índice de ficheros');
 }));
 
 test('enlaces a ficheros: [[x.json]] resuelve y [[x]] sin extensión no; un enlace relativo lleva a la vista del fichero; nota() no lee un PDF', con({}, (c, cu) => {

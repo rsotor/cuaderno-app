@@ -32,7 +32,7 @@ test('ocultar una carpeta desde el árbol: desaparece, sigue oculta al recargar,
 
 test('ocultar un fichero no abre la nota, y con nada oculto Ajustes no enseña la sección', async () => {
   await e.ir('#/');
-  const fila = e.pagina.locator('#arbol .fila', { has: e.pagina.locator('a.hoja', { hasText: 'Mi curso' }) });
+  const fila = e.pagina.locator('#arbol .fila', { has: e.pagina.locator('a.hoja[data-ruta="inicio.md"]') });
   await fila.hover();
   await fila.locator('button.ocultar').click();
   await oculto(fila, 'árbol', 'la nota tras ocultarla');

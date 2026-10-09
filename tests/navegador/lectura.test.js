@@ -9,7 +9,7 @@ let e;
 test.before(async () => { e = await arrancar({ kit: false }); });
 test.after(async () => { if (e) await e.cerrar(); });
 
-test('portada: se ve el título de inicio.md, el nombre del cuaderno y el árbol con títulos', async () => {
+test('portada: se ve el título de inicio.md, el nombre del cuaderno y el árbol con los nombres de fichero', async () => {
   await e.ir('#/');
   await conTexto(e.pagina.locator('#nota h1'), /^Mi curso$/, 'portada', 'el título de la nota');
   await hashCumple(e.pagina, /^#\/n\/inicio\.md$/, 'portada');
@@ -18,7 +18,7 @@ test('portada: se ve el título de inicio.md, el nombre del cuaderno y el árbol
   await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(nombre), 'portada', 'el nombre del cuaderno en la barra lateral');
   // Las carpetas salen plegadas (2026-10-09): se abre «conceptos» para ver la nota de dentro.
   await (await visible(e.pagina.locator('#arbol summary', { hasText: 'conceptos' }), 'portada', 'la carpeta «conceptos» en el árbol')).click();
-  await visible(e.pagina.locator('#arbol a.hoja', { hasText: 'Interés' }), 'portada', 'la nota «Interés» en el árbol (con su título, no el nombre de fichero)');
+  await conTexto(e.pagina.locator('#arbol a.hoja[data-ruta="conceptos/interes.md"] .nombre'), /^interes$/, 'portada', 'la nota «interes» en el árbol (por su fichero, sin .md: la carpeta ya se ve encima)');
   await visible(e.pagina.locator('#link-inicio.activa'), 'portada', 'el enlace Inicio marcado como activo');
 });
 
