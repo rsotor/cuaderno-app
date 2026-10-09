@@ -200,6 +200,12 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .bloque .acciones button:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .backlinks { margin-top: 48px; padding-top: 12px; border-top: 1px solid var(--linea); font-size: 14px; color: var(--tinta-suave); }
 .backlinks a { margin-right: 12px; }
+/* «Tareas que la mencionan»: el pie de la nota, con el aspecto de los backlinks y las filas del panel Tareas */
+.menciones { margin-top: 48px; padding-top: 12px; border-top: 1px solid var(--linea); font-size: 14px; }
+.menciones h2 { margin: 0 0 4px; font-size: 14px; font-weight: 650; color: var(--tinta-suave); border: 0; }
+.menciones .item { font-size: 15px; }
+.menciones .origen { margin-left: auto; flex: none; font-size: 13px; color: var(--tinta-suave); }
+.menciones + .backlinks { margin-top: 16px; }
 
 /* paneles (tareas, comentarios, cuadernos): listas con reglas, no cajas */
 .resumen { color: var(--tinta-suave); margin: 0 0 14px; }

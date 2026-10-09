@@ -16,6 +16,10 @@ const RE_CASILLA = /^(\s*- \[)([ xX])(\] .*)$/;
 // guiones, guiones bajos o barras; acentos admitidos. «#1» y «# título» no lo son. Se busca fuera del código `…`.
 const RE_ETIQUETA = /(^|[\s(])#(\p{L}[\p{L}\p{N}_\-/]*)/gu;
 const RE_WIKI = /\[\[([^\]|]*?)(?:\\?\|[^\]]*)?\]\]/g;
+// Una etiqueta y el nombre de una nota o carpeta se comparan sin mayúsculas y con espacios, guiones y guiones bajos por igual.
+const normalizarNombre = s => s.toLowerCase().replace(/[\s_-]+/g, ' ').trim();
+// La nota principal de una carpeta, por orden: brief.md, README.md, index.md (sin distinguir mayúsculas).
+const PRINCIPALES = ['brief.md', 'readme.md', 'index.md'];
 const sinCodigo = texto => texto.replace(/`[^`]*`/g, m => ' '.repeat(m.length));
 // Lo que lista el índice: todos los ficheros del cuaderno menos los ocultos (punto delante, node_modules, ignorados),
 // como el Finder (Roberto, 2026-10-09). Los que no son notas salen en el árbol y en el buscador por su nombre; la
@@ -157,7 +161,7 @@ class Cuaderno {
   }
   // Las casillas del cuaderno agrupadas por nota. soloPropias: solo tareas.md (sin kit, cualquier casilla no es una tarea).
   tareas({ soloPropias = false } = {}) {
-    const grupos = [];
+    const grupos = [], menciones = this.indiceMenciones();
     for (const p of this.listar()) {
       if (!p.endsWith('.md')) continue;
       if (soloPropias && p !== 'tareas.md') continue;
@@ -170,12 +174,49 @@ class Cuaderno {
         const m = l.match(RE_CASILLA); if (!m) return;
         const crudo = m[3].slice(2);
         const texto = this.acortarRutas(crudo.replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, '$2'));
-        items.push({ linea: i, hecha: m[2] !== ' ', texto, html: this.marcarEtiquetas(this.md.renderInline(texto, {})), enlaces: this.enlacesDe(crudo), etiquetas: etiquetasDe(crudo.replace(RE_WIKI, ' ')) });
+        items.push({ linea: i, hecha: m[2] !== ' ', texto, html: this.marcarEtiquetas(this.md.renderInline(texto, {})), enlaces: this.enlacesDe(crudo), etiquetas: etiquetasDe(crudo.replace(RE_WIKI, ' ')), notas: this.notasDeTarea(crudo, menciones) });
       });
       if (items.length) grupos.push({ ruta: p, generado: /^> Lo genera tu profesor/m.test(ls.slice(0, 6).join('\n')), items });
     }
     grupos.sort((a, b) => (a.ruta === 'tareas.md' ? -1 : b.ruta === 'tareas.md' ? 1 : a.generado - b.generado));
     return grupos;
+  }
+  // A qué notas pertenece una tarea (la «pertenencia», en un solo sitio; Roberto, 2026-10-09): las que enlaza con
+  // [[nombre]], las que se llaman como una de sus #etiquetas (sin mayúsculas; espacio, guion y guion bajo valen igual:
+  // #cms-update ≙ «cms update.md») y, si la etiqueta es el nombre de una carpeta, la nota principal de esa carpeta.
+  // Devuelve rutas; incluye la propia nota donde vive la tarea si se menciona a sí misma (tareasDe la quita).
+  notasDeTarea(crudo, menciones = this.indiceMenciones()) {
+    const rutas = [];
+    const poner = r => { if (r && !rutas.includes(r)) rutas.push(r); };
+    for (const m of sinCodigo(crudo).matchAll(RE_WIKI)) { const d = m[1].trim(); if (d) { const r = this.resolverWiki(d); if (r && r.endsWith('.md')) poner(r); } }
+    for (const e of etiquetasDe(crudo.replace(RE_WIKI, ' '))) {
+      const k = normalizarNombre(e);
+      (menciones.notas.get(k) || []).forEach(poner);
+      (menciones.carpetas.get(k) || []).forEach(poner);
+    }
+    return rutas;
+  }
+  // nombre normalizado → rutas: de las notas por su fichero, y de las carpetas por su nota principal.
+  indiceMenciones() {
+    const notas = new Map(), carpetas = new Map(), todos = this.listar(), rutas = new Set(todos.map(p => p.toLowerCase())), dirs = new Set();
+    const poner = (mapa, k, v) => { if (!mapa.has(k)) mapa.set(k, []); if (!mapa.get(k).includes(v)) mapa.get(k).push(v); };
+    for (const p of todos) {
+      const partes = p.split('/');
+      if (p.endsWith('.md')) poner(notas, normalizarNombre(partes.at(-1).replace(/\.md$/, '')), p);
+      for (let i = 1; i < partes.length; i++) dirs.add(partes.slice(0, i).join('/'));
+    }
+    for (const d of dirs) {
+      const nombre = PRINCIPALES.find(n => rutas.has(`${d}/${n}`.toLowerCase())); if (!nombre) continue;
+      poner(carpetas, normalizarNombre(d.split('/').at(-1)), todos.find(p => p.toLowerCase() === `${d}/${nombre}`.toLowerCase()));
+    }
+    return { notas, carpetas };
+  }
+  // Las tareas que mencionan una nota y viven en otra (las de la propia nota ya se ven en ella), pendientes primero.
+  tareasDe(rel, opciones = {}) {
+    if (!String(rel || '').endsWith('.md')) return [];
+    const lista = [];
+    for (const g of this.tareas(opciones)) if (g.ruta !== rel) for (const i of g.items) if (i.notas.includes(rel)) lista.push({ ...i, ruta: g.ruta, generado: g.generado });
+    return [...lista.filter(i => !i.hecha), ...lista.filter(i => i.hecha)];
   }
   // Una ruta de nota del cuaderno dentro de un texto se deja en su nombre; cualquier otra cosa con barras
   // («regla 50/30/20», «04/10/2026», una URL) se queda como está.

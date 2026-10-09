@@ -262,7 +262,11 @@ async function abrirNota(ruta, lineaDestino) {
   // Las propiedades van debajo del título, no encima: el título es lo primero que se lee.
   const props = n.frontmatter ? `<dl class="propiedades">${Object.entries(n.frontmatter).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${Array.isArray(v) ? v.map(x => `<span class="etiqueta">${esc(x)}</span>`).join('') : esc(v)}</dd>`).join('')}</dl>` : '';
   const back = n.backlinks.length ? `<nav class="backlinks" aria-label="Notas que enlazan aquí">Enlazan aquí: ${n.backlinks.map(b => `<a class="wiki" href="#/n/${encodeURI(b)}" title="${esc(b)}">${esc(tituloDe(b))}</a>`).join('')}</nav>` : '';
-  $('#nota').innerHTML = n.html + back;
+  // «Tareas que la mencionan»: las casillas de otras notas que la enlazan o la nombran con #etiqueta, junto a los backlinks.
+  let menciones = []; try { menciones = await api(`/api/tareas-de?p=${encodeURIComponent(ruta)}`); } catch { /* sin esta sección, la nota se lee igual */ }
+  if (rutaActual !== ruta) return;   // mientras llegaba la respuesta se abrió otra nota
+  const tareasMencion = menciones.length ? `<section class="menciones" aria-label="Tareas que la mencionan"><h2>Tareas que la mencionan</h2>${menciones.map(i => `<label class="item${i.hecha ? ' hecha' : ''}"><input type="checkbox" class="casilla-mencion" data-ruta="${esc(i.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${i.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span><a class="wiki origen" href="#/n/${encodeURI(i.ruta)}?l=${i.linea}" title="${esc(i.ruta)}">${esc(tituloDe(i.ruta))}</a></label>`).join('')}</section>` : '';
+  $('#nota').innerHTML = n.html + tareasMencion + back;
   const h1 = $('#nota .bloque > h1');
   if (props) (h1 ? h1.closest('.bloque') : $('#nota')).insertAdjacentHTML(h1 ? 'afterend' : 'afterbegin', props);
   $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* se queda el texto */ } });
@@ -283,6 +287,7 @@ async function marcarCasilla(ruta, linea, marcada, trasFallo) {
 }
 $('#nota').addEventListener('click', async e => {
   const t = e.target;
+  if (t.classList.contains('casilla-mencion')) { const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { avisar(err.message); abrirNota(rutaActual); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); avisar(t.checked ? 'Marcada' : 'Desmarcada'); refrescarContadores(); } return; }
   if (t.classList.contains('casilla')) { const ok = await marcarCasilla(rutaActual, +t.dataset.linea, t.checked, () => { t.checked = !t.checked; }); if (ok) { avisar(t.checked ? 'Marcada' : 'Desmarcada'); refrescarContadores(); } return; }
   if (t.closest('.callout-titulo')) { const c = t.closest('.callout'); if (c && c.querySelector('.callout-titulo').dataset.plegable) c.classList.toggle('plegado'); return; }
   const btn = t.closest('button[data-accion]'); if (!btn) return;
@@ -414,7 +419,7 @@ async function abrirTareas() {
     + `<span class="pista" id="filtro-resumen" role="status"></span><button type="button" class="secundario pequeno" id="filtro-quitar" hidden>Quitar filtros</button></form>`;
   $('#panel').innerHTML = `<h1>Tareas</h1><p class="resumen">${hechas} de ${total} hechas. ${nota}</p><form class="nueva-tarea" id="nueva-tarea"><label class="oculto" for="tarea-nueva">Nueva tarea</label><input id="tarea-nueva" placeholder="Nueva tarea para mí…" autocomplete="off"><button type="submit">Añadir</button></form>${filtros}`
     + g.map(gr => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(gr.ruta)}" title="${esc(gr.ruta)}">${esc(tituloDe(gr.ruta))}</a>${gr.generado ? '<span class="solo-lectura">la escribe el profesor al guardar</span>' : ''}</h2>`
-      + gr.items.map(i => `<label class="item${i.hecha ? ' hecha' : ''}" data-hecha="${i.hecha ? 1 : 0}" data-enlaces="${esc(JSON.stringify(i.enlaces || []))}" data-etiquetas="${esc(JSON.stringify(i.etiquetas || []))}"><input type="checkbox" data-ruta="${esc(gr.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${gr.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('') + '</section>').join('');
+      + gr.items.map(i => `<label class="item${i.hecha ? ' hecha' : ''}" data-hecha="${i.hecha ? 1 : 0}" data-enlaces="${esc(JSON.stringify(i.enlaces || []))}" data-etiquetas="${esc(JSON.stringify(i.etiquetas || []))}" data-notas="${esc(JSON.stringify(i.notas || []))}"><input type="checkbox" data-ruta="${esc(gr.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${gr.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('') + '</section>').join('');
   aplicarFiltrosTareas();
   if (borrador && $('#tarea-nueva')) $('#tarea-nueva').value = borrador;
   if (activo && $(`#${activo}`)) $(`#${activo}`).focus();
@@ -425,9 +430,10 @@ function aplicarFiltrosTareas() {
   recordarFiltros(location.hash.split('?')[1] || '');
   const activos = !!(f.nota || f.etiqueta || f.estado !== 'todas');
   let visibles = 0, total = 0;
+  const rutaF = f.nota ? rutaDeNombre(f.nota) : null;   // también cuentan las que la mencionan por #etiqueta o por carpeta
   document.querySelectorAll('#panel .item').forEach(it => {
     total++;
-    const cumple = (!f.nota || JSON.parse(it.dataset.enlaces).includes(f.nota)) && (!f.etiqueta || JSON.parse(it.dataset.etiquetas).includes(f.etiqueta))
+    const cumple = (!f.nota || JSON.parse(it.dataset.enlaces).includes(f.nota) || (rutaF && JSON.parse(it.dataset.notas).includes(rutaF))) && (!f.etiqueta || JSON.parse(it.dataset.etiquetas).includes(f.etiqueta))
       && (f.estado === 'todas' || (f.estado === 'hechas') === (it.dataset.hecha === '1'));
     it.hidden = !cumple; if (cumple) visibles++;
   });

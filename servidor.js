@@ -156,6 +156,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
       if (p === '/api/buscar') { const r = conCuaderno().buscar(url.searchParams.get('q') || ''); return json(res, { ficheros: r.ficheros.filter(f => !oculta(f)), lineas: r.lineas.filter(l => !oculta(l.ruta)) }); }
       if (p === '/api/nota') return json(res, conCuaderno().nota(url.searchParams.get('p')));
       if (p === '/api/tareas') return json(res, conCuaderno().tareas({ soloPropias: estado.kit.tipo === 'carpeta' }));   // una salida del kit sin motor sigue teniendo sus formatos
+      if (p === '/api/tareas-de') return json(res, conCuaderno().tareasDe(url.searchParams.get('p'), { soloPropias: estado.kit.tipo === 'carpeta' }));   // «Tareas que la mencionan» al final de una nota
       if (p === '/api/comentarios') return json(res, conCuaderno().comentarios());
       if (p === '/api/recorrido') return json(res, conCuaderno().recorrido());
       if (p === '/api/examen') {

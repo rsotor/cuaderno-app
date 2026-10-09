@@ -22,6 +22,7 @@ nuevo entra en una nota o carpeta nueva, con su fila aquí y su test. Las rutas 
 | Dos notas con el mismo título en la misma carpeta (el árbol las nombra por su fichero) | `estructura/repetida-a.md`, `estructura/repetida-b.md` | `tests/navegador/casos.test.js` |
 | Carpeta que empieza por `_`: no sale en el árbol | `estructura/_archivo/archivada.md` | `tests/navegador/casos.test.js` |
 | Adjuntos: audio con su reproductor, un fichero que la app no sabe enseñar (lleva al Finder), carpeta con solo un `.gitkeep` | `adjuntos/` | `tests/navegador/ficheros.test.js`, `tests/cuaderno.test.js` |
+| Tareas que mencionan una nota: por `[[enlace]]`, por `#Etiqueta` con el nombre de la nota, y por `#etiqueta` con el nombre de una carpeta (sale en su `brief.md`) | `personas/ana.md`, `iniciativas/mudanza/brief.md` (reciben), `iniciativas/mudanza/pendientes.md` (las tareas) | `tests/menciones.test.js`, `tests/navegador/menciones.test.js` |
 
 ## Casos de uso y su recorrido
 
