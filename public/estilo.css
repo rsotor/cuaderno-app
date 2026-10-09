@@ -157,7 +157,7 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
    (56 px a cada lado: 912 px). Letra de 16 px con la «Media»; en em para que el ajuste «Letra» siga mandando. */
 #nota, #panel { max-width: calc(var(--texto) + 2 * var(--hoja-pad)); margin: 8px auto 0; padding: 20px var(--hoja-pad) 40px; background: var(--papel); border: 1px solid var(--linea); border-radius: 10px; }
 #nota { font-size: 1.0667em; line-height: 1.65; }
-#nota.ancha { background: none; border: 0; border-radius: 0; margin-top: 0; padding: 8px 40px 40px; }   /* PDF y páginas HTML: sin hoja */
+#nota.ancha { background: none; border: 0; border-radius: 0; margin-top: 0; padding: 8px 40px 40px; }   /* sin hoja a todo el ancho: PDF, páginas HTML, imágenes, vídeo, audio y lo que la app no sabe enseñar (Roberto, 2026-10-09) */
 #centro.con-indice .miga-barra:not(.ancha) { padding-left: calc(max(16px, (100% - var(--texto) - 2 * var(--hoja-pad) - 224px) / 2) + var(--hoja-pad)); }
 #centro.con-indice #nota, #centro.con-indice #panel { margin-left: max(16px, calc((100% - var(--texto) - 2 * var(--hoja-pad) - 224px) / 2)); margin-right: 0; }   /* hoja + índice, como un grupo centrado */
 #nota h1, #panel h1 { font-size: 28px; line-height: 1.15; margin: 6px 0 18px; font-weight: 700; letter-spacing: -.01em; }

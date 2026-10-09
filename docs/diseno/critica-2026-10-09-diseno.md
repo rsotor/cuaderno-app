@@ -31,3 +31,5 @@ El azul ya pasa AA con holgura en los dos temas: **no se cambia** (decisión 3 d
 - Texto a 16 px con 96 caracteres de mediana por línea (80 es la referencia de WCAG 1.4.8, no se cumple por decisión de Roberto; el test pone techo en 105).
 - La hoja se funde con el fondo a ≤ 760 px sin márgenes que roben sitio (sin scroll horizontal a 390).
 - Los paneles (Tareas, Comentarios) llevan la misma hoja: una sola regla visual, y sin hoja en PDF, HTML, examen y tarjetas solo donde el contenido ya es otro objeto (PDF y HTML); examen y tarjetas sí la llevan, sin índice.
+
+- **Cambios de medida posteriores a esta crítica (Roberto, 2026-10-09):** el texto de la nota pasa de 720 a 800 px (hoja de 912; mediana medida 108 caracteres por línea, por encima de los 80 de WCAG 1.4.8, decisión suya: «sé que no es lo mejor, pero para mí sí»), y la hoja queda solo para texto: PDF, HTML, imágenes, vídeo, audio y la página «no sabe enseñar» van sin hoja a todo el ancho de `#centro`. El umbral del índice sube a ventana de ~1448 px (ya no 1368).

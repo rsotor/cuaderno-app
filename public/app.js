@@ -227,7 +227,7 @@ const RE_VIDEO = /^(mp4|m4v|webm|mov|ogv)$/, RE_AUDIO = /^(mp3|m4a|aac|wav|ogg|o
 let ultimoMostrado = null;   // la recarga en vivo vuelve a pintar el fichero: el Finder se abre una vez por visita
 async function abrirFichero(ruta, tipo) {
   const url = `/fichero/${encodeURI(ruta)}`, nombre = ruta.split('/').pop();
-  ancho(tipo === 'pdf');
+  ancho(!RE_TEXTO.test(tipo));   // sin hoja: PDF, imágenes, vídeo, audio y lo que la app no sabe enseñar; la hoja, solo para texto (Roberto, 2026-10-09)
   if (tipo === 'pdf') { $('#nota').innerHTML = `<iframe class="visor-pdf" src="${url}" title="${esc(nombre)}"></iframe>`; return; }
   if (/^(png|jpe?g|gif|webp|avif|svg)$/.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><img class="visor-imagen" src="${url}" alt="${esc(nombre)}">`; return; }
   if (RE_VIDEO.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><video class="visor-imagen" src="${url}" controls preload="metadata"></video>`; return; }
