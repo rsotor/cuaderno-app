@@ -55,3 +55,5 @@ test del índice comprueba que el fichero existe y que tiene un recorrido que em
 | 18 | Mostrar en el Finder, copiar la ruta, papelera | `tests/navegador/ficheros.test.js` | mostrar en el Finder: | sin kit |
 | 19 | Aviso de app desactualizada | `tests/navegador/ocultar.test.js` | aviso de reinicio: | sin kit |
 | 20 | Un curso del kit sin motor no guarda | `tests/guardar.test.js` | salida del kit sin motor: | con kit (sin motor) |
+| 21 | Tareas que la mencionan | `tests/navegador/menciones.test.js` | una persona: | con kit |
+| 22 | Adjuntos: vídeo, audio, al Finder, carpetas vacías | `tests/navegador/ficheros.test.js` | adjuntos: | sin kit |
