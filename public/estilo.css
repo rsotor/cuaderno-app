@@ -397,3 +397,8 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
   #app.lateral-plegado .miga-barra { min-height: 44px; }
 }
 @media (max-width: 760px) { .marca .plegar { display: none; } }
+
+/* ---------- editor de la nota entera (CodeMirror; public/live.js) */
+#edicion-cm { min-height: 40vh; }
+.edicion-pie { position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px; padding: 10px 0 4px; margin-top: 24px; background: var(--papel); border-top: 1px solid var(--linea); }
+.edicion-pie .pista { margin-left: auto; }

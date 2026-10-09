@@ -36,7 +36,7 @@ test del índice comprueba que el fichero existe y que tiene un recorrido que em
 | 1 | Abrir el cuaderno: portada y árbol | `tests/navegador/lectura.test.js` | portada: | sin kit |
 | 2 | Buscar por nombre y por texto | `tests/navegador/lectura.test.js` | buscar: | sin kit |
 | 3 | Leer una nota: propiedades, enlaces, callouts, imágenes, código, fórmulas | `tests/navegador/casos.test.js` | render: | sin kit |
-| 4 | Editar un bloque | `tests/navegador/lectura.test.js` | editar un bloque: | sin kit |
+| 4 | Editar la nota | `tests/navegador/edicion.test.js` | editar la nota: | sin kit |
 | 5 | Comentar un bloque y verlo en Comentarios | `tests/navegador/casos.test.js` | comentar un bloque: | sin kit |
 | 6 | Marcar una sesión como estudiada | — | — | **no implementado** en la app |
 | 7 | Repasar tarjetas | `tests/navegador/tarjetas.test.js` | modo tarjeta: | sin kit |

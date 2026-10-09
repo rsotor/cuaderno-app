@@ -24,22 +24,21 @@ const rgb = c => c.match(/[\d.]+/g).slice(0, 3).map(Number);
 const luz = c => { const [r, g, b] = rgb(c).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 const contraste = (a, b) => { const [x, y] = [luz(a), luz(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
 
-test('«Guardar» es solo del repositorio: el editor de un bloque dice «Aplicar» y avisa «Cambio escrito en la nota»; la línea de estado habla de cambios por guardar', async () => {
+test('«Guardar» es solo del repositorio: el editor de la nota dice «Aplicar» y avisa «Nota escrita»; la línea de estado habla de cambios por guardar', async () => {
   await e.ir('#/n/conceptos/capital.md');
   const bloque = e.pagina.locator('#nota .bloque').nth(1);
-  await bloque.hover();
-  await bloque.locator('[data-accion="editar"]').click();
-  await visible(e.pagina.locator('#editor'), 'editar', 'el editor del bloque');
-  assert.equal((await e.pagina.locator('#editor-guardar').textContent()).trim(), 'Aplicar', 'editar: el botón del editor no se llama «Aplicar»');
-  assert.match(await e.pagina.locator('#editor .pista').textContent(), /Ctrl Enter aplica/, 'editar: la pista sigue diciendo «guarda»');
-  const texto = await e.pagina.locator('#editor-texto').inputValue();
-  await e.pagina.locator('#editor-texto').fill(texto + ' Una frase más.');
-  await e.pagina.locator('#editor-guardar').click();
-  await visible(e.pagina.locator('.aviso-flotante', { hasText: 'Cambio escrito en la nota' }), 'editar', 'el aviso «Cambio escrito en la nota»');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'editar', 'el editor de la nota');
+  assert.equal((await e.pagina.locator('#edicion-aplicar').textContent()).trim(), 'Aplicar', 'editar: el botón del editor no se llama «Aplicar»');
+  assert.match(await e.pagina.locator('.edicion-pie .pista').textContent(), /(Ctrl|⌘) Enter aplica/, 'editar: la pista no dice «aplica»');
+  await e.pagina.keyboard.press('ControlOrMeta+End');
+  await e.pagina.keyboard.type('Una frase más.');
+  await e.pagina.locator('#edicion-aplicar').click();
+  await visible(e.pagina.locator('.aviso-flotante', { hasText: 'Nota escrita' }), 'editar', 'el aviso «Nota escrita»');
   await ficheroCumple(e.c, 'conceptos/capital.md', /Una frase más\./, 'editar');
   await conTexto(e.pagina.locator('#estado-git'), /\d+ cambios? por guardar/, 'estado', 'la línea de estado del repositorio');
   assert.doesNotMatch(await e.pagina.locator('#estado-git').textContent(), /sin guardar/, 'estado: queda «sin guardar»');
-  // Comentar usa el mismo editor con sus palabras.
+  // Comentar usa su propio diálogo, con sus palabras.
   await bloque.hover();
   await bloque.locator('[data-accion="comentar"]').click();
   await visible(e.pagina.locator('#editor'), 'comentar', 'el editor del comentario');
@@ -77,7 +76,7 @@ test('teclado: «Saltar al contenido» lleva a la nota sin cambiar la ruta; los 
   }
   assert.ok(paradas[0].saltar, 'teclado: la primera parada no es «Saltar al contenido»');
   assert.ok(!paradas.some(p => p.boton), 'teclado: un botón de fila del árbol es parada de Tab');
-  assert.ok(paradas.at(-1).enNota && paradas.length <= 32, `teclado: ${paradas.length} Tab hasta la nota (hoy son 31 con el árbol plegado, antes 62 con carpetas abiertas; el techo vigila que no crezca; el atajo es «Saltar al contenido»)`);
+  assert.ok(paradas.at(-1).enNota && paradas.length <= 33, `teclado: ${paradas.length} Tab hasta la nota (hoy son 32 con el árbol plegado y el botón «Editar» de la miga, antes 62 con carpetas abiertas; el techo vigila que no crezca; el atajo es «Saltar al contenido»)`);
   // El enlace: Enter va a la nota, y la ruta sigue siendo la misma.
   await e.pagina.locator('.saltar').focus();
   await e.pagina.keyboard.press('Enter');
@@ -93,7 +92,7 @@ test('teclado: «Saltar al contenido» lleva a la nota sin cambiar la ruta; los 
   assert.ok(await e.pagina.evaluate(() => document.activeElement.matches('#arbol summary')), 'teclado: la flecha izquierda no vuelve a la carpeta');
 });
 
-test('teclado en la nota: un solo punto de Tab, flechas entre bloques, E edita y C comenta el bloque enfocado', async () => {
+test('teclado en la nota: un solo punto de Tab, flechas entre bloques, E edita la nota y C comenta el bloque enfocado', async () => {
   await e.ir('#/n/sesiones/01-01-01-sesion.md');
   assert.equal(await e.pagina.locator('#nota .bloque[tabindex="0"]').count(), 1, 'nota: hay más de un bloque con tabindex 0');
   assert.equal(await e.pagina.locator('#nota .bloque .acciones button:not([tabindex="-1"])').count(), 0, 'nota: un botón de bloque es parada de Tab');
@@ -105,16 +104,17 @@ test('teclado en la nota: un solo punto de Tab, flechas entre bloques, E edita y
   await e.pagina.keyboard.press('ArrowUp');
   assert.ok(await e.pagina.evaluate(() => document.activeElement === document.querySelectorAll('#nota .bloque')[0]), 'nota: la flecha arriba no vuelve al bloque anterior');
   await e.pagina.keyboard.press('e');
-  await visible(e.pagina.locator('#editor'), 'nota', 'el editor con la tecla E');
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'nota', 'el editor de la nota con la tecla E');
   await e.pagina.keyboard.press('Escape');
-  await oculto(e.pagina.locator('#editor'), 'nota', 'el editor tras Escape');
-  assert.ok(await e.pagina.evaluate(() => document.activeElement.classList.contains('bloque')), 'nota: al cerrar el editor el foco no vuelve al bloque');
+  await oculto(e.pagina.locator('#edicion-cm'), 'nota', 'el editor tras Escape');
+  assert.ok(await e.pagina.evaluate(() => document.activeElement.id === 'btn-editar'), 'nota: al salir del editor el foco no vuelve al botón «Editar»');
+  await e.pagina.locator('#nota .bloque').first().focus();
   await e.pagina.keyboard.press('c');
   await visible(e.pagina.locator('#editor'), 'nota', 'el editor del comentario con la tecla C');
   await e.pagina.keyboard.press('Escape');
 });
 
-test('diálogos: Ajustes, Nueva nota y el editor retienen el foco con Tab y Mayús Tab, dejan lo de detrás inerte y devuelven el foco al cerrar', async () => {
+test('diálogos: Ajustes, Nueva nota y el diálogo de comentar retienen el foco con Tab y Mayús Tab, dejan lo de detrás inerte y devuelven el foco al cerrar', async () => {
   const dentro = id => e.pagina.evaluate(i => !!document.activeElement.closest(i), id);
   const probar = async (abrir, id, cerrar) => {
     await abrir();
@@ -132,7 +132,7 @@ test('diálogos: Ajustes, Nueva nota y el editor retienen el foco con Tab y May�
   assert.ok(await e.pagina.evaluate(() => document.activeElement.id === 'btn-ajustes'), 'ajustes: al cerrar el foco no vuelve a su botón');
   await probar(() => e.pagina.click('#btn-nueva-nota'), '#nueva-nota', () => e.pagina.keyboard.press('Escape'));
   const bloque = e.pagina.locator('#nota .bloque').nth(1);
-  await probar(async () => { await bloque.hover(); await bloque.locator('[data-accion="editar"]').click(); }, '#editor', () => e.pagina.keyboard.press('Escape'));
+  await probar(async () => { await bloque.hover(); await bloque.locator('[data-accion="comentar"]').click(); }, '#editor', () => e.pagina.keyboard.press('Escape'));
 });
 
 test('contraste en oscuro: el enlace del panel Tareas pasa de 4,5:1 y los controles nativos siguen el tema (color-scheme)', async () => {

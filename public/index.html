@@ -8,6 +8,33 @@
 <link rel="stylesheet" href="/assets/katex/dist/katex.min.css">
 <link rel="stylesheet" href="/assets/@xterm/xterm/css/xterm.css">
 <link rel="stylesheet" href="/public/estilo.css">
+<script type="importmap">
+{
+ "imports": {
+   "@codemirror/state": "/assets/@codemirror/state/dist/index.js",
+   "@codemirror/view": "/assets/@codemirror/view/dist/index.js",
+   "@codemirror/language": "/assets/@codemirror/language/dist/index.js",
+   "@codemirror/lang-markdown": "/assets/@codemirror/lang-markdown/dist/index.js",
+   "@codemirror/commands": "/assets/@codemirror/commands/dist/index.js",
+   "@lezer/markdown": "/assets/@lezer/markdown/dist/index.js",
+   "@codemirror/autocomplete": "/assets/@codemirror/autocomplete/dist/index.js",
+   "@codemirror/lang-css": "/assets/@codemirror/lang-css/dist/index.js",
+   "@codemirror/lang-html": "/assets/@codemirror/lang-html/dist/index.js",
+   "@codemirror/lang-javascript": "/assets/@codemirror/lang-javascript/dist/index.js",
+   "@codemirror/streamparser": "/assets/@codemirror/streamparser/dist/index.js",
+   "@lezer/common": "/assets/@lezer/common/dist/index.js",
+   "@lezer/css": "/assets/@lezer/css/dist/index.js",
+   "@lezer/highlight": "/assets/@lezer/highlight/dist/index.js",
+   "@lezer/html": "/assets/@lezer/html/dist/index.js",
+   "@lezer/javascript": "/assets/@lezer/javascript/dist/index.js",
+   "@lezer/lr": "/assets/@lezer/lr/dist/index.js",
+   "@marijn/find-cluster-break": "/assets/@marijn/find-cluster-break/src/index.js",
+   "crelt": "/assets/crelt/index.js",
+   "style-mod": "/assets/style-mod/src/style-mod.js",
+   "w3c-keyname": "/assets/w3c-keyname/index.js"
+ }
+}
+</script>
 </head>
 <body>
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -50,7 +77,7 @@
     </footer>
   </aside>
   <main id="centro">
-    <div class="miga-barra"><button type="button" id="btn-desplegar" class="secundario" aria-label="Abrir la barra lateral" aria-expanded="false" aria-controls="lateral" title="Abrir la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button><button type="button" id="btn-menu" class="secundario" aria-label="Abrir el menú" aria-controls="lateral" aria-expanded="false"><svg class="icono" aria-hidden="true"><use href="#i-menu"/></svg></button><div id="miga" aria-label="Ruta de la nota"></div></div>
+    <div class="miga-barra"><button type="button" id="btn-desplegar" class="secundario" aria-label="Abrir la barra lateral" aria-expanded="false" aria-controls="lateral" title="Abrir la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button><button type="button" id="btn-menu" class="secundario" aria-label="Abrir el menú" aria-controls="lateral" aria-expanded="false"><svg class="icono" aria-hidden="true"><use href="#i-menu"/></svg></button><div id="miga" aria-label="Ruta de la nota"></div><button type="button" id="btn-editar" class="secundario" title="Editar la nota (E)" hidden><svg class="icono" aria-hidden="true"><use href="#i-lapiz"/></svg>Editar</button></div>
     <article id="nota" tabindex="-1"></article>
     <section id="panel" hidden></section>
     <nav id="indice" aria-label="Índice de la nota" hidden></nav>
@@ -101,6 +128,7 @@
       <label>Tema <select id="ajustes-tema"><option value="auto">Como el sistema</option><option value="claro">Claro</option><option value="oscuro">Oscuro</option></select></label>
       <label>Letra <select id="ajustes-letra"><option value="pequeña">Pequeña</option><option value="media">Media</option><option value="grande">Grande</option></select></label>
       <label>Fuente de lectura <select id="ajustes-fuente"><option value="sistema">Del sistema</option><option value="serif">Con serifa</option></select></label>
+      <label>Editor <select id="ajustes-editor"><option value="vista">Con vista</option><option value="plano">Markdown plano</option></select></label>
       <label>Panel de la terminal <select id="ajustes-panel"><option value="derecha">A la derecha</option><option value="abajo">Abajo</option></select></label>
       <label>Comando del profesor en carpetas sin kit <input id="ajustes-comando" placeholder="claude" autocomplete="off"></label>
     </form>

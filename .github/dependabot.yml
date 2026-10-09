@@ -1,0 +1,19 @@
+# Dependencias npm, una vez por semana. CodeMirror y Lezer van juntos: se resuelven sin bundler con un import map
+# (public/index.html) y dos versiones mezcladas de @codemirror/@lezer rompen el editor; tests/importmap.test.js lo vigila.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      codemirror:
+        patterns:
+          - "@codemirror/*"
+          - "@lezer/*"
+      resto:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@codemirror/*"
+          - "@lezer/*"

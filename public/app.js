@@ -16,7 +16,7 @@ async function api(p, body) {
   if (!r.ok) {
     if (r.status === 404 && p.startsWith('/api/') && !avisoCerrado) $('#aviso-reinicio').hidden = false;   // una ruta que el servidor no conoce: es de antes
     if (r.status === 403) avisarError('Esta pestaña ha perdido el permiso: arranca la app desde la terminal y entra por la pestaña que abre.');
-    if (r.status === 409 && rutaActual) { avisarError('Esta nota cambió en el disco mientras la tenías abierta. La he vuelto a cargar: repite el cambio.'); abrirNota(rutaActual); }
+    if (r.status === 409 && rutaActual && !edicion) { avisarError('Esta nota cambió en el disco mientras la tenías abierta. La he vuelto a cargar: repite el cambio.'); abrirNota(rutaActual); }
     throw Object.assign(new Error(d.error || `error ${r.status}`), { status: r.status });
   }
   return d;
@@ -156,7 +156,8 @@ document.addEventListener('keydown', e => {
 });
 
 // ---------- mostrar en el gestor de archivos del sistema (Finder, Explorador…)
-const GESTOR = /Mac/i.test(navigator.platform) ? 'el Finder' : /Win/i.test(navigator.platform) ? 'el Explorador' : 'la carpeta';
+const MAC = /Mac/i.test(navigator.platform);
+const GESTOR = MAC ? 'el Finder' : /Win/i.test(navigator.platform) ? 'el Explorador' : 'la carpeta';
 const botonMostrar = (ruta, nombre) => `<button type="button" class="mostrar" data-mostrar="${esc(ruta)}" title="Mostrar en ${GESTOR}" aria-label="Mostrar ${esc(String(nombre).replace(/<[^>]*>/g, ''))} en ${GESTOR}">${icono('carpeta')}</button>`;
 const botonOcultar = (ruta, nombre) => `<button type="button" class="ocultar" data-ocultar="${esc(ruta)}" title="Ocultar aquí (solo en la app; se recupera en Ajustes)" aria-label="Ocultar ${esc(String(nombre).replace(/<[^>]*>/g, ''))}">${icono('ojo-tachado')}</button>`;
 // En un fichero, además, la papelera, la última y algo separada (crítica 2026-10-08: sin confirmar, el hueco es lo que la protege).
@@ -265,6 +266,7 @@ function sinPortada() {
   $('#nota').innerHTML = `<h1>${esc(cuaderno().nombre)}</h1><p class="resumen">Esta carpeta no tiene una nota de portada. Elige una nota en el árbol de la izquierda o busca con <kbd>Ctrl K</kbd>.</p>`;
 }
 async function abrirNota(ruta, lineaDestino) {
+  soltarEdicion();   // pintar una nota (otra, o esta recién escrita) cierra el editor que hubiera
   // La misma nota otra vez (recarga en vivo, un comentario recién escrito) conserva el scroll; una nota nueva empieza arriba.
   const recarga = rutaActual === ruta && !$('#nota').hidden && lineaDestino == null, scrollAntes = $('#centro').scrollTop;
   if (rutaActual !== ruta) { vistaNota = null; ultimoMostrado = null; }
@@ -274,6 +276,7 @@ async function abrirNota(ruta, lineaDestino) {
   try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonCopiar(ruta) + (n.generado ? '' : botonPapelera(ruta, ruta.split('/').pop()));   // una nota que regenera el profesor no se manda a la papelera desde aquí
   ancho(!!n.esHtml, !!n.esHtml);
+  $('#btn-editar').hidden = !!(n.esFichero || n.esHtml);   // lo que no es Markdown no se edita aquí
   if (n.esFichero) return abrirFichero(ruta, n.tipo);
   const tipo = n.frontmatter && n.frontmatter.tipo;
   if (vistaNota !== ruta && tipo === 'examen') return abrirExamen(ruta);
@@ -290,13 +293,13 @@ async function abrirNota(ruta, lineaDestino) {
   const h1 = $('#nota .bloque > h1');
   if (props) (h1 ? h1.closest('.bloque') : $('#nota')).insertAdjacentHTML(h1 ? 'afterend' : 'afterbegin', props);
   $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* se queda el texto */ } });
-  // acciones por bloque: editar y comentar, dos iconos en el margen izquierdo; el bloque no cambia de color (Roberto,
+  // acciones por bloque: comentar, un icono en el margen izquierdo (editar es de la nota entera: botón «Editar» de la miga); el bloque no cambia de color (Roberto,
   // 2026-10-08: el fondo al pasar el ratón distraía). Con teclado: Tab hasta el bloque y aparecen.
-  // Un solo punto de Tab en toda la nota (hallazgo 7): flechas entre bloques, E edita y C comenta el bloque enfocado.
+  // Un solo punto de Tab en toda la nota (hallazgo 7): flechas entre bloques, C comenta el bloque enfocado (E edita la nota entera).
   $('#nota').querySelectorAll('.bloque').forEach((b, i) => {
     b.tabIndex = i === 0 ? 0 : -1;
     const acc = document.createElement('div'); acc.className = 'acciones';
-    acc.innerHTML = `<button type="button" tabindex="-1" data-accion="editar" aria-label="Editar este bloque" title="Editar (tecla E con el bloque enfocado)">${icono('lapiz')}</button><button type="button" tabindex="-1" data-accion="comentar" aria-label="Comentar este bloque" title="Comentar (tecla C con el bloque enfocado)">${icono('comentar')}</button>`;
+    acc.innerHTML = `<button type="button" tabindex="-1" data-accion="comentar" aria-label="Comentar este bloque" title="Comentar (tecla C con el bloque enfocado)">${icono('comentar')}</button>`;
     b.prepend(acc);
   });
   $('#nota').dataset.vista = 'nota';   // una nota normal: el índice se puede mostrar (refrescarIndice)
@@ -360,7 +363,6 @@ $('#nota').addEventListener('click', async e => {
   const btn = t.closest('button[data-accion]'); if (!btn) return;
   const b = btn.closest('.bloque'); const desde = +b.dataset.desde, hasta = +b.dataset.hasta;
   const original = lineasDe(await textoFichero(rutaActual)).slice(desde, hasta).join('\n');
-  if (btn.dataset.accion === 'editar') abrirEditor('Editar bloque', original, `líneas ${desde + 1}–${hasta}`, async texto => { await api('/api/bloque', { ruta: rutaActual, desde, hasta, texto, original }); avisar('Cambio escrito en la nota'); abrirNota(rutaActual); });
   if (btn.dataset.accion === 'comentar') abrirEditor('Comentar este bloque', '', 'se guarda en la nota, debajo del bloque', async texto => { if (!texto.trim()) return; await api('/api/comentario', { ruta: rutaActual, desde, hasta, texto, original }); avisar('Comentario añadido a la nota'); abrirNota(rutaActual); refrescarContadores(); }, { boton: 'Comentar', verbo: 'comenta' });
 });
 $('#nota').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('callout-titulo')) e.target.click(); });
@@ -370,7 +372,7 @@ $('#nota').addEventListener('keydown', e => {
   const bs = [...$('#nota').querySelectorAll('.bloque')], i = bs.indexOf(b);
   if (e.key === 'ArrowDown' && bs[i + 1]) { e.preventDefault(); bs[i + 1].focus(); }
   else if (e.key === 'ArrowUp' && bs[i - 1]) { e.preventDefault(); bs[i - 1].focus(); }
-  else if (e.key.toLowerCase() === 'e' || e.key.toLowerCase() === 'c') { const bt = b.querySelector(`[data-accion="${e.key.toLowerCase() === 'e' ? 'editar' : 'comentar'}"]`); if (bt) { e.preventDefault(); bt.click(); } }
+  else if (e.key.toLowerCase() === 'c') { const bt = b.querySelector('[data-accion="comentar"]'); if (bt) { e.preventDefault(); bt.click(); } }
 });
 
 // ---------- examen como formulario
@@ -453,7 +455,68 @@ document.addEventListener('keydown', e => {
   if (m) { e.preventDefault(); accionTarjeta(m); }
 });
 
-// ---------- editor modal
+// ---------- editor de la nota entera (CodeMirror, public/live.js; Roberto, 2026-10-09)
+// «Editar» (botón de la miga o tecla E) cambia la hoja por el editor con el texto del fichero tal cual; «Aplicar» lo
+// escribe entero (/api/nota/escribir) y vuelve a la lectura, en el mismo bloque. Hasta aplicar no se toca el fichero.
+let edicion = null;   // { ruta, original (como lo sirve /fichero), linea (donde estaba el lector) }
+let live = null;      // el módulo public/live.js, la primera vez que se edita
+const teclaAplicar = MAC ? '⌘ Enter' : 'Ctrl Enter';
+const desplazamientoDeLinea = (texto, linea) => texto.split('\n').slice(0, linea).reduce((a, l) => a + l.length + 1, 0);
+async function entrarEdicion() {
+  if (edicion || !rutaActual || $('#nota').hidden || $('#btn-editar').hidden || dialogoAbierto()) return;
+  const ruta = rutaActual, centro = $('#centro');
+  // El bloque que se estaba leyendo (el primero que asoma bajo la miga): el cursor queda en su primera línea. Arriba del todo, al principio.
+  const tope = $('.miga-barra').getBoundingClientRect().bottom;
+  const bloque = centro.scrollTop > 0 ? [...$('#nota').querySelectorAll('.bloque')].find(b => b.getBoundingClientRect().bottom > tope + 4) : null;
+  let original;
+  try { original = await textoFichero(ruta); live = live || await import('/public/live.js'); } catch (e) { return avisarError('No se ha podido abrir el editor.', e.message); }
+  if (rutaActual !== ruta || edicion) return;   // mientras llegaba se cambió de nota
+  const texto = original.replace(/\r\n/g, '\n'), linea = bloque ? +bloque.dataset.desde : 0;
+  edicion = { ruta, original, linea };
+  $('#btn-editar').hidden = true;
+  $('#nota').dataset.vista = 'edicion';
+  $('#nota').innerHTML = `<div id="edicion-cm"></div><div class="edicion-pie"><button type="button" id="edicion-cancelar" class="secundario">Cancelar</button><button type="button" id="edicion-aplicar" class="primario">Aplicar</button><span class="pista">${teclaAplicar} aplica · Esc cancela</span></div>`;
+  live.montar($('#edicion-cm'), texto, { plano: info.configuracion.editor === 'plano', posicion: desplazamientoDeLinea(texto, linea) });
+  $('#edicion-cancelar').onclick = () => salirEdicion();
+  $('#edicion-aplicar').onclick = aplicarEdicion;
+}
+// Cierra el editor sin repintar (otra pantalla lo sustituye).
+function soltarEdicion() { if (!edicion) return; edicion = null; if (live) live.destruir(); }
+async function salirEdicion() {
+  if (!edicion) return;
+  const { ruta, linea } = edicion;
+  soltarEdicion();
+  await abrirNota(ruta);
+  const b = [...$('#nota').querySelectorAll('.bloque')].find(x => +x.dataset.desde <= linea && linea < +x.dataset.hasta);
+  if (b && linea > 0) { b.scrollIntoView({ block: 'start' }); $('#centro').scrollTop -= $('.miga-barra').offsetHeight + 8; }
+  if (!$('#btn-editar').hidden) $('#btn-editar').focus();
+}
+async function aplicarEdicion() {
+  if (!edicion) return;
+  const { ruta, original } = edicion, texto = live.texto();
+  if (texto === original.replace(/\r\n/g, '\n')) return salirEdicion();   // nada que escribir
+  try { await api('/api/nota/escribir', { ruta, texto, original }); }
+  catch (e) { return avisarError(e.status === 409 ? 'La nota cambió en el disco mientras la editabas. Lo que has escrito sigue aquí.' : 'No se ha podido escribir la nota.', e.message); }
+  avisar('Nota escrita');
+  await salirEdicion();
+  refrescarContadores();
+}
+$('#btn-editar').onclick = entrarEdicion;
+// Esc cancela y Ctrl/⌘ Enter aplica, con el foco en el editor (en captura: el editor no debe insertar una línea con Mod-Enter).
+$('#nota').addEventListener('keydown', e => {
+  if (!edicion || !e.target.closest('#edicion-cm')) return;
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); salirEdicion(); }
+  else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); aplicarEdicion(); }
+}, true);
+// E, con la nota a la vista y el foco fuera de un campo de texto, de otro panel o de un diálogo.
+document.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() !== 'e' || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.defaultPrevented) return;
+  const t = e.target;
+  if (t.closest('input, textarea, select, [contenteditable], .cm-editor, #lateral, #cajon, [role="dialog"]')) return;
+  if (!$('#btn-editar').hidden) { e.preventDefault(); entrarEdicion(); }
+});
+
+// ---------- editor modal (hoy solo para comentar un bloque)
 let alGuardar = null, foco = null;
 // «Guardar» es solo del repositorio (revisión de diseño 2026-10-09, hallazgo 3): el editor de un bloque escribe en la nota y lo dice con otro verbo.
 // Con un diálogo abierto, lo de detrás queda `inert` y el Tab da la vuelta dentro (hallazgo 8, WCAG 2.4.3): aria-modal no basta.
@@ -772,7 +835,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { for (const
 function aplicarApariencia(c) { const r = document.documentElement; r.dataset.tema = c.tema; r.dataset.letra = c.letra; r.dataset.fuente = c.fuente; }
 function abrirAjustes() {
   const c = info.configuracion;
-  $('#ajustes-tema').value = c.tema; $('#ajustes-letra').value = c.letra; $('#ajustes-fuente').value = c.fuente; $('#ajustes-panel').value = posicionCajon(); $('#ajustes-comando').value = c.comando_agente || '';
+  $('#ajustes-tema').value = c.tema; $('#ajustes-letra').value = c.letra; $('#ajustes-fuente').value = c.fuente; $('#ajustes-editor').value = c.editor; $('#ajustes-panel').value = posicionCajon(); $('#ajustes-comando').value = c.comando_agente || '';
   foco = document.activeElement; $('#ajustes').hidden = false; sincronizarInerte(); $('#ajustes-tema').focus(); pintarOcultas();
 }
 function cerrarAjustes() { $('#ajustes').hidden = true; sincronizarInerte(); if (foco) foco.focus(); }
@@ -803,7 +866,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#latera
 $('#lateral').addEventListener('click', e => { if (e.target.closest('a') && window.innerWidth <= 760) menuLateral(false); });
 $('#ajustes-cerrar').onclick = cerrarAjustes;
 $('#ajustes form').addEventListener('change', async () => {
-  info.configuracion = await api('/api/configuracion', { tema: $('#ajustes-tema').value, letra: $('#ajustes-letra').value, fuente: $('#ajustes-fuente').value, panel: $('#ajustes-panel').value, comando_agente: $('#ajustes-comando').value });
+  info.configuracion = await api('/api/configuracion', { tema: $('#ajustes-tema').value, letra: $('#ajustes-letra').value, fuente: $('#ajustes-fuente').value, editor: $('#ajustes-editor').value, panel: $('#ajustes-panel').value, comando_agente: $('#ajustes-comando').value });
   aplicarApariencia(info.configuracion); aplicarCajon();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ajustes').hidden) cerrarAjustes(); });
@@ -829,6 +892,7 @@ async function cargarCuaderno() {
 // ---------- rutas
 function enrutar() {
   const h = location.hash;
+  soltarEdicion(); $('#btn-editar').hidden = true;   // abrirNota lo vuelve a enseñar si la pantalla es una nota
   if (!cuaderno() || h === '#/cuadernos') { abrirCuadernos(); marcarActiva(); return; }
   if (enTareas()) abrirTareas(); else if (h === '#/comentarios') abrirComentarios();
   else if (h.startsWith('#/n/')) { const [ruta, q] = h.slice(4).split('?'); const l = q && new URLSearchParams(q).get('l'); abrirNota(decodeURI(ruta), l != null ? +l : null); }
@@ -839,7 +903,7 @@ function enrutar() {
 window.addEventListener('hashchange', enrutar);
 
 // ---------- recarga en vivo
-try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
+try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
 
 (async () => {
   info = await api('/api/info');
