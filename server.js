@@ -1,16 +1,18 @@
 'use strict';
 // Cuaderno: abre una carpeta de notas en el navegador.
-//   node server.js [carpeta-del-cuaderno] [puerto] [-n]
-// Sin carpeta, arranca en la pantalla de cuadernos (los recientes y "abrir carpeta"). Abre una pestaña del navegador
-// ya dentro de la app; con -n (--no-abrir), no.
+//   node server.js [carpeta-del-cuaderno] [puerto] [-n] [-e]
+// Sin carpeta, abre el último cuaderno (el reciente más nuevo cuya carpeta existe); si no hay, arranca en la pantalla
+// de cuadernos (los recientes y "abrir carpeta"), que es también lo que da -e (--elegir). Abre una pestaña del
+// navegador ya dentro de la app; con -n (--no-abrir), no.
 const path = require('node:path');
 const fs = require('node:fs');
 const { crearServidor } = require('./servidor');
 const sistema = require('./sistema');
 
 const noAbrir = process.argv.slice(2).some(a => a === '-n' || a === '--no-abrir');
+const elegir = process.argv.slice(2).some(a => a === '-e' || a === '--elegir');
 const argumentos = process.argv.slice(2).filter(a => !a.startsWith('-'));
-const carpeta = argumentos[0] && !/^\d+$/.test(argumentos[0]) ? path.resolve(argumentos[0]) : null;
+const carpetaArg = argumentos[0] && !/^\d+$/.test(argumentos[0]) ? path.resolve(argumentos[0]) : null;
 const puerto = Number(argumentos[1] || (/^\d+$/.test(argumentos[0] || '') ? argumentos[0] : 7331));
 let pty = null;
 try {
@@ -23,14 +25,19 @@ try {
 
 // El código de la URL es el del usuario (config.token(): fijo entre arranques); CUADERNO_TOKEN lo cambia si se fija.
 const config = require('./config');
+const { carpeta, origen } = config.cuadernoAlArrancar(carpetaArg, config.leer().recientes, r => fs.statSync(r).isDirectory(), elegir);
 const server = crearServidor({ pty, token: process.env.CUADERNO_TOKEN || config.token() });
 if (carpeta) {
-  try { server.abrir(carpeta); } catch (e) { console.error(`No se puede abrir ${carpeta}: ${e.message}`); process.exit(2); }
+  try { server.abrir(carpeta); } catch (e) {
+    if (origen === 'argumento') { console.error(`No se puede abrir ${carpeta}: ${e.message}`); process.exit(2); }
+    console.error(`No se puede abrir el último cuaderno (${carpeta}): ${e.message}`);   // el reciente falla: pantalla de cuadernos
+  }
 }
 server.listen(puerto, '127.0.0.1', () => {
   const { cuaderno, kit } = server.estado;
   if (cuaderno) {
     const que = { kit: 'cuaderno con kit', 'salida-sin-motor': 'cuaderno del kit sin motor (no se puede guardar desde aquí)', carpeta: 'carpeta de notas sin kit' }[kit.tipo];
+    if (origen === 'reciente') console.log('Abierto el último cuaderno (con -e eliges otro)');
     console.log(`Cuaderno · ${kit.base} · ${que}${kit.tipo === 'kit' && !kit.comando ? ' · sin comando de profesor' : ''}`);
   } else console.log('Cuaderno · sin carpeta: elige uno en la pantalla de cuadernos');
   console.log(`Abre: ${server.url()}`);

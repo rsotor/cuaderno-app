@@ -17,9 +17,9 @@ const abrirDelArbol = async nombre => {
 test.before(async () => { e = await arrancar({ kit: false }); });
 test.after(async () => { if (e) await e.cerrar(); });
 
-test('HTML: la página corre con su script, ocupa el ancho y casi todo el alto, y el árbol la titula con su <title>', async () => {
+test('HTML: la página corre con su script, ocupa el ancho y casi todo el alto, el árbol la nombra por su fichero y la miga, con su <title>', async () => {
   await e.ir('#/');
-  await abrirDelArbol('Calculadora 50/30/20');
+  await abrirDelArbol('calculadora-50-30-20.html');
   const marco = await visible(e.pagina.locator('#nota iframe.ejercicio'), 'html', 'el iframe de la página');
   const f = e.pagina.frameLocator('#nota iframe.ejercicio');
   await conTexto(f.locator('[data-parte="Ahorro"]'), /360,00/, 'html', 'el cálculo del script (20 % de 1800)');
@@ -147,4 +147,28 @@ test('la miga de una nota que regenera el profesor (inicio.md) no ofrece la pape
   assert.equal(await e.pagina.locator('#miga button.papelera').count(), 0, 'miga: inicio.md (lo genera el profesor) ofrece la papelera');
   await e.ir('#/n/material/material.md');
   await visible(e.pagina.locator('#miga button.papelera'), 'miga', 'la papelera en una nota normal');
+});
+
+test('adjuntos: audio y vídeo con su reproductor; lo que la app no sabe enseñar lleva al Finder; una carpeta con solo un .gitkeep sale y dice que está vacía', async () => {
+  fs.writeFileSync(path.join(e.c.base, 'adjuntos', 'grabacion.mp4'), 'vídeo de mentira: basta para el reproductor');
+  await e.ir('#/');
+  const abrir = async nombre => {
+    const carpeta = e.pagina.locator('#arbol details[data-carpeta="adjuntos"]');
+    if (!(await carpeta.evaluate(d => d.open))) await carpeta.locator(':scope > summary .nombre').click();
+    await (await visible(hoja(nombre), 'adjuntos', `«${nombre}» en la carpeta adjuntos`)).click();
+  };
+  await abrir('nota-de-voz.wav');
+  assert.match(await (await visible(e.pagina.locator('#nota audio[controls]'), 'audio', 'el reproductor')).getAttribute('src'), /\/fichero\/adjuntos\/nota-de-voz\.wav$/);
+  await abrir('grabacion.mp4');
+  await hasta(() => e.pagina.locator('#nota video[controls]').count(), 'vídeo', 'no aparece el reproductor');   // de mentira: no tiene tamaño que ver
+  const antes = e.lanzado.length;
+  await abrir('presupuesto.xlsx');
+  await conTexto(e.pagina.locator('#nota'), /no sabe enseñar/, 'xlsx', 'el aviso de que la app no lo enseña');
+  await hasta(() => e.lanzado.length === antes + 1, 'xlsx', 'no lo señala en el Finder al abrirlo');
+  assert.deepEqual(e.lanzado.at(-1).args, ['-R', path.join(e.c.base, 'adjuntos', 'presupuesto.xlsx')]);
+  await e.pagina.click('#nota button[data-mostrar]');
+  await hasta(() => e.lanzado.length === antes + 2, 'xlsx', 'el botón no lo vuelve a señalar');
+  const vacia = e.pagina.locator('#arbol details[data-carpeta="adjuntos/vacia"]');
+  await vacia.locator('summary .nombre').click();
+  await visible(vacia.locator('.carpeta-vacia'), 'adjuntos', 'la carpeta vacía dice que está vacía');
 });

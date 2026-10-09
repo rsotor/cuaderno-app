@@ -17,7 +17,7 @@ const item = texto => e.pagina.locator('#panel .item', { hasText: texto });
 test('panel Tareas: agrupa por nota y marcar una casilla escribe en tareas.md', async () => {
   await e.ir('#/tareas');
   await conTexto(e.pagina.locator('#panel h1'), /^Tareas$/, 'tareas', 'el título del panel');
-  await conTexto(e.pagina.locator('#panel .resumen'), /^2 de 6 hechas\./, 'tareas', 'el recuento de hechas');
+  await conTexto(e.pagina.locator('#panel .resumen'), /^3 de 11 hechas\./, 'tareas', 'el recuento de hechas');
   await visible(e.pagina.locator('#panel .grupo h2 a', { hasText: 'Mis tareas' }), 'tareas', 'el grupo de tareas.md con su título');
   await visible(e.pagina.locator('#panel .grupo h2 a', { hasText: '1.1 La sesión' }), 'tareas', 'el grupo de la sesión');
   await visible(item('Repasar con capital').locator('.etiqueta', { hasText: '#repaso' }), 'tareas', 'la etiqueta #repaso pintada en su tarea');
@@ -42,7 +42,7 @@ test('«+» en el buscador: la pista, Enter añade a tareas.md y el panel se rep
   await hasta(async () => (await e.pagina.locator('#buscador').inputValue()) === '', 'buscador', 'el buscador no se vació tras añadir');
   await visible(e.pagina.locator('#arbol > .fila a.hoja'), 'buscador', 'el árbol de notas de vuelta en el lateral');   // las de la raíz: las carpetas salen plegadas
   await visible(item('Pedir apuntes').locator('.etiqueta', { hasText: '#clase' }), 'tareas', 'la tarea nueva con su etiqueta en el panel');
-  await conTexto(e.pagina.locator('#n-tareas'), /^\(4\)$/, 'lateral', 'el contador de pendientes');
+  await conTexto(e.pagina.locator('#n-tareas'), /^\(8\)$/, 'lateral', 'el contador de pendientes');
 });
 
 test('«+» con una nota abierta: la tarea lleva [[la nota]] al final', async () => {
@@ -60,19 +60,19 @@ test('filtros: por nota enlazada, por etiqueta y por estado; van en el hash y so
   await e.ir('#/tareas');
   const nota = await visible(e.pagina.locator('#filtro-nota'), 'tareas', 'el filtro por nota (hay tareas con [[enlaces]])');
   await visible(e.pagina.locator('label[for="filtro-nota"]'), 'tareas', 'la etiqueta <label> del filtro por nota');
-  assert.deepEqual(await nota.locator('option').allTextContents(), ['Todas', '1.1 La sesión', 'Capital', 'Interés'], 'tareas: las opciones del filtro por nota no son los títulos de las notas enlazadas');
+  assert.deepEqual(await nota.locator('option').allTextContents(), ['Todas', '1.1 La sesión', 'Ana', 'Capital', 'Interés'], 'tareas: las opciones del filtro por nota no son los títulos de las notas enlazadas');
   await nota.focus(); await nota.selectOption('interes');   // como con el teclado: el foco está en el control al cambiarlo
   await hashCumple(e.pagina, /^#\/tareas\?nota=interes$/, 'tareas');
   await visible(item('Releer esto'), 'tareas · filtro nota', 'la tarea enlazada a Interés');
   await oculto(item('Comprar cuaderno'), 'tareas · filtro nota', 'una tarea sin enlace');
   await visible(item('Leer interes'), 'tareas · filtro nota', 'la tarea de la sesión que enlaza a Interés');
   await oculto(e.pagina.locator('#panel .grupo:has(h2 a[title="conceptos/interes.md"])'), 'tareas · filtro nota', 'el grupo de Interés, sin tareas que cumplan');
-  await conTexto(e.pagina.locator('#filtro-resumen'), /^2 de 8 tareas$/, 'tareas · filtro nota', 'el resumen del filtro');
+  await conTexto(e.pagina.locator('#filtro-resumen'), /^2 de 13 tareas$/, 'tareas · filtro nota', 'el resumen del filtro');
   assert.equal(await e.pagina.evaluate(() => document.activeElement && document.activeElement.id), 'filtro-nota', 'tareas: el foco se fue del control al filtrar');
 
   await nota.selectOption('');
   const etiqueta = await visible(e.pagina.locator('#filtro-etiqueta'), 'tareas', 'el filtro por etiqueta');
-  assert.deepEqual(await etiqueta.locator('option').allTextContents(), ['Todas', '#clase', '#repaso', '#tema/dinero']);
+  assert.deepEqual(await etiqueta.locator('option').allTextContents(), ['Todas', '#Ana', '#clase', '#mudanza', '#repaso', '#tema/dinero']);
   await etiqueta.selectOption('clase');
   await hashCumple(e.pagina, /^#\/tareas\?etiqueta=clase$/, 'tareas');
   await visible(item('Pedir apuntes'), 'tareas · filtro etiqueta', 'la tarea con #clase');
@@ -84,7 +84,7 @@ test('filtros: por nota enlazada, por etiqueta y por estado; van en el hash y so
   await visible(item('Comprar cuaderno'), 'tareas · hechas', 'la tarea marcada antes');
   await visible(item('Hecho ya'), 'tareas · hechas', 'la tarea hecha de la sesión');
   await oculto(item('Pedir apuntes'), 'tareas · hechas', 'una tarea pendiente');
-  await conTexto(e.pagina.locator('#filtro-resumen'), /^3 de 8 tareas$/, 'tareas · hechas', 'el resumen');
+  await conTexto(e.pagina.locator('#filtro-resumen'), /^4 de 13 tareas$/, 'tareas · hechas', 'el resumen');
 
   await e.pagina.reload();
   await visible(e.pagina.locator('#filtro-estado'), 'tareas tras recargar', 'los filtros');
@@ -92,10 +92,20 @@ test('filtros: por nota enlazada, por etiqueta y por estado; van en el hash y so
   await oculto(item('Pedir apuntes'), 'tareas tras recargar', 'una tarea pendiente con el filtro «hechas»');
   await visible(e.pagina.locator('.paginas a.activa', { hasText: 'Tareas' }), 'tareas tras recargar', 'el enlace Tareas activo con filtros en el hash');
 
+  // Recordados: salir a otra pantalla y volver por la barra lateral recupera el filtro.
+  const volverATareas = async () => { await e.ir('#/'); await e.pagina.locator('.paginas a', { hasText: 'Tareas' }).click(); };
+  await volverATareas();
+  await hashCumple(e.pagina, /^#\/tareas\?estado=hechas$/, 'tareas recordadas');
+  assert.equal(await e.pagina.locator('#filtro-estado').inputValue(), 'hechas', 'tareas recordadas: el select no recuperó «hechas»');
+
   await e.pagina.locator('#filtro-quitar').click();
   await hashCumple(e.pagina, /^#\/tareas$/, 'tareas');
   await visible(item('Pedir apuntes'), 'tareas sin filtros', 'todas las tareas de vuelta');
   await oculto(e.pagina.locator('#filtro-quitar'), 'tareas sin filtros', 'el botón «Quitar filtros»');
+
+  await volverATareas();   // tras «Quitar filtros», nada que recordar
+  await hashCumple(e.pagina, /^#\/tareas$/, 'tareas olvidadas');
+  assert.equal(await e.pagina.locator('#filtro-estado').inputValue(), 'todas', 'tareas olvidadas: quedó un filtro de estado');
 });
 
 test('a 390 px el panel con filtros no desborda', async () => {

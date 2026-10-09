@@ -84,6 +84,19 @@ test('la API: info, árbol, nota, escrituras y el 409 cuando la nota cambió', a
   } finally { await s.cerrar(); }
 });
 
+test('/api/tareas-de: las tareas de otras notas que la mencionan; sin kit, solo las de tareas.md', async () => {
+  const s = await arrancar({ kit: true });
+  try {
+    const d = await (await s.pedir('/api/tareas-de?p=personas%2Fana.md')).json();
+    assert.deepEqual(d.map(i => [i.texto, i.ruta, i.hecha]), [['Llamar a ana por las llaves', 'iniciativas/mudanza/pendientes.md', false], ['Pedir la caja de herramientas #Ana', 'iniciativas/mudanza/pendientes.md', false]]);
+    const t = await (await s.pedir('/api/tareas')).json();
+    assert.deepEqual(t.flatMap(g => g.items).find(i => i.texto.includes('#mudanza')).notas, ['iniciativas/mudanza/brief.md']);
+    assert.deepEqual(await (await s.pedir('/api/tareas-de?p=iniciativas/mudanza/pendientes.md')).json(), []);
+  } finally { await s.cerrar(); }
+  const sin = await arrancar();
+  try { assert.deepEqual(await (await sin.pedir('/api/tareas-de?p=personas%2Fana.md')).json(), [], 'sin kit solo cuenta tareas.md'); } finally { await sin.cerrar(); }
+});
+
 test('sin kit: sin profesor y las tareas son solo las propias', async () => {
   const s = await arrancar();
   try {
@@ -307,7 +320,7 @@ test('rutas de lectura y de nota nueva: títulos, recorrido y crear una nota', a
     const t = await (await s.pedir('/api/titulos')).json();
     assert.equal(t['conceptos/capital.md'], 'Capital'); assert.equal(t['material/calculadora-50-30-20.html'], 'Calculadora 50/30/20');
     const r = await (await s.pedir('/api/recorrido')).json();
-    assert.equal(r.notas, 16); assert.deepEqual(r.fallos, []);
+    assert.equal(r.notas, 19); assert.deepEqual(r.fallos, []);
     const n = await (await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).json();
     assert.equal(n.ruta, 'conceptos/Idea nueva.md'); assert.equal(s.c.leer('conceptos/Idea nueva.md'), '# Idea nueva\n\n');   // el título y una línea en blanco para escribir debajo
     assert.equal((await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).status, 400, 'una nota repetida no da error');
@@ -347,5 +360,21 @@ test('ningún GET de la API escribe en el cuaderno', async () => {
     const rutas = [...new Set([...fs.readFileSync(path.join(__dirname, '..', 'servidor.js'), 'utf8').matchAll(/p === '(\/api\/[\w/.-]+)'/g)].map(m => m[1]))];
     for (const r of rutas) await (await s.pedir(`${r}?p=inicio.md&q=a`)).arrayBuffer();
     assert.equal(foto(), antes);
+  } finally { await s.cerrar(); }
+});
+
+test('un fichero del cuaderno se sirve por trozos (Range): vídeo y audio se reproducen y se puede saltar', async () => {
+  const s = await arrancar();
+  try {
+    fs.writeFileSync(path.join(s.c.base, 'clip.mp4'), '0123456789');
+    const r = await s.pedir('/fichero/clip.mp4', { headers: { range: 'bytes=2-5' } });
+    assert.equal(r.status, 206);
+    assert.equal(r.headers.get('content-range'), 'bytes 2-5/10');
+    assert.equal(r.headers.get('content-type'), 'video/mp4');
+    assert.equal(await r.text(), '2345');
+    assert.equal(await (await s.pedir('/fichero/clip.mp4', { headers: { range: 'bytes=-3' } })).text(), '789');
+    assert.equal((await s.pedir('/fichero/clip.mp4', { headers: { range: 'bytes=20-' } })).status, 416);
+    const entero = await s.pedir('/fichero/clip.mp4');
+    assert.equal(entero.status, 200); assert.equal(entero.headers.get('accept-ranges'), 'bytes'); assert.equal(await entero.text(), '0123456789');
   } finally { await s.cerrar(); }
 });

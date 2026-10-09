@@ -85,7 +85,7 @@ test('render: propiedades de cada tipo, enlaces de cada forma, callouts, imágen
   await hasta(async () => (await e.pagina.locator('#nota .katex').count()) >= 2, 'fórmulas', 'las dos fórmulas no salen con KaTeX');
 });
 
-test('estructura: un nombre con acentos y espacios se abre y se busca; títulos repetidos enseñan el fichero; «_» no sale', async () => {
+test('estructura: un nombre con acentos y espacios se abre y se busca; dos notas con el mismo título se distinguen en el árbol por su fichero; «_» no sale', async () => {
   await e.ir('#/');
   await abrirCarpeta('estructura');
   await (await visible(e.pagina.locator('#arbol a.hoja', { hasText: 'Nota con acentos y espacios' }), 'estructura', 'la nota con acentos')).click();
@@ -94,9 +94,10 @@ test('estructura: un nombre con acentos y espacios se abre y se busca; títulos 
   await visible(e.pagina.locator('#arbol a.resultado', { hasText: 'Nota con acentos y espacios' }), 'buscador', 'la nota con acentos en el buscador');
   await e.pagina.fill('#buscador', ''); await e.pagina.press('#buscador', 'Escape');
   await abrirCarpeta('estructura');
-  const repetidas = e.pagina.locator('#arbol a.hoja', { hasText: 'Repetida' });
+  // El árbol enseña el nombre del fichero, no el título (Roberto, 2026-10-09): dos notas con el mismo título no se confunden.
+  const repetidas = e.pagina.locator('#arbol a.hoja', { hasText: 'repetida-' });
   await hasta(async () => (await repetidas.count()) === 2, 'estructura', 'las dos notas «Repetida»');
-  assert.deepEqual(await repetidas.locator('small').allTextContents(), ['repetida-a.md', 'repetida-b.md'], 'estructura: los títulos repetidos no enseñan su fichero');
+  assert.deepEqual(await repetidas.locator('.nombre').allTextContents(), ['repetida-a', 'repetida-b'], 'estructura: el árbol no las nombra por su fichero');
   assert.equal(await e.pagina.locator('#arbol summary', { hasText: '_archivo' }).count(), 0, 'estructura: la carpeta «_archivo» sale en el árbol');
 });
 

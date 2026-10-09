@@ -20,7 +20,7 @@ const { leerTarjetas } = require('./tarjetas');
 const { leerFrontmatter } = require('./markdown');
 
 const COOKIE = 'cuaderno';
-const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.avif': 'image/avif', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' , '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8'};
+const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.avif': 'image/avif', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' , '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8', '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime', '.ogv': 'video/ogg', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.oga': 'audio/ogg', '.flac': 'audio/flac'};
 const PUBLICO = path.join(__dirname, 'public');
 const NODE_MODULES = path.join(__dirname, 'node_modules');
 // Ruta relativa a la raíz del cuaderno tal como se le pasa a una herramienta del kit: siempre con «/», también en
@@ -93,21 +93,30 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
   let ocupado = false;
   const accion = fn => { if (ocupado) throw Object.assign(new Error('hay otra operación en marcha; espera a que termine'), { status: 409 }); ocupado = true; try { return fn(conCuaderno().raiz, estado.kit); } finally { ocupado = false; } };
 
-  const servir = (res, abs, cabeceras = {}) => {
+  const servir = (res, abs, cabeceras = {}, req = null) => {
     if (!fs.existsSync(abs) || fs.statSync(abs).isDirectory()) { res.writeHead(404); return res.end('no existe'); }
-    res.writeHead(200, { 'content-type': TIPOS[path.extname(abs).toLowerCase()] || 'application/octet-stream', 'x-content-type-options': 'nosniff', ...cabeceras });
+    const tam = fs.statSync(abs).size, comunes = { 'content-type': TIPOS[path.extname(abs).toLowerCase()] || 'application/octet-stream', 'x-content-type-options': 'nosniff', 'accept-ranges': 'bytes', ...cabeceras };
+    // Un vídeo o un audio se piden por trozos (Range): Safari no los reproduce sin ellos, y así se puede saltar adelante.
+    const r = /^bytes=(\d*)-(\d*)$/.exec((req && req.headers.range) || '');
+    if (r && (r[1] || r[2])) {
+      const ini = r[1] ? Number(r[1]) : Math.max(0, tam - Number(r[2])), fin = r[1] && r[2] ? Math.min(Number(r[2]), tam - 1) : tam - 1;
+      if (ini > fin || ini >= tam) { res.writeHead(416, { 'content-range': `bytes */${tam}` }); return res.end(); }
+      res.writeHead(206, { ...comunes, 'content-range': `bytes ${ini}-${fin}/${tam}`, 'content-length': fin - ini + 1 });
+      return fs.createReadStream(abs, { start: ini, end: fin }).pipe(res);
+    }
+    res.writeHead(200, { ...comunes, 'content-length': tam });
     fs.createReadStream(abs).pipe(res);
   };
   // Un fichero del cuaderno: dentro de la carpeta también por su ruta real (un enlace simbólico no saca nada de ella).
   // Una página .html o un .svg corre aislada (origen opaco: sin la cookie ni la API de la app), también si alguien la
   // abre en una pestaña y no en el iframe de la app.
-  const servirDelCuaderno = (res, rel) => {
+  const servirDelCuaderno = (res, rel, req) => {
     const cu = conCuaderno(), abs = cu.dentro(rel);
     let real, base;
     try { real = fs.realpathSync(abs); base = fs.realpathSync(cu.base); } catch { res.writeHead(404); return res.end('no existe'); }
     if (real !== base && !real.startsWith(base + path.sep)) throw new ErrorPeticion('ruta fuera del cuaderno');
     const activo = /\.(html?|svg)$/i.test(abs);
-    return servir(res, real, activo ? { 'content-security-policy': 'sandbox allow-scripts allow-forms allow-modals' } : {});
+    return servir(res, real, activo ? { 'content-security-policy': 'sandbox allow-scripts allow-forms allow-modals' } : {}, req);
   };
   const json = (res, obj, code = 200) => { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(obj)); };
   const leerCuerpo = req => new Promise((ok, mal) => {
@@ -147,6 +156,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
       if (p === '/api/buscar') { const r = conCuaderno().buscar(url.searchParams.get('q') || ''); return json(res, { ficheros: r.ficheros.filter(f => !oculta(f)), lineas: r.lineas.filter(l => !oculta(l.ruta)) }); }
       if (p === '/api/nota') return json(res, conCuaderno().nota(url.searchParams.get('p')));
       if (p === '/api/tareas') return json(res, conCuaderno().tareas({ soloPropias: estado.kit.tipo === 'carpeta' }));   // una salida del kit sin motor sigue teniendo sus formatos
+      if (p === '/api/tareas-de') return json(res, conCuaderno().tareasDe(url.searchParams.get('p'), { soloPropias: estado.kit.tipo === 'carpeta' }));   // «Tareas que la mencionan» al final de una nota
       if (p === '/api/comentarios') return json(res, conCuaderno().comentarios());
       if (p === '/api/recorrido') return json(res, conCuaderno().recorrido());
       if (p === '/api/examen') {
@@ -166,7 +176,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
         return json(res, { ruta: rel, titulo, tarjetas: t.map(x => ({ ...x, pregunta: cu.md.renderInline(x.pregunta, {}), respuesta: cu.md.render(x.respuesta, {}) })) });
       }
       if (p === '/api/guardar/propuesta') { const raiz = conCuaderno().raiz; return json(res, { mensaje: acciones.proponerMensaje(raiz), cambios: acciones.cambios(raiz), repo: acciones.esRepo(raiz), kit: estado.kit.tipo }); }
-      if (p.startsWith('/fichero/')) return servirDelCuaderno(res, decodeURIComponent(p.slice(9)));
+      if (p.startsWith('/fichero/')) return servirDelCuaderno(res, decodeURIComponent(p.slice(9)), req);
       if (req.method === 'POST') {
         const b = await leerCuerpo(req);
         if (p === '/api/abrir') return json(res, abrir(b.ruta));

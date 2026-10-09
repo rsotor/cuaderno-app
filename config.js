@@ -91,6 +91,16 @@ function token() {
   try { fs.chmodSync(f, 0o600); } catch { /* Windows: los permisos los da la carpeta del usuario */ }
   return t;
 }
+// Qué cuaderno abre el arranque: la carpeta que se pasa; si no hay (y no se pidió elegir), el reciente más nuevo cuya
+// carpeta aún existe; si no, ninguno (pantalla de cuadernos). Devuelve { carpeta, origen: 'argumento'|'reciente'|null }.
+function cuadernoAlArrancar(argCarpeta, recientes, existe, elegir = false) {
+  if (argCarpeta) return { carpeta: argCarpeta, origen: 'argumento' };
+  if (elegir) return { carpeta: null, origen: null };
+  const nuevos = (Array.isArray(recientes) ? recientes : []).filter(r => r && typeof r.ruta === 'string' && r.ruta)
+    .sort((a, b) => String(b.abierto || '').localeCompare(String(a.abierto || '')));
+  for (const r of nuevos) { let ok = false; try { ok = existe(r.ruta); } catch { /* cuenta como que no existe */ } if (ok) return { carpeta: r.ruta, origen: 'reciente' }; }
+  return { carpeta: null, origen: null };
+}
 const apariencia = c => ({ tema: c.tema, letra: c.letra, fuente: c.fuente, comando_agente: c.comando_agente, panel: c.panel, panel_ancho: c.panel_ancho, panel_alto: c.panel_alto });
 
-module.exports = { leer, ajustar, registrarReciente, olvidarReciente, apariencia, carpeta, ocultas, ocultar, token, POR_DEFECTO };
+module.exports = { leer, ajustar, registrarReciente, olvidarReciente, apariencia, carpeta, ocultas, ocultar, token, cuadernoAlArrancar, POR_DEFECTO };

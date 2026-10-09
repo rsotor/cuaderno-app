@@ -37,11 +37,13 @@ $('#arbol').addEventListener('toggle', e => { const d = e.target; if (d.dataset 
 function pintarArbol(lista) {
   lista = lista.filter(p => p !== 'tareas.md');   // tareas.md se ve en el panel Tareas, no dos veces
   const raiz = {};
-  for (const p of lista) { let n = raiz; const partes = p.split('/'); partes.forEach((s, i) => { if (i === partes.length - 1) (n.__f ??= []).push(p); else n = (n[s] ??= {}); }); }
+  // «carpeta/» es una carpeta sin nada que enseñar: sale, vacía, como en el Finder.
+  for (const p of lista) { let n = raiz; const partes = p.split('/'); partes.forEach((s, i) => { if (i < partes.length - 1) n = (n[s] ??= {}); else if (s) (n.__f ??= []).push(p); }); }
+  // Cada fichero, por su nombre (sin .md): la carpeta ya se ve encima y el título es de la nota (Roberto, 2026-10-09).
   // Plegadas por defecto (Roberto, 2026-10-09); abiertas las que abrió la persona (no se le cierran al repintar, en la
   // recarga en vivo) y las que llevan a la nota abierta (marcarActiva).
-  const pintar = (n, abierto, prefijo = '') => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details data-carpeta="${esc(prefijo + k)}"${carpetasAbiertas.has(prefijo + k) ? ' open' : ''}><summary title="${esc(k)}"><span class="nombre">${nombreCarpeta(k)}</span>${botonesFila(prefijo + k, k)}</summary>${pintar(n[k], false, `${prefijo}${k}/`)}</details>`).join('')
-    + (n.__f || []).map(p => { const t = tituloDe(p), repetido = (n.__f || []).some(q => q !== p && tituloDe(q) === t); return `<div class="fila"><a class="hoja${p.endsWith('.md') ? '' : ' fichero'}" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}"><span class="nombre">${esc(t)}</span>${repetido ? `<small>${esc(p.split('/').pop())}</small>` : ''}</a>${botonesFila(p, t, true)}</div>`; }).join('');
+  const pintar = (n, abierto, prefijo = '') => Object.keys(n).filter(k => k !== '__f').sort((a, b) => a.localeCompare(b, 'es')).map(k => `<details data-carpeta="${esc(prefijo + k)}"${carpetasAbiertas.has(prefijo + k) ? ' open' : ''}><summary title="${esc(k)}"><span class="nombre">${nombreCarpeta(k)}</span>${botonesFila(prefijo + k, k)}</summary>${pintar(n[k], false, `${prefijo}${k}/`) || '<p class="carpeta-vacia">Vacía</p>'}</details>`).join('')
+    + (n.__f || []).map(p => { const t = nombreNota(p); return `<div class="fila"><a class="hoja${p.endsWith('.md') ? '' : ' fichero'}" href="#/n/${encodeURI(p)}" data-ruta="${esc(p)}" title="${esc(p)}"><span class="nombre">${esc(t)}</span></a>${botonesFila(p, t, true)}</div>`; }).join('');
   $('#arbol').innerHTML = lista.length ? pintar(raiz, true) : '<p class="vacio">No hay notas en esta carpeta.</p>';
   pintarCarpetas(lista);
   marcarActiva();
@@ -198,13 +200,23 @@ document.addEventListener('click', e => {
 });
 
 // ---------- ficheros que no son notas: PDF en el visor del navegador; imágenes a su tamaño (como mucho, el de la columna);
-// JSON, CSV y texto tal cual, solo lectura
+// vídeo y audio con su reproductor; JSON, CSV y texto tal cual, solo lectura. Lo que el navegador no sabe enseñar
+// (un .docx, un .zip) lleva al fichero en su carpeta, en el Finder (Roberto, 2026-10-09).
 const TOPE_TEXTO = 1e6;
+const RE_VIDEO = /^(mp4|m4v|webm|mov|ogv)$/, RE_AUDIO = /^(mp3|m4a|aac|wav|ogg|oga|flac)$/, RE_TEXTO = /^(json|csv|txt)$/;
+let ultimoMostrado = null;   // la recarga en vivo vuelve a pintar el fichero: el Finder se abre una vez por visita
 async function abrirFichero(ruta, tipo) {
   const url = `/fichero/${encodeURI(ruta)}`, nombre = ruta.split('/').pop();
   ancho(tipo === 'pdf');
   if (tipo === 'pdf') { $('#nota').innerHTML = `<iframe class="visor-pdf" src="${url}" title="${esc(nombre)}"></iframe>`; return; }
   if (/^(png|jpe?g|gif|webp|avif|svg)$/.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><img class="visor-imagen" src="${url}" alt="${esc(nombre)}">`; return; }
+  if (RE_VIDEO.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><video class="visor-imagen" src="${url}" controls preload="metadata"></video>`; return; }
+  if (RE_AUDIO.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><audio src="${url}" controls preload="metadata"></audio>`; return; }
+  if (!RE_TEXTO.test(tipo)) {
+    $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><p class="resumen">La app no sabe enseñar este fichero: te lo señalo en ${GESTOR}, para abrirlo con su programa.</p><p><button type="button" class="secundario" data-mostrar="${esc(ruta)}">${icono('carpeta')} Mostrar en ${GESTOR}</button></p>`;
+    if (ultimoMostrado !== ruta) { ultimoMostrado = ruta; mostrarEnCarpeta(ruta); }
+    return;
+  }
   let texto;
   try { const r = await fetch(url); if (!r.ok) throw new Error(`respuesta ${r.status}`); texto = await r.text(); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   const cortado = texto.length > TOPE_TEXTO;
@@ -235,7 +247,7 @@ function sinPortada() {
 async function abrirNota(ruta, lineaDestino) {
   // La misma nota otra vez (recarga en vivo, un comentario recién escrito) conserva el scroll; una nota nueva empieza arriba.
   const recarga = rutaActual === ruta && !$('#nota').hidden && lineaDestino == null, scrollAntes = $('#centro').scrollTop;
-  if (rutaActual !== ruta) { vistaNota = null; }
+  if (rutaActual !== ruta) { vistaNota = null; ultimoMostrado = null; }
   rutaActual = ruta;
   $('#panel').hidden = true; $('#nota').hidden = false;
   let n;
@@ -250,7 +262,11 @@ async function abrirNota(ruta, lineaDestino) {
   // Las propiedades van debajo del título, no encima: el título es lo primero que se lee.
   const props = n.frontmatter ? `<dl class="propiedades">${Object.entries(n.frontmatter).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${Array.isArray(v) ? v.map(x => `<span class="etiqueta">${esc(x)}</span>`).join('') : esc(v)}</dd>`).join('')}</dl>` : '';
   const back = n.backlinks.length ? `<nav class="backlinks" aria-label="Notas que enlazan aquí">Enlazan aquí: ${n.backlinks.map(b => `<a class="wiki" href="#/n/${encodeURI(b)}" title="${esc(b)}">${esc(tituloDe(b))}</a>`).join('')}</nav>` : '';
-  $('#nota').innerHTML = n.html + back;
+  // «Tareas que la mencionan»: las casillas de otras notas que la enlazan o la nombran con #etiqueta, junto a los backlinks.
+  let menciones = []; try { menciones = await api(`/api/tareas-de?p=${encodeURIComponent(ruta)}`); } catch { /* sin esta sección, la nota se lee igual */ }
+  if (rutaActual !== ruta) return;   // mientras llegaba la respuesta se abrió otra nota
+  const tareasMencion = menciones.length ? `<section class="menciones" aria-label="Tareas que la mencionan"><h2>Tareas que la mencionan <a class="wiki ver-en-tareas" href="#/tareas?nota=${encodeURIComponent(nombreNota(ruta))}">Ver en Tareas</a></h2>${menciones.map(i => `<label class="item${i.hecha ? ' hecha' : ''}"><input type="checkbox" class="casilla-mencion" data-ruta="${esc(i.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${i.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('')}</section>` : '';
+  $('#nota').innerHTML = n.html + tareasMencion + back;
   const h1 = $('#nota .bloque > h1');
   if (props) (h1 ? h1.closest('.bloque') : $('#nota')).insertAdjacentHTML(h1 ? 'afterend' : 'afterbegin', props);
   $('#nota').querySelectorAll('.math').forEach(el => { try { katex.render(el.textContent, el, { displayMode: el.dataset.display === '1', throwOnError: false }); } catch { /* se queda el texto */ } });
@@ -271,6 +287,7 @@ async function marcarCasilla(ruta, linea, marcada, trasFallo) {
 }
 $('#nota').addEventListener('click', async e => {
   const t = e.target;
+  if (t.classList.contains('casilla-mencion')) { const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { avisar(err.message); abrirNota(rutaActual); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); avisar(t.checked ? 'Marcada' : 'Desmarcada'); refrescarContadores(); } return; }
   if (t.classList.contains('casilla')) { const ok = await marcarCasilla(rutaActual, +t.dataset.linea, t.checked, () => { t.checked = !t.checked; }); if (ok) { avisar(t.checked ? 'Marcada' : 'Desmarcada'); refrescarContadores(); } return; }
   if (t.closest('.callout-titulo')) { const c = t.closest('.callout'); if (c && c.querySelector('.callout-titulo').dataset.plegable) c.classList.toggle('plegado'); return; }
   const btn = t.closest('button[data-accion]'); if (!btn) return;
@@ -375,7 +392,13 @@ $('#editor-texto').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKe
 const enTareas = () => location.hash.split('?')[0] === '#/tareas';
 const filtrosTareas = () => { const q = new URLSearchParams(location.hash.split('?')[1] || ''); return { nota: q.get('nota') || '', etiqueta: q.get('etiqueta') || '', estado: ['pendientes', 'hechas'].includes(q.get('estado')) ? q.get('estado') : 'todas' }; };
 const rutaDeNombre = nombre => arbol.find(p => p.replace(/\.md$/, '') === nombre) || arbol.find(p => nombreNota(p) === nombre) || null;
+// Los filtros se recuerdan por cuaderno en este navegador (Roberto, 2026-10-09: «cambio de página y tengo que volver a
+// seleccionar»): ir a Tareas sin filtros en la dirección recupera los últimos. Si el navegador no guarda, no pasa nada.
+const claveFiltros = () => `cuaderno:filtros-tareas:${cuaderno() ? cuaderno().ruta : ''}`;
+function recordarFiltros(q) { try { if (q) localStorage.setItem(claveFiltros(), q); else localStorage.removeItem(claveFiltros()); } catch { /* sin almacenamiento */ } }
+function filtrosRecordados() { try { return localStorage.getItem(claveFiltros()) || ''; } catch { return ''; } }
 async function abrirTareas() {
+  if (location.hash === '#/tareas' && filtrosRecordados()) history.replaceState(null, '', `#/tareas?${filtrosRecordados()}`);
   $('#nota').hidden = true; $('#panel').hidden = false; rutaActual = null;
   $('#miga').innerHTML = '<strong>Tareas</strong>';
   const g = await api('/api/tareas');
@@ -386,7 +409,7 @@ async function abrirTareas() {
   const total = g.reduce((a, x) => a + x.items.length, 0), hechas = g.reduce((a, x) => a + x.items.filter(i => i.hecha).length, 0);
   const nota = cuaderno().kit !== 'carpeta' ? 'Lo que marcas aquí se escribe en su nota. Los exámenes y las flashcards se contestan en la suya.' : 'Tu lista propia, en <a href="#/n/tareas.md">tareas.md</a>.';
   const f = filtrosTareas();
-  const notas = [...new Set(g.flatMap(x => x.items.flatMap(i => i.enlaces || [])))].sort((a, b) => a.localeCompare(b, 'es'));
+  const notas = [...new Set([...g.flatMap(x => x.items.flatMap(i => i.enlaces || [])), ...(f.nota ? [f.nota] : [])])].sort((a, b) => a.localeCompare(b, 'es'));
   const etiquetas = [...new Set(g.flatMap(x => x.items.flatMap(i => i.etiquetas || [])))].sort((a, b) => a.localeCompare(b, 'es'));
   const opcion = (v, texto, actual) => `<option value="${esc(v)}"${v === actual ? ' selected' : ''}>${esc(texto)}</option>`;
   const filtros = `<form class="filtros" id="filtros-tareas" aria-label="Filtrar las tareas">`
@@ -396,7 +419,7 @@ async function abrirTareas() {
     + `<span class="pista" id="filtro-resumen" role="status"></span><button type="button" class="secundario pequeno" id="filtro-quitar" hidden>Quitar filtros</button></form>`;
   $('#panel').innerHTML = `<h1>Tareas</h1><p class="resumen">${hechas} de ${total} hechas. ${nota}</p><form class="nueva-tarea" id="nueva-tarea"><label class="oculto" for="tarea-nueva">Nueva tarea</label><input id="tarea-nueva" placeholder="Nueva tarea para mí…" autocomplete="off"><button type="submit">Añadir</button></form>${filtros}`
     + g.map(gr => `<section class="grupo"><h2><a class="wiki" href="#/n/${encodeURI(gr.ruta)}" title="${esc(gr.ruta)}">${esc(tituloDe(gr.ruta))}</a>${gr.generado ? '<span class="solo-lectura">la escribe el profesor al guardar</span>' : ''}</h2>`
-      + gr.items.map(i => `<label class="item${i.hecha ? ' hecha' : ''}" data-hecha="${i.hecha ? 1 : 0}" data-enlaces="${esc(JSON.stringify(i.enlaces || []))}" data-etiquetas="${esc(JSON.stringify(i.etiquetas || []))}"><input type="checkbox" data-ruta="${esc(gr.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${gr.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('') + '</section>').join('');
+      + gr.items.map(i => `<label class="item${i.hecha ? ' hecha' : ''}" data-hecha="${i.hecha ? 1 : 0}" data-enlaces="${esc(JSON.stringify(i.enlaces || []))}" data-etiquetas="${esc(JSON.stringify(i.etiquetas || []))}" data-notas="${esc(JSON.stringify(i.notas || []))}"><input type="checkbox" data-ruta="${esc(gr.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${gr.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('') + '</section>').join('');
   aplicarFiltrosTareas();
   if (borrador && $('#tarea-nueva')) $('#tarea-nueva').value = borrador;
   if (activo && $(`#${activo}`)) $(`#${activo}`).focus();
@@ -404,11 +427,13 @@ async function abrirTareas() {
 // Filtra en el sitio (sin repintar: el foco se queda en el control) y deja los filtros en el hash sin añadir historial.
 function aplicarFiltrosTareas() {
   const f = filtrosTareas();
+  recordarFiltros(location.hash.split('?')[1] || '');
   const activos = !!(f.nota || f.etiqueta || f.estado !== 'todas');
   let visibles = 0, total = 0;
+  const rutaF = f.nota ? rutaDeNombre(f.nota) : null;   // también cuentan las que la mencionan por #etiqueta o por carpeta
   document.querySelectorAll('#panel .item').forEach(it => {
     total++;
-    const cumple = (!f.nota || JSON.parse(it.dataset.enlaces).includes(f.nota)) && (!f.etiqueta || JSON.parse(it.dataset.etiquetas).includes(f.etiqueta))
+    const cumple = (!f.nota || JSON.parse(it.dataset.enlaces).includes(f.nota) || (rutaF && JSON.parse(it.dataset.notas).includes(rutaF))) && (!f.etiqueta || JSON.parse(it.dataset.etiquetas).includes(f.etiqueta))
       && (f.estado === 'todas' || (f.estado === 'hechas') === (it.dataset.hecha === '1'));
     it.hidden = !cumple; if (cumple) visibles++;
   });
@@ -423,7 +448,7 @@ $('#panel').addEventListener('change', e => {
   history.replaceState(null, '', `#/tareas${q.size ? `?${q}` : ''}`);
   aplicarFiltrosTareas(); marcarActiva();
 });
-$('#panel').addEventListener('click', e => { if (e.target.id === 'filtro-quitar') { history.replaceState(null, '', '#/tareas'); abrirTareas().then(() => { const s = $('#filtro-estado'); if (s) s.focus(); }); } });
+$('#panel').addEventListener('click', e => { if (e.target.id === 'filtro-quitar') { recordarFiltros(''); history.replaceState(null, '', '#/tareas'); abrirTareas().then(() => { const s = $('#filtro-estado'); if (s) s.focus(); }); } });
 $('#panel').addEventListener('submit', async e => { if (e.target.id !== 'nueva-tarea') return; e.preventDefault(); const i = e.target.querySelector('input'); if (!i.value.trim()) return; await api('/api/tarea', { texto: i.value }); i.value = ''; avisar('Tarea añadida'); abrirTareas(); refrescarContadores(); });
 $('#panel').addEventListener('change', async e => { const t = e.target; if (t.type !== 'checkbox') return; const ok = await marcarCasilla(t.dataset.ruta, +t.dataset.linea, t.checked, err => { avisar(err.message); abrirTareas(); }); if (ok) { t.closest('.item').classList.toggle('hecha', t.checked); refrescarContadores(); } });
 async function abrirComentarios() {
