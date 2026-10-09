@@ -287,7 +287,7 @@ async function abrirNota(ruta, lineaDestino) {
   const back = n.backlinks.length ? `<nav class="backlinks" aria-label="Notas que enlazan aquí">Enlazan aquí: ${n.backlinks.map(b => `<a class="wiki" href="#/n/${encodeURI(b)}" title="${esc(b)}">${esc(tituloDe(b))}</a>`).join('')}</nav>` : '';
   // «Tareas que la mencionan»: las casillas de otras notas que la enlazan o la nombran con #etiqueta, junto a los backlinks.
   let menciones = []; try { menciones = await api(`/api/tareas-de?p=${encodeURIComponent(ruta)}`); } catch { /* sin esta sección, la nota se lee igual */ }
-  if (rutaActual !== ruta) return;   // mientras llegaba la respuesta se abrió otra nota
+  if (rutaActual !== ruta || edicion) return;   // mientras llegaba la respuesta se abrió otra nota, o se pulsó «Editar» (el editor no se pisa)
   const tareasMencion = menciones.length ? `<section class="menciones" aria-label="Tareas que la mencionan"><h2>Tareas que la mencionan <a class="wiki ver-en-tareas" href="#/tareas?nota=${encodeURIComponent(nombreNota(ruta))}">Ver en Tareas</a></h2>${menciones.map(i => `<label class="item${i.hecha ? ' hecha' : ''}"><input type="checkbox" class="casilla-mencion" data-ruta="${esc(i.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${i.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('')}</section>` : '';
   $('#nota').innerHTML = n.html + tareasMencion + back;
   const h1 = $('#nota .bloque > h1');

@@ -77,7 +77,9 @@ test('editar un párrafo desde el editor de la nota: el editor trae el Markdown 
   await visible(e.pagina.locator('#nota .bloque', { hasText: 'Lo que pones' }), 'nota Capital', 'el párrafo «Lo que pones»');
   await e.pagina.locator('#btn-editar').click();
   await visible(e.pagina.locator('#edicion-cm .cm-content'), 'editor', 'el editor de la nota');
-  assert.equal(await e.pagina.locator('#edicion-cm .cm-line').allTextContents().then(l => l.join('\n')), '# Capital\n\nLo que pones. Enlaza con [[interes|el interés]].\n', 'editor: el texto no es el Markdown del fichero');
+  // Con vista, el Markdown crudo se ve en la línea del cursor: se baja a ella y se comprueba tal cual está en el fichero.
+  await e.pagina.keyboard.press('ArrowDown'); await e.pagina.keyboard.press('ArrowDown');
+  assert.equal(await e.pagina.locator('#edicion-cm .cm-line').nth(2).textContent(), 'Lo que pones. Enlaza con [[interes|el interés]].', 'editor: la línea del cursor no es el Markdown del fichero');
   await e.pagina.locator('#edicion-cm .cm-content').press('ControlOrMeta+a');
   await e.pagina.keyboard.insertText('# Capital\n\nLo que pones tú.\n');
   await e.pagina.locator('#edicion-aplicar').click();
