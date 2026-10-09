@@ -40,7 +40,7 @@ test('índice: con la nota larga y la ventana ancha sale a la derecha de la hoja
     return { izq: i.left, der: i.right, notaDer: n.right, notaIzq: n.left, centroDer: v.right, ancho: n.width }; });
   assert.ok(c.izq >= c.notaDer + 8, `índice: se pisa con la hoja (índice desde ${c.izq}, hoja hasta ${c.notaDer})`);
   assert.ok(c.der <= c.centroDer, `índice: se sale de la ventana (hasta ${c.der} de ${c.centroDer})`);
-  assert.equal(Math.round(c.ancho), 832, `índice: la hoja mide ${c.ancho} px con el índice, no su ancho entero (832)`);
+  assert.equal(Math.round(c.ancho), 912, `índice: la hoja mide ${c.ancho} px con el índice, no su ancho entero (912 = 800 de texto + 2 × 56)`);
 });
 
 test('índice: una nota con menos de 3 títulos, los paneles, el examen y las tarjetas no lo llevan', async () => {
