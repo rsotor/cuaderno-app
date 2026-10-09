@@ -606,3 +606,24 @@ test('accesibilidad: la casilla del editor se llama como su tarea y en colores f
   } finally { await e.pagina.emulateMedia({ forcedColors: 'none' }); }
   await salirDescartando();
 });
+
+test('feedback de uso: las barras con fondo translúcido y sombra, el marco de foco en la hoja y la línea activa sin fondo', async () => {
+  fs.writeFileSync(path.join(e.c.base, 'feedback.md'), '# Feedback\n\n' + Array.from({ length: 40 }, (_, i) => `Párrafo ${i + 1} con texto.`).join('\n\n') + '\n');
+  await ajustarEditor('vista', 'feedback.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'feedback', 'el editor');
+  const e1 = await e.pagina.evaluate(() => {
+    const est = q => { const c = getComputedStyle(document.querySelector(q)); return { fondo: c.backgroundColor, difuminado: c.backdropFilter, sombra: c.boxShadow }; };
+    const hoja = getComputedStyle(document.querySelector('#nota')), cm = getComputedStyle(document.querySelector('.cm-editor'));
+    return { barra: est('.edicion-barra'), pie: est('.edicion-pie'), hojaContorno: hoja.outlineStyle, cmContorno: cm.outlineStyle, activa: getComputedStyle(document.querySelector('#edicion-cm .live-activa')).backgroundColor };
+  });
+  for (const k of ['barra', 'pie']) {
+    assert.match(e1[k].difuminado, /blur/, `${k}: sin difuminado`);
+    assert.notEqual(e1[k].sombra, 'none', `${k}: sin sombra`);
+    assert.match(e1[k].fondo, /\/ 0\.\d+\)|rgba\(.*0\.\d+\)/, `${k}: el fondo no es translúcido (${e1[k].fondo})`);
+  }
+  assert.equal(e1.hojaContorno, 'solid', 'el marco de foco no está en la hoja');
+  assert.equal(e1.cmContorno, 'none', 'el editor sigue con su propio marco, pegado al texto');
+  assert.match(e1.activa, /rgba\(0, 0, 0, 0\)|transparent/, 'la línea activa tiene fondo');
+  await salirDescartando();
+});

@@ -101,11 +101,22 @@
         h.padre = padre; h.desde = +padre.dataset.desde; h.hasta = +padre.dataset.hasta;
         h.botones = envolverCita(padre, h.cita, h.id);
       }
-      if (h.botones.length) { b.hidden = true; b.classList.add('comentario-oculto'); padre.classList.add('con-comentario'); }
+      if (h.botones.length) { b.hidden = true; b.classList.add('comentario-oculto'); }
       else cal.querySelector('.callout-titulo').insertAdjacentHTML('afterend', '<p class="cita-perdida">La cita ya no está en el texto.</p>');
     });
   }
   const hiloEnLinea = linea => hilos.find(h => h.linea === linea && h.botones.length) || null;
+
+  // Devuelve el foco a `el`. Tras un Esc el navegador pinta el anillo de foco aunque lo de antes fuera el ratón; si venimos del ratón se
+  // marca el elemento para que no lo enseñe hasta que se pulse otra tecla (`focusVisible: false` aún no lo respeta Chrome).
+  function enfocar(el, conAnillo) {
+    if (conAnillo) return el.focus();
+    el.dataset.sinAnillo = '1';
+    const quitar = () => { delete el.dataset.sinAnillo; document.removeEventListener('keydown', alTeclear, true); el.removeEventListener('blur', quitar); };
+    const alTeclear = e => { if (e.key !== 'Escape') quitar(); };
+    document.addEventListener('keydown', alTeclear, true); el.addEventListener('blur', quitar);
+    el.focus();
+  }
 
   // ---------- colocar un popover junto a un rectángulo de la pantalla, dentro de #centro (se mueve con el scroll)
   function colocar(el, rect, hueco = 6) {
@@ -149,7 +160,7 @@
         botonSel = document.createElement('button');
         botonSel.type = 'button'; botonSel.id = 'comentar-boton'; botonSel.textContent = 'Comentar';
         botonSel.addEventListener('mousedown', e => e.preventDefault());   // no pierde la selección
-        botonSel.addEventListener('click', () => { const i = analizar(getSelection()); ocultarBoton(); if (i) abrirCaja(i); });
+        botonSel.addEventListener('click', () => { const i = analizar(getSelection()); ocultarBoton(); if (i) abrirCaja(i, { teclado: false }); });
         $('#centro').append(botonSel);
       }
       botonSel.dataset.scroll = String($('#centro').scrollTop);
@@ -159,9 +170,9 @@
   }
 
   // ---------- la caja de comentar (popover, no modal)
-  function abrirCaja(info) {
+  function abrirCaja(info, { teclado = true } = {}) {
     cerrarHilo(false); cerrarCaja(false);
-    ctx = info; cajaAbierta = true;
+    ctx = info; ctx.teclado = teclado; cajaAbierta = true;
     const f = document.createElement('form');
     f.id = 'comentar-caja'; f.setAttribute('role', 'dialog'); f.setAttribute('aria-label', 'Comentar');
     f.innerHTML = `${info.cita ? `<p class="caja-cita"><i>«${esc(info.cita)}»</i></p>` : '<p class="caja-cita">Comentario sobre este bloque</p>'}`
@@ -180,7 +191,8 @@
   function cerrarCaja(devolverFoco) {
     const f = $('#comentar-caja'); if (f) f.remove();
     const c = ctx; cajaAbierta = false; ctx = null;
-    if (devolverFoco && c && c.bloque.isConnected) c.bloque.focus();
+    // Con el teclado el foco vuelve con su borde; abierta con el ratón vuelve sin él (Roberto, 2026-10-09: «me remarca con borde ese bloque»).
+    if (devolverFoco && c && c.bloque.isConnected) enfocar(c.bloque, !!c.teclado);
   }
   async function enviar(texto) {
     const c = ctx, ruta = host.ruta();
@@ -201,8 +213,9 @@
   }
 
   // ---------- el hilo (popover junto al subrayado)
-  async function abrirHilo(h, { enfocar = true } = {}) {
+  async function abrirHilo(h, { enfocar = true, teclado = true } = {}) {
     cerrarHilo(false); cerrarCaja(false); ocultarBoton();
+    h.teclado = teclado;
     const pop = document.createElement('div');
     pop.id = 'comentar-hilo'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Comentario'); pop.tabIndex = -1;
     pop.innerHTML = '<button type="button" class="hilo-x" aria-label="Ocultar el hilo">×</button>'
@@ -220,7 +233,7 @@
   function cerrarHilo(devolverFoco) {
     const pop = $('#comentar-hilo'); if (pop) pop.remove();
     const h = hiloAbierto; hiloAbierto = null;
-    if (devolverFoco && h && h.botones[0] && h.botones[0].isConnected) h.botones[0].focus();
+    if (devolverFoco && h && h.botones[0] && h.botones[0].isConnected) enfocar(h.botones[0], h.teclado !== false);
   }
   function avisoConAccion(mensaje, etiqueta, accion, ms = 5000) {
     const d = document.createElement('div');
@@ -257,7 +270,7 @@
       const b = e.target.closest('button.comentado'); if (!b) return;
       e.preventDefault(); e.stopPropagation();
       const h = hilos[+b.dataset.hilo];
-      if (hiloAbierto === h) cerrarHilo(true); else if (h) abrirHilo(h);
+      if (hiloAbierto === h) cerrarHilo(true); else if (h) abrirHilo(h, { teclado: e.detail === 0 });
     }, true);
     // c: con texto seleccionado comenta ese texto; sin selección, el bloque enfocado.
     document.addEventListener('keydown', e => {

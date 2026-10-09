@@ -226,3 +226,34 @@ test('selección solo con teclado: Mayús + flechas sobre un bloque enfocado cre
   for (let i = 0; i < 5; i++) await e.pagina.keyboard.press('Shift+ArrowLeft');
   assert.equal(await e.pagina.evaluate(() => getSelection().toString()), 'tipo.', 'teclado: Mayús + flecha izquierda no crea la selección desde el final del bloque');
 });
+
+test('Esc en la caja: tras abrirla con el ratón el bloque recupera el foco sin borde; tras abrirla con c, con borde de foco', async () => {
+  await abrir('c11.md', '# Nota\n\nEl capital inicial se multiplica cada año por el tipo.\n\nOtro párrafo.\n');
+  const bloque = bloqueDe('capital inicial');
+  const marcado = () => e.pagina.evaluate(() => { const a = document.activeElement; return { esBloque: a.classList.contains('bloque'), visible: a.matches(':focus-visible'), contorno: getComputedStyle(a).outlineStyle }; });
+  // Con el ratón: selección y botón flotante, Esc.
+  await seleccionar(bloque, 'capital inicial');
+  await visible(e.pagina.locator('#comentar-boton'), 'esc', 'el botón flotante');
+  await e.pagina.locator('#comentar-boton').click();
+  await visible(e.pagina.locator('#comentar-caja'), 'esc', 'la caja');
+  await e.pagina.keyboard.press('Escape');
+  await oculto(e.pagina.locator('#comentar-caja'), 'esc', 'la caja tras Esc');
+  const r = await marcado();
+  assert.equal(r.esBloque, true); assert.equal(r.contorno, 'none', 'esc con ratón: el bloque queda con borde de foco');
+  // Con el teclado (c sobre el bloque enfocado): el foco vuelve con su borde, que es lo que necesita quien no usa el ratón.
+  await bloque.focus();
+  await e.pagina.keyboard.press('c');
+  await visible(e.pagina.locator('#comentar-caja'), 'esc', 'la caja con c');
+  await e.pagina.keyboard.press('Escape');
+  await oculto(e.pagina.locator('#comentar-caja'), 'esc', 'la caja tras Esc con c');
+  const m = await marcado();
+  assert.equal(m.esBloque, true); assert.equal(m.contorno, 'solid', 'esc con teclado: el bloque no enseña dónde está el foco');
+});
+
+test('el bloque comentado no lleva marca en el margen: el subrayado inferior es la señal (Roberto, 2026-10-09)', async () => {
+  await abrir('c12.md', '# Nota\n\nEl capital inicial manda.\n\n> [!comment] Alumno (2026-10-01) · «capital inicial»\n> Un comentario.\n');
+  await visible(e.pagina.locator('#nota button.comentado'), 'margen', 'el subrayado');
+  const b = await e.pagina.locator('#nota .bloque', { has: e.pagina.locator('button.comentado') }).evaluate(x => { const c = getComputedStyle(x); return [c.boxShadow, c.borderLeftStyle]; });
+  assert.deepEqual(b, ['none', 'none'], 'margen: el bloque comentado tiene marca a la izquierda');
+  assert.match(await e.pagina.locator('#nota button.comentado').evaluate(x => getComputedStyle(x).textDecorationLine), /underline/);
+});

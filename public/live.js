@@ -18,9 +18,8 @@ const tema = EditorView.theme({
   '.cm-scroller': { fontFamily: 'inherit', lineHeight: 'inherit', overflow: 'visible' },
   '.cm-content': { fontFamily: 'inherit', padding: '0', caretColor: 'var(--tinta)' },
   '.cm-line': { padding: '0' },
-  '.cm-cursor': { borderLeftColor: 'var(--tinta)' },
+  '.cm-cursor': { borderLeftColor: 'var(--tinta)', borderLeftWidth: '2px' },
   '.cm-selectionBackground, &.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': { background: 'var(--acento-suave)' },
-  '&:focus-within': { outline: '2px solid var(--acento)', outlineOffset: '12px', borderRadius: 'var(--radio)' },
 });
 
 // ---------- live preview (inline)
