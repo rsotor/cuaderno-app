@@ -438,3 +438,152 @@ test('otra nota cambia en el disco mientras editas: ninguna franja', async () =>
   assert.equal(await e.pagina.locator('#franja-edicion').isVisible(), false, 'otra nota: franja por un cambio solo de finales de línea');
   await salirDescartando();
 });
+
+// ---------- barra de formato y atajos
+const textoEditor = () => e.pagina.evaluate(async () => (await import('/public/live.js')).texto());
+const boton = n => e.pagina.locator(`.edicion-barra [data-formato="${n}"]`);
+const FORMATO = '# Formato\n\nUna frase con palabra para negrita.\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\nOtro párrafo.\n';
+// Pone el cursor al principio de la línea que contiene `t` y selecciona `n` letras tras `desde` letras.
+const seleccionar = async (t, desde, n) => {
+  await lineaCmTexto(t).click({ position: { x: 5, y: 6 } });
+  await e.pagina.keyboard.press('Home');
+  for (let i = 0; i < desde; i++) await e.pagina.keyboard.press('ArrowRight');
+  for (let i = 0; i < n; i++) await e.pagina.keyboard.press('Shift+ArrowRight');
+};
+
+test('formato: Negrita rodea la selección y volver a pulsar la quita; Ctrl Z lo deshace con un widget en la nota', async () => {
+  const ruta = path.join(e.c.base, 'formato.md');
+  fs.writeFileSync(ruta, FORMATO);
+  await ajustarEditor('vista', 'formato.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .live-tabla table'), 'formato', 'la tabla pintada');
+  await seleccionar('Una frase', 14, 7);   // «palabra»
+  await boton('negrita').click();
+  assert.equal(await textoEditor(), FORMATO.replace('palabra', '**palabra**'), 'formato: Negrita no rodea la selección');
+  assert.equal(await boton('negrita').getAttribute('aria-pressed'), 'true', 'formato: Negrita no sale pulsada con la selección en negrita');
+  await boton('negrita').click();
+  assert.equal(await textoEditor(), FORMATO, 'formato: volver a pulsar Negrita no quita los marcadores');
+  assert.equal(await boton('negrita').getAttribute('aria-pressed'), 'false');
+  // Ctrl Z tras aplicar un formato deshace solo el formato y la tabla sigue pintada.
+  await boton('negrita').click();
+  assert.equal(await textoEditor(), FORMATO.replace('palabra', '**palabra**'));
+  await e.pagina.keyboard.press('ControlOrMeta+z');
+  assert.equal(await textoEditor(), FORMATO, 'formato: Ctrl Z no deshace el formato');
+  await visible(e.pagina.locator('#edicion-cm .live-tabla table'), 'formato', 'la tabla sigue pintada tras deshacer');
+  await e.pagina.keyboard.press('ControlOrMeta+Shift+z');
+  assert.equal(await textoEditor(), FORMATO.replace('palabra', '**palabra**'), 'formato: rehacer no devuelve el formato');
+  await e.pagina.locator('#edicion-aplicar').click();
+  await oculto(e.pagina.locator('#edicion-cm'), 'formato', 'el editor tras aplicar');
+  assert.equal(fs.readFileSync(ruta, 'utf8'), FORMATO.replace('palabra', '**palabra**'), 'formato: el fichero no tiene la negrita');
+});
+
+test('formato por teclado: Ctrl/⌘ B e I rodean y quitan; sin selección dejan el cursor dentro', async () => {
+  fs.writeFileSync(path.join(e.c.base, 'formato.md'), FORMATO);
+  await ajustarEditor('vista', 'formato.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'teclado', 'el editor');
+  await seleccionar('Una frase', 14, 7);
+  await e.pagina.keyboard.press('ControlOrMeta+b');
+  assert.equal(await textoEditor(), FORMATO.replace('palabra', '**palabra**'), 'teclado: Ctrl B no pone negrita');
+  await e.pagina.keyboard.press('ControlOrMeta+i');
+  assert.equal(await textoEditor(), FORMATO.replace('palabra', '***palabra***'), 'teclado: Ctrl I no pone cursiva sobre la negrita');
+  assert.equal(await boton('cursiva').getAttribute('aria-pressed'), 'true');
+  await e.pagina.keyboard.press('ControlOrMeta+i');
+  assert.equal(await textoEditor(), FORMATO.replace('palabra', '**palabra**'), 'teclado: Ctrl I no quita la cursiva y deja la negrita');
+  await e.pagina.keyboard.press('ControlOrMeta+b');
+  assert.equal(await textoEditor(), FORMATO, 'teclado: Ctrl B no quita la negrita');
+  // Sin selección: los marcadores y el cursor dentro.
+  await e.pagina.keyboard.press('ArrowRight');   // colapsa la selección al final de «palabra»
+  await e.pagina.keyboard.press('ControlOrMeta+b');
+  await e.pagina.keyboard.type('hola');
+  assert.equal(await textoEditor(), FORMATO.replace('palabra', 'palabra**hola**'), 'teclado: sin selección, Ctrl B no deja el cursor entre los marcadores');
+  await salirDescartando();
+});
+
+test('barra: flechas mueven el foco entre botones, aria-pressed sigue a la selección y el clic devuelve el foco al editor', async () => {
+  fs.writeFileSync(path.join(e.c.base, 'formato.md'), FORMATO.replace('palabra', '**palabra**'));
+  await ajustarEditor('vista', 'formato.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('.edicion-barra[role="toolbar"]'), 'barra', 'la barra de formato');
+  assert.equal(await e.pagina.locator('.edicion-barra').getAttribute('aria-label'), 'Formato');
+  const botones = e.pagina.locator('.edicion-barra button');
+  const nombres = await botones.evaluateAll(l => l.map(b => b.dataset.formato));
+  assert.deepEqual(nombres, ['negrita', 'cursiva', 'titulo', 'lista', 'casilla', 'enlace', 'codigo']);
+  for (const b of await botones.all()) { assert.ok(await b.getAttribute('aria-label'), 'barra: un botón sin aria-label'); assert.ok(await b.getAttribute('title'), 'barra: un botón sin pista'); }
+  assert.match(await boton('negrita').getAttribute('title'), /(Ctrl|⌘) B/, 'barra: la pista de Negrita no dice el atajo');
+  // Una sola parada de Tab (roving tabindex), flechas, Inicio y Fin.
+  const parada = () => e.pagina.locator('.edicion-barra button[tabindex="0"]').evaluateAll(l => l.map(b => b.dataset.formato));
+  assert.deepEqual(await parada(), ['negrita']);
+  await boton('negrita').focus();
+  await e.pagina.keyboard.press('ArrowRight');
+  assert.equal(await e.pagina.evaluate(() => document.activeElement.dataset.formato), 'cursiva', 'barra: la flecha derecha no pasa al botón siguiente');
+  assert.deepEqual(await parada(), ['cursiva'], 'barra: el tabindex no sigue al foco');
+  await e.pagina.keyboard.press('End');
+  assert.equal(await e.pagina.evaluate(() => document.activeElement.dataset.formato), 'codigo');
+  await e.pagina.keyboard.press('ArrowRight');
+  assert.equal(await e.pagina.evaluate(() => document.activeElement.dataset.formato), 'negrita', 'barra: la flecha derecha en el último no vuelve al primero');
+  await e.pagina.keyboard.press('ArrowLeft');
+  assert.equal(await e.pagina.evaluate(() => document.activeElement.dataset.formato), 'codigo');
+  await e.pagina.keyboard.press('Home');
+  assert.equal(await e.pagina.evaluate(() => document.activeElement.dataset.formato), 'negrita');
+  // aria-pressed sigue a la selección: dentro de la negrita sí, en otra línea no; el título también.
+  await lineaCmTexto('Una frase').click({ position: { x: 5, y: 6 } });
+  await e.pagina.keyboard.press('Home'); for (let i = 0; i < 17; i++) await e.pagina.keyboard.press('ArrowRight');   // dentro de «palabra»
+  await hasta(async () => (await boton('negrita').getAttribute('aria-pressed')) === 'true', 'barra', 'Negrita no sale pulsada con el cursor dentro de la negrita');
+  assert.equal(await boton('cursiva').getAttribute('aria-pressed'), 'false');
+  await lineaCmTexto('Otro párrafo').click({ position: { x: 5, y: 6 } });
+  await hasta(async () => (await boton('negrita').getAttribute('aria-pressed')) === 'false', 'barra', 'Negrita sigue pulsada fuera de la negrita');
+  await lineaCmTexto('Formato').click({ position: { x: 5, y: 6 } });
+  await hasta(async () => (await boton('titulo').getAttribute('aria-pressed')) === 'true', 'barra', 'Título no sale pulsado en un título');
+  // El clic en un botón devuelve el foco al editor.
+  await boton('cursiva').click();
+  assert.equal(await e.pagina.evaluate(() => !!document.activeElement.closest('#edicion-cm')), true, 'barra: el clic no devuelve el foco al editor');
+  await salirDescartando();
+  // En el modo plano también hay barra.
+  await ajustarEditor('plano', 'formato.md');
+  try {
+    await e.pagina.locator('#btn-editar').click();
+    await visible(e.pagina.locator('.edicion-barra[role="toolbar"]'), 'barra', 'la barra en el modo plano');
+    await e.pagina.keyboard.press('Escape');
+  } finally { await ajustarEditor('vista', 'formato.md'); }
+});
+
+test('formato: título, lista, casilla, enlace y código', async () => {
+  const antes = '# T\n\nuno\ndos\n\ntexto de enlace\n\ncodigo\n';
+  fs.writeFileSync(path.join(e.c.base, 'formato2.md'), antes);
+  await ajustarEditor('vista', 'formato2.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'formato', 'el editor');
+  // Título: pone ##, sube a ###, a ####, y quita.
+  await lineaCmTexto('uno').click({ position: { x: 5, y: 6 } });
+  for (const esperado of ['## uno', '### uno', '#### uno', 'uno']) { await boton('titulo').click(); assert.ok((await textoEditor()).includes(`\n${esperado}\ndos`) || (await textoEditor()).includes(`\n\n${esperado}\ndos`), `título: ${esperado}`); }
+  // Lista y casilla sobre dos líneas; volver a pulsar quita.
+  await lineaCmTexto('uno').click({ position: { x: 5, y: 6 } });
+  await e.pagina.keyboard.press('Home'); await e.pagina.keyboard.press('Shift+ArrowDown');
+  await boton('lista').click();
+  assert.ok((await textoEditor()).includes('\n- uno\n- dos\n'), 'lista: no pone «- » en las dos líneas');
+  assert.equal(await boton('lista').getAttribute('aria-pressed'), 'true');
+  await boton('casilla').click();
+  assert.ok((await textoEditor()).includes('\n- [ ] uno\n- [ ] dos\n'), 'casilla: no convierte la lista en casillas');
+  await boton('casilla').click();
+  assert.ok((await textoEditor()).includes('\nuno\ndos\n'), 'casilla: volver a pulsar no quita las casillas');
+  await boton('lista').click(); await boton('lista').click();
+  assert.ok((await textoEditor()).includes('\nuno\ndos\n'), 'lista: poner y quitar no deja el texto como estaba');
+  // Enlace: rodea la selección con el cursor (seleccionada) en la url.
+  await seleccionar('texto de enlace', 0, 5);
+  await boton('enlace').click();
+  assert.ok((await textoEditor()).includes('\n[texto](url) de enlace\n'), 'enlace: no rodea la selección');
+  await e.pagina.keyboard.type('https://ejemplo.org');
+  assert.ok((await textoEditor()).includes('\n[texto](https://ejemplo.org) de enlace\n'), 'enlace: la url no queda seleccionada para escribirla');
+  // Código: en línea con selección; bloque con varias líneas.
+  await seleccionar('codigo', 0, 6);
+  await boton('codigo').click();
+  assert.ok((await textoEditor()).endsWith('\n`codigo`\n'), 'código: no rodea con comillas inversas');
+  await boton('codigo').click();
+  assert.ok((await textoEditor()).endsWith('\ncodigo\n'), 'código: volver a pulsar no quita las comillas');
+  await lineaCmTexto('uno').click({ position: { x: 5, y: 6 } });
+  await e.pagina.keyboard.press('Home'); await e.pagina.keyboard.press('Shift+ArrowDown');
+  await boton('codigo').click();
+  assert.ok((await textoEditor()).includes('\n```\nuno\ndos\n```\n'), 'código: la selección multilínea no pasa a bloque');
+  await salirDescartando();
+});

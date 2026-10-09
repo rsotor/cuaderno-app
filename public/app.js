@@ -465,6 +465,30 @@ document.addEventListener('keydown', e => {
 let edicion = null;   // { ruta, original (como lo sirve /fichero), texto0 (el mismo, con LF), linea (donde estaba el lector), hash (la ruta de la nota) }
 let live = null;      // el módulo public/live.js, la primera vez que se edita
 const teclaAplicar = MAC ? '⌘ Enter' : 'Ctrl Enter';
+const teclaMod = MAC ? '⌘' : 'Ctrl';
+// La barra de formato (role=toolbar): un solo botón con tabindex 0 y flechas entre ellos.
+const FORMATOS_BARRA = [
+  ['negrita', '<b>B</b>', 'Negrita', `${teclaMod} B`], ['cursiva', '<i>I</i>', 'Cursiva', `${teclaMod} I`], ['titulo', 'H', 'Título (cada pulsación sube el nivel: ##, ###, ####; en el último, lo quita)', ''],
+  ['lista', '•', 'Lista', ''], ['casilla', '☐', 'Casilla', ''],
+  ['enlace', '<svg class="icono" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>', 'Enlace', ''], ['codigo', '&lt;/&gt;', 'Código', ''],
+];
+const htmlBarra = () => `<div class="edicion-barra" role="toolbar" aria-label="Formato" aria-orientation="horizontal">${FORMATOS_BARRA.map(([id, icono, nombre, atajo], i) => `<button type="button" class="secundario" data-formato="${id}" aria-label="${nombre.replace(/ \(.*/, '')}" title="${nombre}${atajo ? ` (${atajo})` : ''}" aria-pressed="false" tabindex="${i === 0 ? 0 : -1}">${icono}</button>`).join('')}</div>`;
+function actualizarBarra() {
+  if (!edicion || !live) return;
+  const activos = live.formatosActivos();
+  document.querySelectorAll('.edicion-barra button').forEach(b => b.setAttribute('aria-pressed', String(!!activos[b.dataset.formato])));
+}
+function enlazarBarra() {
+  const barra = $('.edicion-barra'), botones = () => [...barra.querySelectorAll('button')];
+  barra.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });   // el editor no pierde el foco ni la selección
+  barra.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; live.formato(b.dataset.formato); live.enfocar(); actualizarBarra(); });
+  barra.addEventListener('keydown', e => {
+    const bs = botones(), i = bs.indexOf(document.activeElement); if (i < 0) return;
+    const j = { ArrowRight: (i + 1) % bs.length, ArrowLeft: (i - 1 + bs.length) % bs.length, Home: 0, End: bs.length - 1 }[e.key];
+    if (j == null) return;
+    e.preventDefault(); bs.forEach((b, k) => { b.tabIndex = k === j ? 0 : -1; }); bs[j].focus();
+  });
+}
 const desplazamientoDeLinea = (texto, linea) => texto.split('\n').slice(0, linea).reduce((a, l) => a + l.length + 1, 0);
 async function entrarEdicion() {
   if (edicion || !rutaActual || $('#nota').hidden || $('#btn-editar').hidden || dialogoAbierto()) return;
@@ -479,8 +503,10 @@ async function entrarEdicion() {
   edicion = { ruta, original, texto0: texto, linea, hash: location.hash };
   $('#btn-editar').hidden = true;
   $('#nota').dataset.vista = 'edicion';
-  $('#nota').innerHTML = `<div id="edicion-cm"></div><div class="edicion-pie"><div id="franja-edicion" role="alert" hidden></div><button type="button" id="edicion-cancelar" class="secundario">Cancelar</button><button type="button" id="edicion-aplicar" class="primario" disabled>Aplicar</button><span class="pista">${teclaAplicar} aplica · Esc cancela</span></div>`;
-  live.montar($('#edicion-cm'), texto, { plano: info.configuracion.editor === 'plano', ruta, propiedades: propiedadesActual, posicion: desplazamientoDeLinea(texto, linea), alCambiar: actualizarEstadoEdicion });
+  $('#nota').style.setProperty('--alto-miga', `${$('.miga-barra').offsetHeight}px`);
+  $('#nota').innerHTML = `${htmlBarra()}<div id="edicion-cm"></div><div class="edicion-pie"><div id="franja-edicion" role="alert" hidden></div><button type="button" id="edicion-cancelar" class="secundario">Cancelar</button><button type="button" id="edicion-aplicar" class="primario" disabled>Aplicar</button><span class="pista">${teclaAplicar} aplica · Esc cancela</span></div>`;
+  live.montar($('#edicion-cm'), texto, { plano: info.configuracion.editor === 'plano', ruta, propiedades: propiedadesActual, posicion: desplazamientoDeLinea(texto, linea), alCambiar: actualizarEstadoEdicion, alSeleccionar: actualizarBarra });
+  enlazarBarra();
   $('#edicion-cancelar').onclick = pedirSalida;
   $('#edicion-aplicar').onclick = aplicarEdicion;
 }

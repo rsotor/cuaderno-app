@@ -222,11 +222,133 @@ const protegerPropiedades = [
   ]),
 ];
 
+
+// ---------- formato: comandos sobre la selección principal (barra y atajos). Rodean o quitan según el estado actual,
+// leído del árbol Markdown: si la selección ya está dentro de una negrita, el comando quita sus marcadores.
+function nodoQue(estado, nombres, from, to) {
+  const arbol = syntaxTree(estado);
+  for (const [pos, lado] of [[from, 1], [from, -1], [to, -1]]) {
+    for (let n = arbol.resolveInner(pos, lado); n; n = n.parent) if (nombres.includes(n.name) && n.from <= from && n.to >= to) return n;
+  }
+  return null;
+}
+// Los marcadores de un nodo (los de sus extremos): [primero, último] o null.
+function marcasDe(nodo, nombre) {
+  const marcas = nodo.getChildren(nombre);
+  return marcas.length >= 2 && marcas[0].from === nodo.from && marcas[marcas.length - 1].to === nodo.to ? [marcas[0], marcas[marcas.length - 1]] : null;
+}
+const NODOS = { negrita: ['StrongEmphasis', 'EmphasisMark'], cursiva: ['Emphasis'], codigo: ['InlineCode'] };
+function envolver(v, marca, nodos, nombreMarca) {
+  const { from, to } = v.state.selection.main;
+  const nodo = nodoQue(v.state, nodos, from, to), marcas = nodo && marcasDe(nodo, nombreMarca);
+  if (marcas) { v.dispatch({ changes: [{ from: marcas[0].from, to: marcas[0].to }, { from: marcas[1].from, to: marcas[1].to }], userEvent: 'input.format' }); return true; }
+  const n = marca.length;
+  if (from === to) v.dispatch({ changes: { from, insert: marca + marca }, selection: { anchor: from + n }, userEvent: 'input.format' });   // sin selección: el cursor, dentro
+  else v.dispatch({ changes: [{ from, insert: marca }, { from: to, insert: marca }], selection: { anchor: from + n, head: to + n }, userEvent: 'input.format' });
+  return true;
+}
+const lineasDe = estado => {   // las líneas que toca la selección principal
+  const { from, to } = estado.selection.main, ls = [];
+  for (let n = estado.doc.lineAt(from).number; n <= estado.doc.lineAt(to).number; n++) ls.push(estado.doc.line(n));
+  return ls;
+};
+const RE_ITEM = /^(\s*)[-*+] /, RE_TAREA = /^(\s*)[-*+] \[[ xX]\] /, RE_TITULO = /^(#{1,6}) /;
+const objetivos = ls => { const con = ls.filter(l => l.text.trim() !== ''); return con.length ? con : ls; };   // las líneas en blanco no cuentan
+function porLineas(v, cambiar) {   // cambiar(linea) → { from, to, insert } o null
+  const cambios = lineasDe(v.state).map(cambiar).filter(Boolean);
+  if (cambios.length) v.dispatch({ changes: cambios, userEvent: 'input.format' });
+  return true;
+}
+// Título: sin título pone «## » (el «#» es el título de la nota); en uno ya puesto sube de nivel (## → ### → ####) y en «####» lo quita.
+function titulo(v) {
+  return porLineas(v, l => {
+    const m = l.text.match(RE_TITULO);
+    if (!m) return { from: l.from, insert: '## ' };
+    return m[1].length >= 4 ? { from: l.from, to: l.from + m[0].length, insert: '' } : { from: l.from, to: l.from + m[1].length, insert: '#'.repeat(m[1].length + 1) };
+  });
+}
+function lista(v) {
+  const todas = objetivos(lineasDe(v.state)).every(l => RE_ITEM.test(l.text));
+  return porLineas(v, l => {
+    if (l.text.trim() === '') return null;
+    if (todas) { const m = l.text.match(/^(\s*)[-*+] (\[[ xX]\] )?/); return { from: l.from, to: l.from + m[0].length, insert: m[1] }; }
+    if (RE_ITEM.test(l.text)) return null;
+    const sangria = l.text.match(/^\s*/)[0];
+    return { from: l.from + sangria.length, insert: '- ' };
+  });
+}
+function casilla(v) {
+  const todas = objetivos(lineasDe(v.state)).every(l => RE_TAREA.test(l.text));
+  return porLineas(v, l => {
+    if (l.text.trim() === '') return null;
+    if (todas) { const m = l.text.match(RE_TAREA); return { from: l.from, to: l.from + m[0].length, insert: m[1] }; }
+    if (RE_TAREA.test(l.text)) return null;
+    const m = l.text.match(RE_ITEM);
+    if (m) return { from: l.from + m[0].length, insert: '[ ] ' };   // «- texto» → «- [ ] texto»
+    const sangria = l.text.match(/^\s*/)[0];
+    return { from: l.from + sangria.length, insert: '- [ ] ' };
+  });
+}
+function enlace(v) {
+  const { from, to } = v.state.selection.main, doc = v.state.doc;
+  const nodo = nodoQue(v.state, ['Link'], from, to);
+  if (nodo && nodo.getChild('URL')) {   // ya es un enlace: se queda el texto
+    const marcas = nodo.getChildren('LinkMark'), texto = doc.sliceString(marcas[0].to, marcas[1].from);
+    v.dispatch({ changes: { from: nodo.from, to: nodo.to, insert: texto }, selection: { anchor: nodo.from, head: nodo.from + texto.length }, userEvent: 'input.format' });
+    return true;
+  }
+  const texto = from === to ? 'texto' : doc.sliceString(from, to), ancla = from + texto.length + 3;   // «[texto](» y la url queda seleccionada
+  v.dispatch({ changes: { from, to, insert: `[${texto}](url)` }, selection: { anchor: ancla, head: ancla + 3 }, userEvent: 'input.format' });
+  return true;
+}
+function codigo(v) {
+  const { from, to } = v.state.selection.main, doc = v.state.doc;
+  const bloque = nodoQue(v.state, ['FencedCode'], from, to);
+  if (bloque) {   // dentro de un bloque: se quitan las vallas
+    const a = doc.lineAt(bloque.from), b = doc.lineAt(bloque.to);
+    v.dispatch({ changes: [{ from: a.from, to: Math.min(a.to + 1, doc.length) }, { from: Math.max(b.from - 1, a.to), to: b.to }], userEvent: 'input.format' });
+    return true;
+  }
+  if (doc.lineAt(from).number !== doc.lineAt(to).number) {   // varias líneas: un bloque
+    const a = doc.lineAt(from), b = doc.lineAt(to);
+    v.dispatch({ changes: [{ from: a.from, insert: '```\n' }, { from: b.to, insert: '\n```' }], userEvent: 'input.format' });
+    return true;
+  }
+  return envolver(v, '`', NODOS.codigo, 'CodeMark');
+}
+const COMANDOS = {
+  negrita: v => envolver(v, '**', NODOS.negrita.slice(0, 1), 'EmphasisMark'),
+  cursiva: v => envolver(v, '*', NODOS.cursiva, 'EmphasisMark'),
+  titulo, lista, casilla, enlace, codigo,
+};
+export const FORMATOS = Object.keys(COMANDOS);
+// Aplica un formato (o lo quita) en el editor montado.
+export function formato(nombre) { return vista && COMANDOS[nombre] ? COMANDOS[nombre](vista) : false; }
+// Qué formatos tiene la selección (para aria-pressed).
+export function formatosActivos() {
+  const r = Object.fromEntries(FORMATOS.map(f => [f, false]));
+  if (!vista) return r;
+  const st = vista.state, { from, to } = st.selection.main, ls = objetivos(lineasDe(st));
+  r.negrita = !!nodoQue(st, ['StrongEmphasis'], from, to);
+  r.cursiva = !!nodoQue(st, ['Emphasis'], from, to);
+  r.titulo = ls.every(l => RE_TITULO.test(l.text));
+  r.lista = ls.every(l => RE_ITEM.test(l.text));
+  r.casilla = ls.every(l => RE_TAREA.test(l.text));
+  const enlaceNodo = nodoQue(st, ['Link'], from, to);
+  r.enlace = !!(enlaceNodo && enlaceNodo.getChild('URL'));
+  r.codigo = !!nodoQue(st, ['InlineCode', 'FencedCode'], from, to);
+  return r;
+}
+const atajosFormato = keymap.of([
+  { key: 'Mod-b', run: v => COMANDOS.negrita(v) },
+  { key: 'Mod-i', run: v => COMANDOS.cursiva(v) },   // gana a «seleccionar el padre» de defaultKeymap. Ctrl K (enlace) choca con el buscador de la app: sin atajo
+]);
+
 let vista = null;
 
 // Monta el editor en `contenedor` con `texto` (LF). `posicion`: el desplazamiento donde queda el cursor, y que se
 // trae a la vista. `plano`: sin decoraciones (el Markdown tal cual).
-export function montar(contenedor, texto, { plano = false, posicion = 0, ruta = '', propiedades = '', alCambiar = null } = {}) {
+export function montar(contenedor, texto, { plano = false, posicion = 0, ruta = '', propiedades = '', alCambiar = null, alSeleccionar = null } = {}) {
   destruir();
   contexto = { ruta, cache: new Map(), alturas: new Map(), propiedades };
   const extensiones = [
@@ -236,6 +358,8 @@ export function montar(contenedor, texto, { plano = false, posicion = 0, ruta = 
     EditorView.contentAttributes.of({ 'aria-label': 'Editor de la nota', 'aria-multiline': 'true' }),
     tema,
   ];
+  if (alSeleccionar) extensiones.push(EditorView.updateListener.of(u => { if (u.docChanged || u.selectionSet) alSeleccionar(); }));
+  extensiones.unshift(atajosFormato);
   if (alCambiar) extensiones.push(EditorView.updateListener.of(u => { if (u.docChanged) alCambiar(); }));
   if (!plano) extensiones.unshift(protegerPropiedades, vistaPrevia);
   let pos = Math.max(0, Math.min(posicion, texto.length));

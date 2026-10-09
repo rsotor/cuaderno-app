@@ -440,3 +440,8 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 #franja-edicion[hidden] { display: none; }
 #franja-edicion .franja-texto { flex: 1 1 260px; }
 #edicion-aplicar:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+/* barra de formato del editor: fija bajo la miga, dentro de la hoja */
+.edicion-barra { position: sticky; top: var(--alto-miga, 44px); z-index: 1; display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0; margin-bottom: 12px; background: var(--papel); border-bottom: 1px solid var(--linea); }
+.edicion-barra button { min-width: 34px; padding: 3px 8px; font-size: 14px; line-height: 1; }
+.edicion-barra button .icono { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.edicion-barra button[aria-pressed="true"] { background: var(--acento-suave); color: var(--acento); border-color: var(--acento); }
