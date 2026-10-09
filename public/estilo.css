@@ -401,11 +401,11 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 /* ---------- editor de la nota entera (CodeMirror; public/live.js) */
 #edicion-cm { min-height: 40vh; }
 .edicion-pie { position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px; padding: 10px 0 4px; margin-top: 24px; background: var(--papel); border-top: 1px solid var(--linea); }
-.edicion-pie .pista { margin-left: auto; }
+.edicion-pie .pista { margin-left: auto; margin-right: 0; }   /* la global lleva margin-right:auto y la dejaba a medias (crítica 2026-10-09, 8) */
 /* live preview (inline): la hoja, no un editor de código. Los tokens son los de la lectura, en claro y oscuro. */
-#edicion-cm .cm-line.live-activa { background: rgba(127,127,127,.07); border-radius: var(--radio); }
+#edicion-cm .cm-line.live-activa { background: color-mix(in srgb, var(--tinta) 7%, transparent); border-radius: var(--radio); }   /* de la tinta del tema: se ve igual en claro y oscuro (crítica 2026-10-09, 4) */
 #edicion-cm .live-h1 { font-size: 28px; line-height: 1.15; font-weight: 700; letter-spacing: -.01em; padding: 6px 0 12px; }
-#edicion-cm .live-h2 { font-size: 22px; line-height: 1.25; font-weight: 700; border-bottom: 1px solid var(--linea); padding: 26px 0 4px; }
+#edicion-cm .live-h2 { font-size: 22px; line-height: 1.25; font-weight: 700; border-bottom: 1px solid var(--linea); padding: 14px 0 4px; }
 #edicion-cm .live-h3 { font-size: 18px; line-height: 1.3; font-weight: 700; padding: 16px 0 0; }
 #edicion-cm :is(.live-h4, .live-h5, .live-h6) { font-weight: 700; padding: 10px 0 0; }
 #edicion-cm .live-negrita { font-weight: 700; }
@@ -415,7 +415,21 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 #edicion-cm :is(.live-enlace, .live-wiki) { color: var(--acento); }
 #edicion-cm .live-wiki { border-bottom: 1px dotted var(--acento); }
 #edicion-cm .live-etiqueta { background: var(--acento-suave); color: var(--acento); border-radius: 999px; padding: 0 8px; font-size: .85em; }
-#edicion-cm .cm-line.live-cita { border-left: 3px solid var(--linea); color: var(--tinta-suave); padding-left: 16px; }
+#edicion-cm .cm-line.live-cita { border-left: 3px solid var(--tinta-suave); color: var(--tinta-suave); padding-left: 16px; }
 #edicion-cm .cm-line.live-hecha { color: var(--tinta-suave); text-decoration: line-through; }
-#edicion-cm .live-vineta { display: inline-block; width: 1.2em; text-align: center; color: var(--tinta-suave); }
-#edicion-cm .live-casilla { margin: 0 8px 0 2px; transform: translateY(2px); cursor: pointer; }
+#edicion-cm .live-vineta { display: inline-block; width: 1.5em; text-align: center; color: var(--tinta-suave); }
+#edicion-cm .live-casilla { margin: 0 .5em 0 0; border: 1.5px solid var(--tinta-suave); transform: translateY(2px); cursor: pointer; }
+/* live preview (bloques): el widget es el HTML de la lectura; dentro, sin los márgenes de bloque de la hoja */
+/* Sin márgenes verticales en el widget (relleno, y flow-root para contener los de dentro): CodeMirror mide la altura de la caja
+   sin ellos y, con ellos, el clic cae unas líneas más abajo de donde se pulsa (fallo del spike, 2026-10-09). */
+#edicion-cm .live-bloque { padding: 4px 0; display: flow-root; white-space: normal; cursor: text; }
+#edicion-cm .live-bloque > .bloque { margin: 0; padding: 0; }
+#edicion-cm .live-bloque > .bloque > * { margin-top: 0; margin-bottom: 0; }
+#edicion-cm .live-bloque .callout { margin: 0; }
+#edicion-cm .live-bloque .callout-titulo[data-plegable="1"] { cursor: pointer; }
+#edicion-cm .live-formula .math[data-display="1"] { text-align: center; margin: 8px 0; overflow-x: auto; }
+#edicion-cm .live-propiedades { padding: 0 0 14px; display: flow-root; cursor: default; white-space: normal; }
+#edicion-cm .live-propiedades .propiedades { margin: 0; }
+#edicion-cm .cm-line.live-crudo { font-family: var(--mono); font-size: 14px; background: rgba(127,127,127,.08); padding: 0 12px; }
+#edicion-cm .cm-line.live-vacia { height: .7em; line-height: .7em; }   /* la línea en blanco entre bloques no es un renglón entero (crítica 2026-10-09, 3) */
+#edicion-cm .live-marca { color: var(--tinta-suave); font-weight: 400; }   /* el «#» del título, cuando se ve, no compite con él (crítica 2026-10-09, 5) */

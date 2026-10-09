@@ -55,3 +55,29 @@ test('lectura: el ajuste «Letra» sigue mandando sobre el cuerpo de la nota (en
   const pequena = await e.pagina.evaluate(() => parseFloat(getComputedStyle(document.querySelector('#nota p')).fontSize));
   assert.ok(grande > 16 && pequena < 16, `la letra «Grande» da ${grande} px y «Pequeña» ${pequena} px; se esperaba más y menos de 16`);
 });
+
+// Montar el editor de la nota (CodeMirror, public/live.js) no se nota: la nota larga del ejemplo y una sintética de 60 KB
+// con títulos, énfasis, enlaces, tablas y casillas, por debajo de 150 ms. Es el coste síncrono de `montar` (el HTML de los
+// widgets llega después, de /api/render, y no bloquea). Se anota la mediana de tres montajes.
+const TOPE_MONTAJE_MS = 150;
+const sintetica = () => Array.from({ length: 128 }, (_, i) => `## Sección ${i + 1}\n\nUn párrafo con **negrita**, *cursiva*, [[interes|un enlace]], \`código\` y #etiqueta${i}. ${'Texto de relleno para ocupar espacio. '.repeat(8)}\n\n- [ ] Una casilla\n- Una viñeta\n\n| a | b |\n|---|---|\n| ${i} | ${i * 2} |\n`).join('\n');
+
+test('editor de la nota: montar la nota larga del ejemplo y una de 60 KB tarda menos de 150 ms', async () => {
+  await e.ir('#/');
+  const larga = await e.pagina.evaluate(() => fetch('/fichero/lectura/mercado-de-la-plaza.md').then(r => r.text()));
+  const grande = sintetica();
+  assert.ok(grande.length >= 60000, `la nota sintética mide ${grande.length} bytes`);
+  const medir = texto => e.pagina.evaluate(async texto => {
+    const live = await import('/public/live.js'), tiempos = [];
+    for (let i = 0; i < 3; i++) {
+      const c = document.createElement('div'); document.body.append(c);
+      const t0 = performance.now(); live.montar(c, texto, { plano: false, posicion: 0 }); tiempos.push(performance.now() - t0);
+      live.destruir(); c.remove();
+    }
+    return tiempos.sort((a, b) => a - b)[1];
+  }, texto);
+  const msLarga = await medir(larga), msGrande = await medir(grande);
+  console.log(`# montaje del editor: nota larga del ejemplo (${larga.length} bytes) ${msLarga.toFixed(1)} ms; sintética (${grande.length} bytes) ${msGrande.toFixed(1)} ms`);
+  assert.ok(msLarga < TOPE_MONTAJE_MS, `montar la nota larga tarda ${msLarga.toFixed(1)} ms; el tope es ${TOPE_MONTAJE_MS}`);
+  assert.ok(msGrande < TOPE_MONTAJE_MS, `montar 60 KB tarda ${msGrande.toFixed(1)} ms; el tope es ${TOPE_MONTAJE_MS}`);
+});

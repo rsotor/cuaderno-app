@@ -5,7 +5,7 @@
 ## 0. Estado del bloque
 
 **Ahora**
-- Plan aprobado por Roberto (2026-10-09). **Tarea 1 hecha** (rama `edicion-comentarios`): `escribirNota`, `POST /api/nota/escribir`, `POST /api/render`, tests de Node. **Tarea 2 hecha** (rama `edicion-comentarios`): CodeMirror con import map, `live.js` en modo plano, Editar/Aplicar, test del import map, Dependabot. **Tarea 3 hecha** (rama `edicion-comentarios`): live preview inline (marcadores, títulos, énfasis, enlaces, etiquetas, casillas). Rondas: abogado del diablo sobre el diseño (2026-10-09, 5
+- Plan aprobado por Roberto (2026-10-09). **Tarea 1 hecha** (rama `edicion-comentarios`): `escribirNota`, `POST /api/nota/escribir`, `POST /api/render`, tests de Node. **Tarea 2 hecha** (rama `edicion-comentarios`): CodeMirror con import map, `live.js` en modo plano, Editar/Aplicar, test del import map, Dependabot. **Tarea 3 hecha** (rama `edicion-comentarios`): live preview inline (marcadores, títulos, énfasis, enlaces, etiquetas, casillas). **Tarea 4 hecha** (rama `edicion-comentarios`): widgets de fórmula, callout, tabla y código; propiedades como widget de solo lectura; clic bajo widget corregido; crítica de diseño `docs/diseno/critica-2026-10-09-editor.md` (8 objeciones: 5 aplicadas, 1 en parte, 2 razonadas). Rondas: abogado del diablo sobre el diseño (2026-10-09, 5
   objeciones, las 5 asumidas, §3); crítica de diseño + auditoría de accesibilidad sobre el spike (2026-10-09, 29
   hallazgos: 2 críticos, 14 mayores, 4 medios, 9 menores; sus 8 puntos «para el plan» están repartidos en las
   tareas, §5); abogado del diablo sobre el plan escrito (2026-10-09, 5 objeciones, las 5 aplicadas: comentar no se
@@ -13,7 +13,7 @@
   finales mezclados; la unicidad de la cita la decide la app sobre el DOM; la franja de conflicto compara el texto, no
   el nombre que llega por `/cambios`).
 
-**Después:** tarea 4 (widgets y crítica de diseño) en cuanto Roberto dé el ok a la 3.
+**Después:** tarea 5 (lo escrito no se pierde) en cuanto Roberto dé el ok a la 4.
 
 **Inbox del bloque** (fuera de v1, con uso real se decide)
 - Rebasar automáticamente lo escrito sobre la nota nueva cuando los cambios no se solapan (hoy: franja + «Sobrescribir» o «Copiar mi texto y recargar»).

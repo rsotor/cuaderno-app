@@ -187,3 +187,106 @@ test('Markdown plano: con el ajuste, el editor enseña los marcadores siempre', 
     await aBlanco();
   } finally { await ajustarEditor('vista', 'viva.md'); }
 });
+
+// ---------- live preview (bloques): fórmula, callout, tabla, código y las propiedades se pintan como widget
+const BLOQUES = [
+  '# Bloques', '',
+  '$$', 'A = C \\left(1 + \\frac{r}{n}\\right)^{nt}', '$$', '',
+  '> [!note] Una nota', '> Un callout de tipo nota.', '',
+  '> [!tip]- Plegado', '> Un consejo que empieza plegado.', '',
+  '| Concepto | Valor |', '|---|---|', '| Capital | 1000 |', '| Interés | 3 % |', '',
+  '```js', 'const ahorro = ingresos => ingresos * 0.2;', '```', '',
+  'Párrafo final, debajo de todos los bloques.', '',
+].join('\n');
+
+test('widgets: fórmula, callout y tabla se ven pintados y el cursor dentro enseña el crudo', async () => {
+  fs.writeFileSync(path.join(e.c.base, 'bloques.md'), BLOQUES);
+  await ajustarEditor('vista', 'bloques.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .live-formula .katex'), 'widgets', 'la fórmula pintada');
+  await visible(e.pagina.locator('#edicion-cm .live-callout .callout'), 'widgets', 'el callout pintado');
+  await visible(e.pagina.locator('#edicion-cm .live-tabla table'), 'widgets', 'la tabla pintada');
+  await visible(e.pagina.locator('#edicion-cm .live-codigo pre'), 'widgets', 'el bloque de código pintado');
+  const crudo = () => e.pagina.locator('#edicion-cm .cm-line').allTextContents().then(l => l.join('\n'));
+  let texto = await crudo();
+  for (const c of ['\\frac', '[!note]', '|---|', '```js']) assert.ok(!texto.includes(c), `widgets: el crudo «${c}» se ve con el cursor fuera`);
+  // El callout plegado se abre al clic en su título, sin entrar en el crudo.
+  const plegado = e.pagina.locator('#edicion-cm .live-callout .callout.plegado');
+  await visible(plegado, 'widgets', 'el callout que empieza plegado');
+  await plegado.locator('.callout-titulo').click();
+  await oculto(e.pagina.locator('#edicion-cm .callout.plegado'), 'widgets', 'el callout plegado tras el clic en su título');
+  assert.equal(await e.pagina.locator('#edicion-cm .live-callout').count(), 2, 'widgets: abrir un callout lo ha convertido en crudo');
+  // Clic dentro de la tabla: el cursor entra, la tabla se ve en crudo y los demás bloques siguen pintados.
+  await e.pagina.locator('#edicion-cm .live-tabla').click();
+  await hasta(async () => (await crudo()).includes('| Concepto | Valor |'), 'widgets', 'con el cursor en la tabla no se ve su Markdown');
+  assert.equal(await e.pagina.locator('#edicion-cm .live-tabla').count(), 0, 'widgets: la tabla con el cursor dentro sigue pintada');
+  await visible(e.pagina.locator('#edicion-cm .live-formula .katex'), 'widgets', 'la fórmula sigue pintada');
+  // Fuera otra vez: el cursor va al párrafo final y la tabla vuelve a pintarse.
+  await lineaCmTexto('Párrafo final').click();
+  await visible(e.pagina.locator('#edicion-cm .live-tabla table'), 'widgets', 'la tabla pintada al salir el cursor');
+  await aBlanco();
+});
+
+const lineaCmTexto = t => e.pagina.locator('#edicion-cm .cm-line', { hasText: t });
+
+test('clic bajo una tabla: el cursor cae en el párrafo pulsado', async () => {
+  fs.writeFileSync(path.join(e.c.base, 'bloques.md'), BLOQUES + '\nOtro párrafo, el último de la nota.\n');
+  await ajustarEditor('vista', 'bloques.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .live-tabla table'), 'clic', 'la tabla pintada');
+  await visible(e.pagina.locator('#edicion-cm .live-formula .katex'), 'clic', 'la fórmula pintada');
+  // Se espera a que las alturas de los widgets se asienten (KaTeX, fuentes) antes de pulsar.
+  let alto = -1;
+  await hasta(async () => { const a = await e.pagina.evaluate(() => document.querySelector('#edicion-cm .cm-content').getBoundingClientRect().height); const igual = a === alto; alto = a; return igual; }, 'clic', 'la altura del editor no se asienta');
+  for (const t of ['Párrafo final', 'Otro párrafo']) {
+    await lineaCmTexto(t).click({ position: { x: 20, y: 6 } });
+    await hasta(async () => (await e.pagina.locator('#edicion-cm .live-activa').allTextContents()).join('').includes(t), 'clic', `el cursor no ha caído en el párrafo «${t}»; la línea activa es «${await e.pagina.locator('#edicion-cm .live-activa').allTextContents()}»`);
+  }
+  await aBlanco();
+});
+
+const FM = '---\ntitulo: Presupuesto de octubre\netiquetas:\n  - presupuesto\n  - mensual\nrevisado: true\n---\n';
+
+test('propiedades: se ven como tabla, Ctrl+Inicio deja el cursor en la primera línea del cuerpo y escribir no las cambia', async () => {
+  const antes = FM + '# Propiedades\n\nUn párrafo.\n';
+  fs.writeFileSync(path.join(e.c.base, 'props.md'), antes);
+  await ajustarEditor('vista', 'props.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm dl.propiedades'), 'propiedades', 'la tabla de propiedades en el editor');
+  await conTexto(e.pagina.locator('#edicion-cm dl.propiedades'), /titulo.*Presupuesto de octubre/, 'propiedades', 'el título del frontmatter');
+  await visible(e.pagina.locator('#edicion-cm dl.propiedades .etiqueta', { hasText: 'mensual' }), 'propiedades', 'las etiquetas como en lectura');
+  assert.ok(!(await e.pagina.locator('#edicion-cm .cm-content').textContent()).includes('titulo:'), 'propiedades: el frontmatter crudo está en el editor');
+  // Con las propiedades delante, el resto de la nota se pinta igual: el título pierde el «#» al bajar el cursor.
+  await e.pagina.keyboard.press('ArrowDown'); await e.pagina.keyboard.press('ArrowDown');
+  await hasta(async () => (await e.pagina.locator('#edicion-cm .live-h1').textContent()) === 'Propiedades', 'propiedades', 'el título no se pinta como título con el frontmatter delante');
+  // El cursor no puede estar en las propiedades: Ctrl+Inicio y escribir ponen la letra al principio del cuerpo.
+  await e.pagina.keyboard.press('ControlOrMeta+Home');
+  await e.pagina.keyboard.type('X');
+  await e.pagina.keyboard.press('Backspace'); await e.pagina.keyboard.press('Backspace');   // el segundo no puede comerse el frontmatter
+  await e.pagina.keyboard.type('X');
+  await e.pagina.keyboard.press('ControlOrMeta+a');
+  await e.pagina.keyboard.type('Cuerpo nuevo');
+  await e.pagina.locator('#edicion-aplicar').click();
+  await oculto(e.pagina.locator('#edicion-cm'), 'propiedades', 'el editor tras aplicar');
+  assert.equal(fs.readFileSync(path.join(e.c.base, 'props.md'), 'utf8'), FM + 'Cuerpo nuevo', 'propiedades: el frontmatter debe quedar byte a byte y el cuerpo, lo escrito');
+});
+
+test('examen del ejemplo: abrir el editor, Aplicar sin tocar, el fichero no cambia', async () => {
+  const fichero = path.join(e.c.base, 'examenes/01-examen.md');
+  const antes = fs.readFileSync(fichero, 'utf8');
+  await ajustarEditor('vista', 'examenes/01-examen.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm dl.propiedades'), 'examen', 'las propiedades del examen como tabla');
+  await visible(e.pagina.locator('#edicion-cm .cm-line', { hasText: 'Tienes 100' }), 'examen', 'el texto de la primera pregunta');
+  await e.pagina.locator('#edicion-aplicar').click();
+  await oculto(e.pagina.locator('#edicion-cm'), 'examen', 'el editor tras aplicar');
+  assert.equal(fs.readFileSync(fichero, 'utf8'), antes, 'examen: Aplicar sin tocar ha cambiado el fichero');
+  // Y con una edición que se deshace (escribir y borrar), igual: el texto manda y el frontmatter no se toca.
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm dl.propiedades'), 'examen', 'las propiedades del examen la segunda vez');
+  await e.pagina.keyboard.press('ControlOrMeta+Home'); await e.pagina.keyboard.type('X'); await e.pagina.keyboard.press('Backspace');
+  await e.pagina.keyboard.press('ControlOrMeta+Enter');
+  await oculto(e.pagina.locator('#edicion-cm'), 'examen', 'el editor tras Ctrl Enter');
+  assert.equal(fs.readFileSync(fichero, 'utf8'), antes, 'examen: escribir y borrar ha cambiado el fichero');
+  await conTexto(e.pagina.locator('#nota'), /Examen · Módulo 1/, 'examen', 'el examen otra vez en su vista de formulario');
+});

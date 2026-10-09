@@ -265,6 +265,9 @@ function sinPortada() {
   $('#miga').innerHTML = '<strong>Cuaderno</strong>';
   $('#nota').innerHTML = `<h1>${esc(cuaderno().nombre)}</h1><p class="resumen">Esta carpeta no tiene una nota de portada. Elige una nota en el árbol de la izquierda o busca con <kbd>Ctrl K</kbd>.</p>`;
 }
+// La tabla de propiedades (frontmatter) de la lectura; el editor pinta la misma, de solo lectura.
+const htmlPropiedades = fm => fm ? `<dl class="propiedades">${Object.entries(fm).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${Array.isArray(v) ? v.map(x => `<span class="etiqueta">${esc(x)}</span>`).join('') : esc(v)}</dd>`).join('')}</dl>` : '';
+let propiedadesActual = '';   // las de la nota que se ve, para el editor
 async function abrirNota(ruta, lineaDestino) {
   soltarEdicion();   // pintar una nota (otra, o esta recién escrita) cierra el editor que hubiera
   // La misma nota otra vez (recarga en vivo, un comentario recién escrito) conserva el scroll; una nota nueva empieza arriba.
@@ -276,6 +279,7 @@ async function abrirNota(ruta, lineaDestino) {
   try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonCopiar(ruta) + (n.generado ? '' : botonPapelera(ruta, ruta.split('/').pop()));   // una nota que regenera el profesor no se manda a la papelera desde aquí
   ancho(!!n.esHtml, !!n.esHtml);
+  propiedadesActual = htmlPropiedades(n.frontmatter);
   $('#btn-editar').hidden = !!(n.esFichero || n.esHtml);   // lo que no es Markdown no se edita aquí
   if (n.esFichero) return abrirFichero(ruta, n.tipo);
   const tipo = n.frontmatter && n.frontmatter.tipo;
@@ -283,7 +287,7 @@ async function abrirNota(ruta, lineaDestino) {
   if (vistaNota !== ruta && tipo === 'flashcards') return abrirTarjetas(ruta);
   if (n.esHtml) { $('#nota').innerHTML = `<iframe class="ejercicio" sandbox="allow-scripts allow-forms allow-modals" src="/fichero/${encodeURI(ruta)}" title="${esc(nombreNota(ruta))}"></iframe>`; return; }
   // Las propiedades van debajo del título, no encima: el título es lo primero que se lee.
-  const props = n.frontmatter ? `<dl class="propiedades">${Object.entries(n.frontmatter).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${Array.isArray(v) ? v.map(x => `<span class="etiqueta">${esc(x)}</span>`).join('') : esc(v)}</dd>`).join('')}</dl>` : '';
+  const props = htmlPropiedades(n.frontmatter);
   const back = n.backlinks.length ? `<nav class="backlinks" aria-label="Notas que enlazan aquí">Enlazan aquí: ${n.backlinks.map(b => `<a class="wiki" href="#/n/${encodeURI(b)}" title="${esc(b)}">${esc(tituloDe(b))}</a>`).join('')}</nav>` : '';
   // «Tareas que la mencionan»: las casillas de otras notas que la enlazan o la nombran con #etiqueta, junto a los backlinks.
   let menciones = []; try { menciones = await api(`/api/tareas-de?p=${encodeURIComponent(ruta)}`); } catch { /* sin esta sección, la nota se lee igual */ }
@@ -476,7 +480,7 @@ async function entrarEdicion() {
   $('#btn-editar').hidden = true;
   $('#nota').dataset.vista = 'edicion';
   $('#nota').innerHTML = `<div id="edicion-cm"></div><div class="edicion-pie"><button type="button" id="edicion-cancelar" class="secundario">Cancelar</button><button type="button" id="edicion-aplicar" class="primario">Aplicar</button><span class="pista">${teclaAplicar} aplica · Esc cancela</span></div>`;
-  live.montar($('#edicion-cm'), texto, { plano: info.configuracion.editor === 'plano', posicion: desplazamientoDeLinea(texto, linea) });
+  live.montar($('#edicion-cm'), texto, { plano: info.configuracion.editor === 'plano', ruta, propiedades: propiedadesActual, posicion: desplazamientoDeLinea(texto, linea) });
   $('#edicion-cancelar').onclick = () => salirEdicion();
   $('#edicion-aplicar').onclick = aplicarEdicion;
 }
