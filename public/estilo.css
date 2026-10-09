@@ -27,7 +27,7 @@
 }
 :root[data-letra="pequeña"] body { font-size: 14px; }
 :root[data-letra="grande"] body { font-size: 17px; }
-:root[data-fuente="serif"] #nota { font-family: var(--serif); line-height: 1.65; }
+:root[data-fuente="serif"] #nota { font-family: var(--serif); line-height: 1.7; }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -145,18 +145,19 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .pie-lateral #btn-ajustes { flex: 0 0 auto; }
 
 #centro { overflow: auto; min-height: 0; min-width: 0; padding: 0 0 40px; }
-.miga-barra { position: sticky; top: 0; background: var(--fondo); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px max(40px, calc((100% - 76ch - 80px) / 2 + 40px)); }   /* empieza donde empieza la columna de #nota */
+.miga-barra { position: sticky; top: 0; background: var(--fondo); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px max(40px, calc((100% - 880px) / 2 + 40px)); }   /* empieza donde empieza la columna de #nota */
 #miga { font-size: 13px; color: var(--tinta-suave); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #btn-menu { display: none; padding: 6px 8px; }
-#nota, #panel { max-width: calc(76ch + 80px); margin: 0 auto; padding: 8px 40px 40px; }   /* 76 ch ≈ 90 caracteres por línea: en pantalla grande la columna no se queda estrecha (Roberto, 2026-10-08) */
-#nota h1, #panel h1 { font-size: 28px; line-height: 1.15; margin: 6px 0 18px; font-weight: 700; letter-spacing: -.01em; }
-#nota h2 { font-size: 21px; margin: 40px 0 8px; border-bottom: 1px solid var(--linea); padding-bottom: 4px; }
+#nota, #panel { max-width: 880px; margin: 0 auto; padding: 8px 40px 40px; }   /* 800 px de texto + 2 × 40 de margen (Roberto, 2026-10-09: «unos 800 como está ahora lo veo bien»; sustituye a 76 ch) */
+#nota { font-size: 1.2em; line-height: 1.65; }   /* 18 px con la letra «Media»; en em para que el ajuste «Letra» siga mandando (revisión de diseño 2026-10-09, hallazgo 2) */
+#nota h1, #panel h1 { font-size: 30px; line-height: 1.15; margin: 6px 0 18px; font-weight: 700; letter-spacing: -.01em; }
+#nota h2 { font-size: 24px; line-height: 1.25; margin: 44px 0 10px; border-bottom: 1px solid var(--linea); padding-bottom: 4px; }
 #nota .bloque:has(> h2) + .bloque > :nth-child(2) { margin-top: 0; }   /* el bloque que sigue a un título se pega a él (el primer hijo es .acciones) */
-#nota h3 { font-size: 17px; margin: 24px 0 8px; }
+#nota h3 { font-size: 19px; line-height: 1.3; margin: 28px 0 8px; }
 #nota a { color: var(--acento); padding: 3px 0; }   /* objetivo ≥ 24 px de alto sin cambiar la línea */
 #nota a.wiki { text-decoration: none; border-bottom: 1px dotted var(--acento); }
 #nota a.wiki.roto { color: var(--mal); border-bottom-style: dashed; }
-#nota table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 14px; }
+#nota table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: .85em; line-height: 1.5; }
 #nota th, #nota td { border: 1px solid var(--linea); padding: 6px 10px; text-align: left; }
 #nota th { background: rgba(127,127,127,.08); }
 #nota code { background: rgba(127,127,127,.12); padding: 1px 5px; border-radius: 4px; }

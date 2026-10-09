@@ -11,6 +11,7 @@ nuevo entra en una nota o carpeta nueva, con su fila aquí y su test. Las rutas 
 | Nota mínima, destino de enlaces y del buscador | `conceptos/capital.md` | `tests/cuaderno.test.js`, `tests/navegador/lectura.test.js` |
 | Portada que regenera el profesor (`> Lo genera tu profesor`), alias escapado en tabla | `inicio.md` | `tests/navegador/lectura.test.js`, `tests/navegador/ficheros.test.js` |
 | Tareas propias, etiquetas, enlaces en una tarea | `tareas.md` | `tests/navegador/tareas.test.js` |
+| Nota larga (unas 700 palabras, 5 secciones): la lectura a 18 px, la columna de ~800 px y los caracteres por línea | `lectura/nota-larga.md` | `tests/navegador/medida.test.js` |
 | Examen (formulario de preguntas) | `examenes/01-examen.md` | `tests/formulario.test.js`, `tests/navegador/examen.test.js` |
 | Tarjetas (flashcards) | `flashcards/01-tarjetas.md` | `tests/tarjetas.test.js`, `tests/navegador/tarjetas.test.js` |
 | Ficheros que no son notas: PDF, JSON, CSV, TXT, HTML con script, PNG; enlaces a ellos | `material/` | `tests/navegador/ficheros.test.js` |
