@@ -123,14 +123,15 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 #miga :is(.mostrar, .copiar, .papelera) .icono { width: 15px; height: 15px; }
 /* ficheros que no son notas */
 #nota:focus-visible, #panel:focus-visible { outline: none; }   /* a donde lleva «Saltar al contenido» */
-#nota.ancha { max-width: none; margin-left: 0; margin-right: 0; }
-.miga-barra.ancha { padding-left: 40px; }
+#nota.ancha.todo { max-width: none; margin-left: 0; margin-right: 0; }
+.miga-barra.todo { padding-left: 40px; }
 #nota .tabla-csv { overflow-x: auto; }
 #nota .tabla-csv td.cifra { text-align: right; font-variant-numeric: tabular-nums; }
 #nota .como-texto { margin-top: 14px; }
 #nota .como-texto summary { cursor: pointer; color: var(--tinta-suave); font-size: 13.5px; margin-bottom: 8px; }
+#nota audio { display: block; margin: 0 auto; }   /* el reproductor, centrado como la imagen */
 #nota .visor-pdf { width: 100%; height: calc(100vh - 70px); border: 1px solid var(--linea); border-radius: var(--radio-bloque); background: #fff; }
-#nota .visor-imagen { display: block; max-width: 100%; height: auto; border: 1px solid var(--linea); border-radius: 2px; background: repeating-conic-gradient(rgba(127,127,127,.12) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }   /* el damero deja ver la transparencia */
+#nota .visor-imagen { display: block; margin: 0 auto; max-width: 100%; height: auto; border: 1px solid var(--linea); border-radius: 2px; background: repeating-conic-gradient(rgba(127,127,127,.12) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }   /* el damero deja ver la transparencia */
 #nota .fichero-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: rgba(127,127,127,.08); border: 1px solid var(--linea); border-radius: var(--radio-bloque); padding: 14px 16px; margin: 0; }
 #arbol .hoja small { color: var(--tinta-suave); font-size: 12px; margin-left: auto; padding-left: 8px; }   /* dos notas con el mismo título: el fichero las distingue */
 #lateral.buscando .paginas { display: none; }   /* buscando, los resultados necesitan el sitio */
@@ -157,8 +158,9 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
    (56 px a cada lado: 912 px). Letra de 16 px con la «Media»; en em para que el ajuste «Letra» siga mandando. */
 #nota, #panel { max-width: calc(var(--texto) + 2 * var(--hoja-pad)); margin: 8px auto 0; padding: 20px var(--hoja-pad) 40px; background: var(--papel); border: 1px solid var(--linea); border-radius: 10px; }
 #nota { font-size: 1.0667em; line-height: 1.65; }
-#nota.ancha { background: none; border: 0; border-radius: 0; margin-top: 0; padding: 8px 40px 40px; }   /* sin hoja a todo el ancho: PDF, páginas HTML, imágenes, vídeo, audio y lo que la app no sabe enseñar (Roberto, 2026-10-09) */
-#centro.con-indice .miga-barra:not(.ancha) { padding-left: calc(max(16px, (100% - var(--texto) - 2 * var(--hoja-pad) - 224px) / 2) + var(--hoja-pad)); }
+#nota.ancha { background: none; border: 0; border-radius: 0; }   /* sin hoja: la misma columna centrada (imagen, vídeo, audio, lo que la app no sabe enseñar; Roberto, 2026-10-09) */
+#nota.ancha.todo { margin-top: 0; padding: 8px 40px 40px; }   /* a todo el ancho: PDF y páginas HTML */
+#centro.con-indice .miga-barra:not(.todo) { padding-left: calc(max(16px, (100% - var(--texto) - 2 * var(--hoja-pad) - 224px) / 2) + var(--hoja-pad)); }
 #centro.con-indice #nota, #centro.con-indice #panel { margin-left: max(16px, calc((100% - var(--texto) - 2 * var(--hoja-pad) - 224px) / 2)); margin-right: 0; }   /* hoja + índice, como un grupo centrado */
 #nota h1, #panel h1 { font-size: 28px; line-height: 1.15; margin: 6px 0 18px; font-weight: 700; letter-spacing: -.01em; }
 #nota h2 { font-size: 22px; line-height: 1.25; margin: 38px 0 10px; scroll-margin-top: 56px; border-bottom: 1px solid var(--linea); padding-bottom: 4px; }

@@ -227,7 +227,7 @@ const RE_VIDEO = /^(mp4|m4v|webm|mov|ogv)$/, RE_AUDIO = /^(mp3|m4a|aac|wav|ogg|o
 let ultimoMostrado = null;   // la recarga en vivo vuelve a pintar el fichero: el Finder se abre una vez por visita
 async function abrirFichero(ruta, tipo) {
   const url = `/fichero/${encodeURI(ruta)}`, nombre = ruta.split('/').pop();
-  ancho(!RE_TEXTO.test(tipo));   // sin hoja: PDF, imágenes, vídeo, audio y lo que la app no sabe enseñar; la hoja, solo para texto (Roberto, 2026-10-09)
+  ancho(!RE_TEXTO.test(tipo), tipo === 'pdf');   // sin hoja: PDF (a todo el ancho), imágenes, vídeo, audio y lo que la app no sabe enseñar (columna centrada); la hoja, solo para texto (Roberto, 2026-10-09)
   if (tipo === 'pdf') { $('#nota').innerHTML = `<iframe class="visor-pdf" src="${url}" title="${esc(nombre)}"></iframe>`; return; }
   if (/^(png|jpe?g|gif|webp|avif|svg)$/.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><img class="visor-imagen" src="${url}" alt="${esc(nombre)}">`; return; }
   if (RE_VIDEO.test(tipo)) { $('#nota').innerHTML = `<h1>${esc(nombre)}</h1><video class="visor-imagen" src="${url}" controls preload="metadata"></video>`; return; }
@@ -256,8 +256,8 @@ function tablaCsv(texto) {
   const num = v => /^-?\d+([.,]\d+)?$/.test(v.trim());
   return `<div class="tabla-csv"><table><thead><tr>${filas[0].map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${filas.slice(1).map(f => `<tr>${f.map(v => `<td${num(v) ? ' class="cifra"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
-// PDF y páginas HTML a todo el ancho: la miga se alinea con ellos, no con la columna de lectura.
-function ancho(si) { $('#nota').classList.toggle('ancha', si); $('.miga-barra').classList.toggle('ancha', si); }
+// Sin hoja, la misma columna centrada que la hoja; PDF y páginas HTML (todo=true) a todo el ancho, y la miga se alinea con ellos.
+function ancho(si, todo = false) { $('#nota').classList.toggle('ancha', si); $('#nota').classList.toggle('todo', si && todo); $('.miga-barra').classList.toggle('todo', si && todo); }
 
 // ---------- nota
 function sinPortada() {
@@ -273,7 +273,7 @@ async function abrirNota(ruta, lineaDestino) {
   let n;
   try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonCopiar(ruta) + (n.generado ? '' : botonPapelera(ruta, ruta.split('/').pop()));   // una nota que regenera el profesor no se manda a la papelera desde aquí
-  ancho(!!n.esHtml);
+  ancho(!!n.esHtml, !!n.esHtml);
   if (n.esFichero) return abrirFichero(ruta, n.tipo);
   const tipo = n.frontmatter && n.frontmatter.tipo;
   if (vistaNota !== ruta && tipo === 'examen') return abrirExamen(ruta);
