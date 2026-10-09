@@ -312,9 +312,11 @@ test('sin aplicar: Aplicar se activa solo con cambios, la miga dice «Editando»
   await e.pagina.keyboard.type('x');
   assert.equal(await e.pagina.locator('#edicion-aplicar').isDisabled(), false, 'estado: Aplicar debe activarse con un cambio');
   await conTexto(e.pagina.locator('#editando'), /Editando/, 'estado', 'la señal «Editando» con cambios');
+  assert.match(await e.pagina.locator('#editando-aviso[role="status"]').textContent(), /Editando.*sin aplicar/, 'estado: el lector de pantalla no recibe «Editando» (región status)');
   await e.pagina.keyboard.press('Backspace');
   assert.equal(await e.pagina.locator('#edicion-aplicar').isDisabled(), true, 'estado: escribir y borrar debe desactivar Aplicar otra vez');
   await oculto(e.pagina.locator('#editando'), 'estado', 'la señal «Editando» tras deshacer el cambio');
+  assert.equal(await e.pagina.locator('#editando-aviso').textContent(), '', 'estado: el aviso para lector de pantalla se queda tras deshacer');
   // La señal de salida: el evento beforeunload solo se frena con cambios.
   const frena = () => e.pagina.evaluate(() => { const ev = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(ev); return ev.defaultPrevented; });
   assert.equal(await frena(), false, 'estado: beforeunload frena sin cambios');
@@ -585,5 +587,22 @@ test('formato: título, lista, casilla, enlace y código', async () => {
   await e.pagina.keyboard.press('Home'); await e.pagina.keyboard.press('Shift+ArrowDown');
   await boton('codigo').click();
   assert.ok((await textoEditor()).includes('\n```\nuno\ndos\n```\n'), 'código: la selección multilínea no pasa a bloque');
+  await salirDescartando();
+});
+
+test('accesibilidad: la casilla del editor se llama como su tarea y en colores forzados la barra distingue el botón pulsado', async () => {
+  fs.writeFileSync(path.join(e.c.base, 'a11y.md'), '# A11y\n\n- [ ] Llamar a Ana\n- [x] Pagar el recibo\n\nUna **frase**.\n');
+  await ajustarEditor('vista', 'a11y.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .live-casilla').first(), 'a11y', 'las casillas del editor');
+  assert.deepEqual(await e.pagina.locator('#edicion-cm .live-casilla').evaluateAll(l => l.map(i => i.getAttribute('aria-label'))), ['Casilla: Llamar a Ana', 'Casilla: Pagar el recibo']);
+  await e.pagina.emulateMedia({ forcedColors: 'active' });
+  try {
+    await lineaCmTexto('Una').click({ position: { x: 40, y: 6 } });
+    await e.pagina.keyboard.press('Home'); for (let i = 0; i < 6; i++) await e.pagina.keyboard.press('ArrowRight');   // dentro de «frase»
+    await hasta(async () => (await boton('negrita').getAttribute('aria-pressed')) === 'true', 'a11y', 'Negrita no sale pulsada');
+    const estilo = b => b.evaluate(x => { const c = getComputedStyle(x); return [c.borderTopWidth, c.color, c.backgroundColor].join('|'); });
+    assert.notEqual(await estilo(boton('negrita')), await estilo(boton('cursiva')), 'forced-colors: el botón pulsado se ve igual que el que no lo está');
+  } finally { await e.pagina.emulateMedia({ forcedColors: 'none' }); }
   await salirDescartando();
 });

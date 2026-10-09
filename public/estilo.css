@@ -474,3 +474,10 @@ button.comentado:focus-visible { outline: 2px solid var(--acento); outline-offse
 @media (max-width: 600px) {
   #comentar-caja, #comentar-hilo { position: fixed; left: 8px !important; right: 8px; bottom: 8px; top: auto !important; width: auto; max-height: 60vh; overflow: auto; }
 }
+/* auditoría de accesibilidad 2026-10-09 */
+#comentar-caja textarea { border-color: var(--tinta-suave); }   /* el campo se delimita con ≥ 3:1 (hallazgo 7) */
+@media (pointer: coarse) { .edicion-barra button, .edicion-pie button { min-height: 44px; min-width: 44px; } }   /* hallazgo 8 */
+@media (forced-colors: active) {
+  .edicion-barra button[aria-pressed="true"] { border-width: 3px; background: Highlight; color: HighlightText; forced-color-adjust: none; }   /* el estado no depende del color (hallazgo 2) */
+  #descartar .editor-caja { border: 2px solid CanvasText; }   /* el diálogo se distingue de la página (hallazgo 6) */
+}

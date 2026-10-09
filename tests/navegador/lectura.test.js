@@ -102,5 +102,6 @@ test('bloques: sin iconos en el margen, el fondo no cambia al pasar el ratón ni
   const parrafo = await visible(e.pagina.locator('#nota .bloque', { hasText: 'El precio del dinero' }), 'nota Interés', 'el párrafo de la introducción');
   await parrafo.click({ position: { x: 100, y: 5 } });
   await e.pagina.mouse.move(5, 5);
-  assert.equal(await fondo(e.pagina.locator('#nota .bloque', { hasText: 'El precio del dinero' })), transparente, 'el bloque se queda marcado tras clicar en el texto');
+  // Se pregunta de nuevo hasta que la recarga en vivo (que repinta la nota con lo que escribió el recorrido anterior) se asiente.
+  await hasta(async () => (await fondo(e.pagina.locator('#nota .bloque', { hasText: 'El precio del dinero' })).catch(() => null)) === transparente, 'nota Interés', 'el bloque se queda marcado tras clicar en el texto');
 });

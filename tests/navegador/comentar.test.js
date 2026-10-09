@@ -85,6 +85,7 @@ test('comentar con el teclado: Shift+flechas y c', async () => {
   await e.pagina.keyboard.type('Duda por teclado');
   await e.pagina.keyboard.press('ControlOrMeta+Enter');
   await ficheroCumple(e.c, 'c2.md', /· «capital inicial»\n> Duda por teclado\n/, 'teclado');
+  await hasta(() => e.pagina.evaluate(() => document.activeElement.classList.contains('comentado')), 'teclado', 'tras comentar el foco no vuelve al texto comentado (se pierde en el body)');
   // c sin selección: comenta el bloque enfocado, sin cita.
   await e.pagina.locator('#nota .bloque', { hasText: 'Otro párrafo' }).focus();
   await e.pagina.keyboard.press('c');
@@ -206,4 +207,22 @@ test('el cuaderno de ejemplo: la nota comentada tiene un subrayado, un callout v
   await conTexto(visibles.nth(1), /la cita ya no está/i, 'ejemplo', 'el aviso de la cita perdida');
   await e.ir('#/comentarios');
   await conTexto(e.pagina.locator('#panel'), /capital inicial/, 'ejemplo', 'la cita en el panel');
+});
+
+test('selección solo con teclado: Mayús + flechas sobre un bloque enfocado crean la selección, y c comenta ese fragmento', async () => {
+  await abrir('c10.md', '# Nota\n\nEl capital inicial se multiplica cada año por el tipo.\n\nOtro párrafo.\n');
+  const bloque = bloqueDe('capital inicial');
+  await bloque.focus();
+  await e.pagina.evaluate(() => getSelection().removeAllRanges());
+  for (let i = 0; i < 10; i++) await e.pagina.keyboard.press('Shift+ArrowRight');
+  assert.equal(await e.pagina.evaluate(() => getSelection().toString()), 'El capital', 'teclado: Mayús + flecha derecha no crea la selección desde el principio del bloque');
+  await visible(e.pagina.locator('#comentar-boton'), 'teclado', 'el botón flotante con la selección hecha con teclado');
+  await e.pagina.keyboard.press('c');
+  await visible(e.pagina.locator('#comentar-caja'), 'teclado', 'la caja con la selección hecha con teclado');
+  await e.pagina.keyboard.press('Escape');
+  // Desde el final, hacia la izquierda.
+  await bloque.focus();
+  await e.pagina.evaluate(() => getSelection().removeAllRanges());
+  for (let i = 0; i < 5; i++) await e.pagina.keyboard.press('Shift+ArrowLeft');
+  assert.equal(await e.pagina.evaluate(() => getSelection().toString()), 'tipo.', 'teclado: Mayús + flecha izquierda no crea la selección desde el final del bloque');
 });

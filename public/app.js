@@ -507,7 +507,7 @@ async function entrarEdicion() {
   $('#edicion-aplicar').onclick = aplicarEdicion;
 }
 // Cierra el editor sin repintar (otra pantalla lo sustituye).
-function soltarEdicion() { if (!edicion) return; edicion = null; if (live) live.destruir(); $('#editando').hidden = true; }
+function soltarEdicion() { if (!edicion) return; edicion = null; if (live) live.destruir(); $('#editando').hidden = true; $('#editando-aviso').textContent = ''; }
 async function salirEdicion() {
   if (!edicion) return;
   const { ruta, linea } = edicion;
@@ -542,6 +542,7 @@ function actualizarEstadoEdicion() {
   const c = hayCambios();
   $('#edicion-aplicar').disabled = !c;
   $('#editando').hidden = !c;
+  $('#editando-aviso').textContent = c ? 'Editando: hay cambios sin aplicar' : '';   // lo anuncia el lector de pantalla (auditoría 2026-10-09, 5)
 }
 // Salir con Esc o Cancelar: con cambios, antes se pregunta.
 function pedirSalida() { if (!edicion) return; if (hayCambios()) abrirDescartar(() => salirEdicion()); else salirEdicion(); }

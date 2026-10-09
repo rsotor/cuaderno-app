@@ -30,11 +30,11 @@ class Vineta extends WidgetType {
 }
 // «- [ ]» / «- [x]» como casilla de verdad: el clic cambia el texto del documento (no el fichero: eso es Aplicar).
 class Casilla extends WidgetType {
-  constructor(marcada) { super(); this.marcada = marcada; }
-  eq(o) { return o.marcada === this.marcada; }
+  constructor(marcada, tarea = '') { super(); this.marcada = marcada; this.tarea = tarea; }
+  eq(o) { return o.marcada === this.marcada && o.tarea === this.tarea; }
   toDOM(vista) {
     const i = document.createElement('input');
-    i.type = 'checkbox'; i.className = 'live-casilla'; i.checked = this.marcada; i.tabIndex = -1; i.setAttribute('aria-label', 'Casilla');
+    i.type = 'checkbox'; i.className = 'live-casilla'; i.checked = this.marcada; i.tabIndex = -1; i.setAttribute('aria-label', this.tarea ? `Casilla: ${this.tarea}` : 'Casilla');   // con el texto de la tarea; con teclado se cambia el «[ ]» de la línea activa
     i.addEventListener('mousedown', e => e.preventDefault());   // no mueve el cursor
     i.addEventListener('click', e => {
       e.preventDefault();
@@ -180,7 +180,7 @@ function construir(estado) {
           const marcador = item.getChild('Task') && item.getChild('Task').getChild('TaskMarker');
           if (marcador) {
             const hecha = /[xX]/.test(doc.sliceString(marcador.from, marcador.to));
-            decos.push(Decoration.replace({ widget: new Casilla(hecha) }).range(from, marcador.to));
+            decos.push(Decoration.replace({ widget: new Casilla(hecha, doc.lineAt(from).text.replace(/^\s*[-*+] \[[ xX]\]\s*/, '').slice(0, 80)) }).range(from, marcador.to));
             if (hecha) decos.push(linea('live-hecha').range(doc.lineAt(from).from));
           } else decos.push(Decoration.replace({ widget: new Vineta() }).range(from, to));
         }

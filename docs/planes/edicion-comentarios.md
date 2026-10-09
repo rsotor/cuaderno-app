@@ -5,15 +5,17 @@
 ## 0. Estado del bloque
 
 **Ahora**
-- Plan aprobado por Roberto (2026-10-09). **Tarea 1 hecha** (rama `edicion-comentarios`): `escribirNota`, `POST /api/nota/escribir`, `POST /api/render`, tests de Node. **Tarea 2 hecha** (rama `edicion-comentarios`): CodeMirror con import map, `live.js` en modo plano, Editar/Aplicar, test del import map, Dependabot. **Tarea 3 hecha** (rama `edicion-comentarios`): live preview inline (marcadores, títulos, énfasis, enlaces, etiquetas, casillas). **Tarea 4 hecha** (rama `edicion-comentarios`): widgets de fórmula, callout, tabla y código; propiedades como widget de solo lectura; clic bajo widget corregido; crítica de diseño `docs/diseno/critica-2026-10-09-editor.md` (8 objeciones: 5 aplicadas, 1 en parte, 2 razonadas). **Tarea 5 hecha** (rama `edicion-comentarios`): estado sin aplicar, diálogo de descartar, `beforeunload`, franja de conflicto (disco y 409) con Sobrescribir / Copiar y recargar. **Tarea 6 hecha** (rama `edicion-comentarios`): barra de formato (`role=toolbar`, flechas, `aria-pressed`), comandos rodear/quitar, Ctrl/⌘ B e I, deshacer con widgets comprobado. **Tarea 8 hecha** (rama `edicion-comentarios`): comentar por selección con cita decidida sobre el DOM, subrayado, hilo, cierre con deshacer, panel con cita; fuera el icono por bloque y `#editor`; ejemplo `comentarios/nota-comentada.md`; crítica `docs/diseno/critica-2026-10-09-comentar.md` (8 objeciones: 4 aplicadas, 2 en parte, 2 razonadas). **Tarea 7 hecha** (rama `edicion-comentarios`, en paralelo con la 5 en un worktree): `comentar` con cita normalizada, `cerrarComentario`, `comentarios()` con cita, `/api/comentario` con `cita` y `/api/comentario/cerrar`. Decisión (Roberto, 2026-10-09): cerrar quita el callout y la línea en blanco anterior, nunca la posterior (no pega bloques; un bloque pegado al siguiente sin línea en blanco queda con una de más). Rondas: abogado del diablo sobre el diseño (2026-10-09, 5
-  objeciones, las 5 asumidas, §3); crítica de diseño + auditoría de accesibilidad sobre el spike (2026-10-09, 29
-  hallazgos: 2 críticos, 14 mayores, 4 medios, 9 menores; sus 8 puntos «para el plan» están repartidos en las
-  tareas, §5); abogado del diablo sobre el plan escrito (2026-10-09, 5 objeciones, las 5 aplicadas: comentar no se
-  rompe entre las tareas 2 y 8; ancla y cierre con dos comentarios en el mismo párrafo y fichero byte a byte; BOM y
-  finales mezclados; la unicidad de la cita la decide la app sobre el DOM; la franja de conflicto compara el texto, no
-  el nombre que llega por `/cambios`).
+- **Bloque hecho en la rama (9 tareas, commits del `0cba29c` al de la tarea 9); pendiente: prueba a mano de Roberto con VoiceOver (`docs/diseno/accesibilidad-2026-10-09-edicion-comentarios.md`) y PR.**
+  Historia de lo hecho, tarea a tarea:
+  - Plan aprobado por Roberto (2026-10-09). **Tarea 1 hecha** (rama `edicion-comentarios`): `escribirNota`, `POST /api/nota/escribir`, `POST /api/render`, tests de Node. **Tarea 2 hecha** (rama `edicion-comentarios`): CodeMirror con import map, `live.js` en modo plano, Editar/Aplicar, test del import map, Dependabot. **Tarea 3 hecha** (rama `edicion-comentarios`): live preview inline (marcadores, títulos, énfasis, enlaces, etiquetas, casillas). **Tarea 4 hecha** (rama `edicion-comentarios`): widgets de fórmula, callout, tabla y código; propiedades como widget de solo lectura; clic bajo widget corregido; crítica de diseño `docs/diseno/critica-2026-10-09-editor.md` (8 objeciones: 5 aplicadas, 1 en parte, 2 razonadas). **Tarea 5 hecha** (rama `edicion-comentarios`): estado sin aplicar, diálogo de descartar, `beforeunload`, franja de conflicto (disco y 409) con Sobrescribir / Copiar y recargar. **Tarea 6 hecha** (rama `edicion-comentarios`): barra de formato (`role=toolbar`, flechas, `aria-pressed`), comandos rodear/quitar, Ctrl/⌘ B e I, deshacer con widgets comprobado. **Tarea 8 hecha** (rama `edicion-comentarios`): comentar por selección con cita decidida sobre el DOM, subrayado, hilo, cierre con deshacer, panel con cita; fuera el icono por bloque y `#editor`; ejemplo `comentarios/nota-comentada.md`; crítica `docs/diseno/critica-2026-10-09-comentar.md` (8 objeciones: 4 aplicadas, 2 en parte, 2 razonadas). **Tarea 7 hecha** (rama `edicion-comentarios`, en paralelo con la 5 en un worktree): `comentar` con cita normalizada, `cerrarComentario`, `comentarios()` con cita, `/api/comentario` con `cita` y `/api/comentario/cerrar`. Decisión (Roberto, 2026-10-09): cerrar quita el callout y la línea en blanco anterior, nunca la posterior (no pega bloques; un bloque pegado al siguiente sin línea en blanco queda con una de más). Rondas: abogado del diablo sobre el diseño (2026-10-09, 5
+    objeciones, las 5 asumidas, §3); crítica de diseño + auditoría de accesibilidad sobre el spike (2026-10-09, 29
+    hallazgos: 2 críticos, 14 mayores, 4 medios, 9 menores; sus 8 puntos «para el plan» están repartidos en las
+    tareas, §5); abogado del diablo sobre el plan escrito (2026-10-09, 5 objeciones, las 5 aplicadas: comentar no se
+    rompe entre las tareas 2 y 8; ancla y cierre con dos comentarios en el mismo párrafo y fichero byte a byte; BOM y
+    finales mezclados; la unicidad de la cita la decide la app sobre el DOM; la franja de conflicto compara el texto, no
+    el nombre que llega por `/cambios`).
 
-**Después:** tarea 9 (accesibilidad, plan vivo y cierre) en cuanto Roberto dé el ok a la 8.
+**Después:** PR `feat: editor de la nota en live preview y comentarios por selección` cuando Roberto dé el ok tras VoiceOver.
 
 **Inbox del bloque** (fuera de v1, con uso real se decide)
 - Rebasar automáticamente lo escrito sobre la nota nueva cuando los cambios no se solapan (hoy: franja + «Sobrescribir» o «Copiar mi texto y recargar»).
@@ -27,6 +29,13 @@
   bloques de código en el live preview.
 - Paleta de comandos (Ctrl K) con «Editar», «Comentar» y los demás cuando haya varios comandos (Inbox del plan vivo).
 - Formulario de propiedades (frontmatter) con su propia edición: tipos lista, texto, fecha; fuera del contenido.
+- Salido en las tareas, quedó fuera de v1: Mayús + flechas sin selección previa solo funciona sobre un bloque enfocado
+  (la app crea la selección, tarea 9); con el cursor sin selección en otro sitio es cosa de Chrome. El checkbox de una casilla
+  en el editor es solo de ratón (`tabindex -1`; con teclado se edita el `[ ]` de la línea activa). Vista previa mientras se
+  escribe dentro de una tabla (hoy, al entrar el cursor, la tabla se ve en crudo y lo de debajo se mueve unos píxeles).
+  Resaltado de sintaxis dentro de los bloques de código del editor. Cerrar un comentario de un bloque que estaba pegado al
+  siguiente sin línea en blanco deja una de más (nunca pega bloques: `cerrarComentario`). Un solo borde común para los botones
+  secundarios (contraste 1,3:1 del borde; el texto sí pasa).
 
 **Contexto:** spikes guardados en ramas locales sin push: `prototipo-editor-nota` (`cfad72f`, editor plano en un
 textarea) y `prototipo-live-preview` (`873da86`, CodeMirror 6 sin bundler, live preview con widgets; `public/live.js`,

@@ -192,6 +192,12 @@
     } catch (err) { if (err.status !== 409) host.avisarError('No se ha podido añadir el comentario.', err.message); return; }
     host.avisar('Comentario añadido a la nota');
     await host.recargar(); host.contadores();
+    // La nota se repinta: el foco vuelve al texto comentado (o al bloque) en vez de perderse en el body (auditoría 2026-10-09, 3).
+    if (host.ruta() === ruta) {
+      const h = hilos.filter(x => x.cita && x.cita === c.cita && x.desde === c.desde).pop();
+      const destino = (h && h.botones[0]) || [...$('#nota').querySelectorAll('.bloque')].find(b => +b.dataset.desde === c.desde);
+      if (destino) destino.focus();
+    }
   }
 
   // ---------- el hilo (popover junto al subrayado)
@@ -264,6 +270,20 @@
         e.preventDefault(); abrirCaja({ bloque: foco, cita: '', desde: +foco.dataset.desde, hasta: +foco.dataset.hasta });
       }
     });
+    // Mayús + flechas sobre un bloque enfocado, sin selección: la crea (el navegador solo extiende una que ya existe) y desde ahí se
+    // sigue con las flechas: elegir un fragmento para comentar sin ratón (auditoría 2026-10-09, 1). Derecha empieza por el principio del bloque; izquierda, por el final.
+    document.addEventListener('keydown', e => {
+      if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') || !enLectura()) return;
+      const b = e.target;
+      if (!b.classList || !b.classList.contains('bloque') || b.querySelector(':scope > .callout-comment')) return;
+      const sel = getSelection();
+      if (sel.rangeCount && !sel.isCollapsed && b.contains(sel.anchorNode)) return;   // ya hay selección en el bloque: el navegador la amplía
+      const { mapa } = textoVisible(b); if (!mapa.length) return;
+      e.preventDefault();
+      const derecha = e.key === 'ArrowRight';
+      if (!(sel.rangeCount && sel.isCollapsed && b.contains(sel.anchorNode))) { const [n, o] = derecha ? mapa[0] : mapa[mapa.length - 1]; const p = derecha ? o : o + 1; sel.setBaseAndExtent(n, p, n, p); }
+      sel.modify('extend', derecha ? 'forward' : 'backward', 'character');
+    }, true);
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && hiloAbierto) { e.preventDefault(); cerrarHilo(true); } });
     // Un clic fuera cierra el hilo, y la caja si está vacía.
     document.addEventListener('mousedown', e => {
