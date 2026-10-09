@@ -9,12 +9,16 @@
 - Plan escrito, pendiente de la revisión de Roberto. Rondas: abogado del diablo sobre el diseño (2026-10-09, 5
   objeciones, las 5 asumidas, §3); crítica de diseño + auditoría de accesibilidad sobre el spike (2026-10-09, 29
   hallazgos: 2 críticos, 14 mayores, 4 medios, 9 menores; sus 8 puntos «para el plan» están repartidos en las
-  tareas, §5); abogado del diablo sobre el plan escrito (2026-10-09, ver al final de §0).
+  tareas, §5); abogado del diablo sobre el plan escrito (2026-10-09, 5 objeciones, las 5 aplicadas: comentar no se
+  rompe entre las tareas 2 y 8; ancla y cierre con dos comentarios en el mismo párrafo y fichero byte a byte; BOM y
+  finales mezclados; la unicidad de la cita la decide la app sobre el DOM; la franja de conflicto compara el texto, no
+  el nombre que llega por `/cambios`).
 
 **Después:** tarea 1 en cuanto Roberto apruebe el plan.
 
 **Inbox del bloque** (fuera de v1, con uso real se decide)
 - Rebasar automáticamente lo escrito sobre la nota nueva cuando los cambios no se solapan (hoy: franja + «Sobrescribir» o «Copiar mi texto y recargar»).
+- Ficheros con finales de línea mezclados: conservar el de cada línea (hoy: 422 y no se edita desde la app).
 - Nota siempre editable (sin modo lectura). Primero el modo explícito, que es lo que pidió Roberto.
 - Comentarios que cruzan varios bloques, hilos con respuestas del profesor dentro del callout, estado «resuelto» que
   no borra.
@@ -63,30 +67,30 @@ la subraya.
 | Cambio del plan vivo | §6 «Editor: por bloques, sin WYSIWYG» pasa a «nota entera, live preview sobre el texto»; §8 saca «editor WYSIWYG» de Fuera y mete «WYSIWYG que re-serialice». La tarea 9 lo escribe | Decisión de Roberto, 2026-10-09 |
 | Entrar y salir | Botón «Editar» en la miga (fija) y tecla `e` con la nota enfocada. **Sin doble clic**: es el gesto nativo para seleccionar una palabra y comentarla | Objeción 3 de la ronda |
 | Scroll | Al entrar, el editor se coloca en el mismo bloque que estaba visible; al salir, igual | Roberto: «tengo que volver a subir para editar el último párrafo?» |
-| Escritura | Ruta nueva `POST /api/nota/escribir {ruta, texto, original}`: escribe el texto tal cual, respeta el fin de línea del fichero (LF/CRLF), el salto final y el BOM; 409 si el original no coincide | Objeción 2: `/api/bloque` 0..n cuenta líneas en los dos lados y puede duplicar la cola |
-| Lo escrito no se pierde | Estado «sin aplicar»; Esc, Cancelar y navegar con cambios piden confirmación en un diálogo propio; `beforeunload`. Con el editor abierto la recarga en vivo **no repinta**: enseña una franja fija «La nota cambió en el disco» con «Seguir editando» y «Recargar (pierdes lo escrito)». Un 409 al aplicar conserva el editor y ofrece «Sobrescribir» (vuelve a pedir la nota y escribe con ese original) o «Copiar mi texto y recargar» | Objeción 1, hallazgo 1 de la revisión y críticos D1/D2 de la crítica |
-| Widgets | Fórmula `$$`, callout, tabla, frontmatter y bloques del kit se pintan como widget con el HTML de `POST /api/render` (el mismo render que la lectura), cacheado por texto; con el cursor dentro se ve el crudo | Un solo render para lectura y editor; lo que el kit añada se pinta una vez |
+| Escritura | El editor carga el texto con `GET /fichero/<ruta>` (lo que ya usa `textoFichero`, `app.js:24`; el navegador quita el BOM al decodificar). Ruta nueva `POST /api/nota/escribir {ruta, texto, original}`: compara `original` con el fichero **sin BOM en los dos lados** y normalizando solo CRLF→LF; 409 si no coincide. Escribe el texto tal cual con el fin de línea del fichero, conserva el BOM si lo había y no toca el salto final (el texto manda). Fichero con finales mezclados: se rechaza con 422 «la nota tiene saltos de línea mezclados» (hoy `finDeLinea` lo pasaría entero a CRLF; conservarlos línea a línea va al Inbox) | Objeción 2 de la ronda 1 y objeción 3 de la ronda 2 |
+| Lo escrito no se pierde | Estado «sin aplicar»; Esc, Cancelar y navegar con cambios piden confirmación en un diálogo propio; `beforeunload`. Con el editor abierto la recarga en vivo **no repinta**: al llegar un cambio por `/cambios`, la app vuelve a pedir el texto de la nota y lo compara con el `original`; **solo si difiere** enseña la franja fija «La nota cambió en el disco» con «Seguir editando» y «Recargar (pierdes lo escrito)» (el mensaje de `/cambios` trae un solo fichero por lote y en Windows con `\`: no sirve para filtrar). Un 409 al aplicar conserva el editor y ofrece «Sobrescribir» (vuelve a pedir la nota y escribe con ese original) o «Copiar mi texto y recargar» | Objeción 1 de la ronda 1, hallazgo 1 de la revisión, críticos D1/D2 de la crítica, objeción 5 de la ronda 2 |
+| Widgets | Fórmula `$$`, callout, tabla, frontmatter y bloques del kit se pintan como widget con el HTML de `POST /api/render {texto, ruta}` (el mismo render que la lectura; `ruta` para que imágenes y enlaces relativos resuelvan), cacheado por texto; con el cursor dentro se ve el crudo | Un solo render para lectura y editor; lo que el kit añada se pinta una vez |
 | Markdown plano | Ajuste «Editor: con vista / Markdown plano». Plano = el mismo CodeMirror sin decoraciones (letra de la app, sin mono). Es la alternativa para lector de pantalla y para quien prefiera ver el Markdown | A4/A8 de la auditoría. El prototipo del textarea queda como rama guardada, no se usa |
-| Import map | Versiones exactas de los 5 paquetes directos; un test de Node recorre los `import` de cada ESM servido y comprueba que está en el mapa, que el fichero existe y que no hay copias anidadas de `@codemirror`/`@lezer`; `.github/dependabot.yml` con los dos ámbitos agrupados | Objeción 5 |
-| Comentarios: formato | Tras el bloque, como hoy: `> [!comment] Alumno (2026-10-09) · «cita»` + cuerpo. La cita: texto visible de la selección, una sola línea, espacios colapsados, sin `«»` dentro, máximo 120 caracteres; si no es única en el bloque se amplía con contexto hasta serlo, y si no se consigue se comenta el bloque sin cita. Los comentarios viejos (sin cita) siguen valiendo y se pintan como ahora | Objeción 4. Afloja el principio 1 («sin formatos propios») para los comentarios: decisión de Roberto, 2026-10-09 («una cosa es que lea bien el documento y otra funcionalidad añadida») |
-| Comentarios: ancla | La app busca la cita en el texto visible del bloque anterior al callout. Si no está, el hilo se ve igual, con «la cita ya no está» | Objeción 4 |
+| Import map | Versiones exactas de los 6 paquetes directos (`@codemirror/state`, `view`, `language`, `lang-markdown`, `commands` y `@lezer/markdown`, que el spike importa para GFM); un test de Node recorre los `import` de cada ESM servido y comprueba que está en el mapa, que el fichero existe y que no hay copias anidadas de `@codemirror`/`@lezer`; `.github/dependabot.yml` con los dos ámbitos agrupados | Objeción 5 |
+| Comentarios: formato | Tras el bloque, como hoy: `> [!comment] Alumno (2026-10-09) · «cita»` + cuerpo. La cita: texto visible de la selección, una sola línea, espacios colapsados, sin `«»` dentro, máximo 120 caracteres. **La unicidad la decide `comentar.js` sobre el DOM** (el mismo texto donde luego se busca: alias de wikilink, MathML de KaTeX, casillas; el servidor no lo ve igual): si la cita aparece más de una vez en el bloque se amplía con las palabras siguientes hasta ser única, y si no se consigue se comenta el bloque sin cita. El servidor solo normaliza el formato. Los comentarios viejos (sin cita) siguen valiendo y se pintan como ahora | Objeción 4 de la ronda 1 y 4 de la ronda 2. Afloja el principio 1 («sin formatos propios») para los comentarios: decisión de Roberto, 2026-10-09 («una cosa es que lea bien el documento y otra funcionalidad añadida») |
+| Comentarios: ancla | La app busca la cita en el texto visible del **primer bloque por encima del callout que no sea un callout `comment`** (dos comentarios del mismo párrafo quedan uno tras otro: `comentar()` inserta justo detrás del bloque, `cuaderno.js:315`). Si no está, el hilo se ve igual, con «la cita ya no está» | Objeción 4 de la ronda 1 y 2 de la ronda 2 |
 | Comentar | Solo en lectura (con el editor abierto no hay selección de lectura). Selección con ratón o con teclado (Shift+flechas) → botón flotante «Comentar» (nace en `selectionchange`, 44 px en táctil) → caja con textarea, «Comentar» desactivado sin texto, Esc devuelve el foco. Tecla `c`: con selección, comenta con cita; sin ella, comenta el bloque enfocado (como hoy) | A9/A10/A11 y el menor «comentar con la caja vacía» |
 | Subrayado | Amarillo rotulador y subrayado inferior en tinta (no solo color), marca en el margen, `forced-colors`. Oscuro: ocre que pase 4,5:1 con el texto y el enlace (el `#6b5a00` no pasa: enlace 3,77:1). El subrayado es un botón: foco, Enter abre el hilo | A1/A2/D12. El amarillo es solo para lo comentado; el buscador no lo usa |
 | Hilo | Popover junto al subrayado: cita, autor, fecha, texto, «Cerrar». El panel Comentarios lista cita + texto y salta al subrayado abriendo el hilo | |
-| Cerrar | Borra el callout, con «Deshacer» en el aviso (como ocultar en el árbol). Git guarda la historia; el profesor borra igual al recoger. «Resuelto» sin borrar va al Inbox | D5 de la crítica, decidido en contra: el comentario es una pregunta del alumno, y el alumno decide cuándo sobra |
-| Lo que se va | Los iconos de editar y comentar por bloque, el diálogo `#editor` para bloques y `/api/bloque` como vía de edición desde la pantalla. `/api/bloque`, `/api/comentario` y `/api/casilla` se quedan (las casillas y la tecla `c` sin cita los usan) | |
+| Cerrar | Ruta nueva `POST /api/comentario/cerrar {ruta, linea, original}` que quita el callout **y las líneas en blanco que `comentar()` añadió** (`cuaderno.js:313-314`), de modo que el fichero queda byte a byte como antes de comentar (con `/api/bloque` y texto vacío quedarían 2-3 líneas en blanco de más). «Deshacer» en el aviso vuelve a comentar. Git guarda la historia; el profesor borra igual al recoger. «Resuelto» sin borrar va al Inbox | D5 de la crítica, decidido en contra: el comentario es una pregunta del alumno, y el alumno decide cuándo sobra. Objeción 2 de la ronda 2 |
+| Lo que se va | El icono de editar por bloque y `/api/bloque` como vía de edición desde la pantalla (tarea 2). El icono de comentar y el diálogo `#editor` **se quedan, solo para comentar, hasta la tarea 8**, que los sustituye por la selección y la caja: así comentar funciona y sus recorridos están en verde en todas las tareas intermedias. `/api/bloque`, `/api/comentario` y `/api/casilla` se quedan (las casillas y la tecla `c` sin cita los usan) | Objeción 1 de la ronda 2 |
 
 ## 4. Ficheros
 
 | Fichero | Responsable de |
 |---|---|
-| `cuaderno.js` | `escribirNota(rel, texto, original)` (nuevo: texto tal cual, EOL, salto final, BOM, 409); `comentar()` con cita opcional y su normalización; `comentarios()` devuelve también `cita` |
-| `servidor.js` | `POST /api/nota/escribir`, `POST /api/render` (nuevo: `{texto}` → HTML con el render de lectura), `POST /api/comentario` con `cita` |
+| `cuaderno.js` | `escribirNota(rel, texto, original)` (nuevo: texto tal cual, EOL, salto final, BOM, 409, 422 si mezclado); `comentar()` con cita opcional y su normalización de formato; `cerrarComentario(rel, linea, original)` (nuevo); `comentarios()` devuelve también `cita` |
+| `servidor.js` | `POST /api/nota/escribir`, `POST /api/render` (nuevo: `{texto, ruta}` → HTML con el render de lectura), `POST /api/comentario` con `cita`, `POST /api/comentario/cerrar` |
 | `markdown.js` | Nada nuevo salvo que el render exponga lo que `/api/render` necesita (comprobar) |
-| `public/index.html` | Import map de CodeMirror; botón «Editar» en la miga; franja de conflicto; diálogo propio «¿Descartar lo escrito?»; caja de comentar; plantilla del hilo; ajuste «Editor» en Ajustes; sin el diálogo `#editor` |
+| `public/index.html` | Import map de CodeMirror; botón «Editar» en la miga; franja de conflicto; diálogo propio «¿Descartar lo escrito?»; caja de comentar; plantilla del hilo; ajuste «Editor» en Ajustes; el diálogo `#editor` se va en la tarea 8 |
 | `public/live.js` (nuevo, ESM) | Todo lo de CodeMirror: montar/destruir, tema con los tokens de la app, decoraciones inline (marcadores, títulos, énfasis, código, enlaces, wikilinks, etiquetas, casillas), widgets por `/api/render` con caché, modo plano, barra de formato (comandos sobre el estado), atajos Ctrl/⌘ B, I, Enter |
-| `public/app.js` | Entrar y salir del modo edición (botón, `e`, foco de vuelta, scroll al bloque visible), estado «sin aplicar», franja de conflicto, 409, `beforeunload`, recarga en vivo que no repinta con el editor abierto; quitar iconos por bloque y `abrirEditor`; ajuste del editor |
-| `public/comentar.js` (nuevo, script clásico) | Selección → botón flotante → caja → `POST /api/comentario` con cita; subrayado de las citas al pintar la nota; hilo; cerrar con deshacer; tecla `c`; panel Comentarios con cita y salto |
+| `public/app.js` | Entrar y salir del modo edición (botón, `e`, foco de vuelta, scroll al bloque visible), estado «sin aplicar», franja de conflicto, 409, `beforeunload`, recarga en vivo que no repinta con el editor abierto (pide la nota y compara); quitar el icono de editar (tarea 2) y `abrirEditor` (tarea 8); ajuste del editor |
+| `public/comentar.js` (nuevo, script clásico) | Selección → botón flotante → caja → `POST /api/comentario` con cita (unicidad y ampliación decididas aquí, sobre el DOM); subrayado de las citas al pintar la nota (ancla: primer bloque de encima que no sea callout `comment`); hilo; cerrar con deshacer; tecla `c`; panel Comentarios con cita y salto |
 | `public/estilo.css` | `.cm-editor` con la hoja (claro y oscuro), barra de formato, franja, botón flotante, subrayado (`--rotulador`, `--rotulador-tinta`, `forced-colors`), hilo |
 | `tests/cuaderno.test.js`, `tests/servidor.test.js`, `tests/rutas.test.js` | Escribir nota (4 casos de fin de fichero + 409), render, comentar con cita (normalización, unicidad, formato viejo), rutas nuevas |
 | `tests/importmap.test.js` (nuevo) | El mapa cubre todos los `import` de los ESM servidos, sin copias anidadas |
@@ -103,18 +107,21 @@ Cada tarea: su test primero, `npm test` y `npm run test:navegador` en verde, un 
 (o una PR por tarea si Roberto quiere revisarlas por separado; §6 del plan vivo).
 
 ### 1 · Servidor: escribir la nota entera y pintar Markdown
-- `cuaderno.js`: `escribirNota(rel, texto, original)`. Lee el fichero, compara `original` con el contenido actual
-  normalizando solo CRLF→LF (nada más: ni blancos finales), 409 si no coincide; escribe `texto` convirtiendo `\n` al
-  EOL del fichero; conserva el BOM si lo había; no añade ni quita el salto final (el texto manda).
-- `servidor.js`: `POST /api/nota/escribir`; `POST /api/render {texto}` → `{html}` con el render de lectura.
+- `cuaderno.js`: `escribirNota(rel, texto, original)`. Lee el fichero, quita el BOM a los dos lados y normaliza solo
+  CRLF→LF (nada más: ni blancos finales) para comparar `original` con el contenido actual; 409 si no coincide; 422
+  si el fichero tiene finales mezclados (hay `\r\n` y `\n` sueltos); escribe `texto` convirtiendo `\n` al EOL del
+  fichero; vuelve a poner el BOM si lo había; no añade ni quita el salto final (el texto manda).
+- `servidor.js`: `POST /api/nota/escribir`; `POST /api/render {texto, ruta}` → `{html}` con el render de lectura
+  (la `ruta` resuelve imágenes y enlaces relativos como en `/api/nota`).
 - Tests de Node en `tests/cuaderno.test.js` y `tests/servidor.test.js`: fichero sin salto final que sigue sin él; con dos
-  líneas en blanco al final que se conservan; CRLF que vuelve CRLF; BOM que vuelve BOM; 409 con original distinto;
-  render de un callout y una fórmula igual que `/api/nota`.
+  líneas en blanco al final que se conservan; CRLF que vuelve CRLF; BOM que vuelve BOM **con el `original` sin BOM,
+  como lo manda el navegador**; mezclado → 422; 409 con original distinto; render de un callout, una fórmula y una
+  imagen relativa igual que `/api/nota`.
 - Comando: `npm test`. Commit: `feat: escribir la nota entera y pintar Markdown por la API`.
 
 ### 2 · CodeMirror sin bundler, editor plano y entrada/salida
-- `npm install --save-exact` de `@codemirror/state`, `view`, `language`, `lang-markdown`, `commands` (justificación en
-  el plan vivo, tarea 9). Import map en `index.html` con las rutas reales (`dist/index.js`; `style-mod` `src/`,
+- `npm install --save-exact` de `@codemirror/state`, `view`, `language`, `lang-markdown`, `commands` y `@lezer/markdown`
+  (justificación en el plan vivo, tarea 9). Import map en `index.html` con las rutas reales (`dist/index.js`; `style-mod` `src/`,
   `@marijn/find-cluster-break` `src/index.js`, `w3c-keyname` y `crelt` `index.js`).
 - `tests/importmap.test.js`: lee el import map de `index.html`, recorre los `import … from '…'` de cada fichero mapeado
   (recursivo) y comprueba que todo especificador está en el mapa, que el fichero existe y que no hay
@@ -126,14 +133,16 @@ Cada tarea: su test primero, `npm test` y `npm run test:navegador` en verde, un 
 - `app.js`: botón «Editar» en la miga y tecla `e` (ignorando campos editables); al entrar, el editor se coloca en el
   bloque que estaba visible y el cursor en su primera línea; «Cancelar» y «Aplicar» (Ctrl/⌘ Enter, Esc); Aplicar escribe
   con `/api/nota/escribir`, repinta y devuelve el foco al botón «Editar»; el aviso dice «Nota escrita». Pistas con ⌘ en
-  Mac (`GESTOR`). Se quitan los iconos por bloque, `abrirEditor` y el diálogo `#editor`. Ajuste «Editor: con vista /
-  Markdown plano» en Ajustes (por ahora los dos hacen lo mismo).
+  Mac (`GESTOR`). Se quita **solo el icono de editar** por bloque y su rama en `abrirEditor`; el icono de comentar, la
+  tecla `c` y el diálogo `#editor` siguen como hoy hasta la tarea 8 (comentar no deja de funcionar en ninguna tarea).
+  Ajuste «Editor: con vista / Markdown plano» en Ajustes (por ahora los dos hacen lo mismo).
 - Recorridos en `tests/navegador/edicion.test.js`: «editar la nota: Editar abre el editor en el bloque visible, Aplicar
   escribe el fichero tal cual y vuelve a lectura» (comprueba el fichero con `diff` de líneas); «editar con el teclado: e
   entra, Esc sale, el foco vuelve a Editar». Adaptar: `lectura.test.js:44` (editar una lista → ahora desde el editor de la
-  nota), `:76` (editar un bloque → editar la nota), `:91` (ya no hay iconos: comprobar que no salen), `diseno.test.js:27`
-  (sin `#editor`; «Aplicar» sigue siendo el verbo), `:96` (E abre el editor de la nota), `:117` (sin el diálogo del
-  editor; el diálogo de descartar entra en la tarea 5). Fila 4 del índice de casos → «Editar la nota».
+  nota), `:76` (editar un bloque → editar la nota), `:91` (solo queda el icono de comentar), `diseno.test.js:27` (la
+  parte de editar pasa al editor de la nota; la de comentar, `:42-48`, sigue), `:96` (E abre el editor de la nota; C
+  sigue), `:117` (el diálogo de comentar sigue reteniendo el foco; el de descartar entra en la tarea 5). Fila 4 del
+  índice de casos → «Editar la nota».
 - Comando: `npm test && npm run test:navegador`. Commit: `feat: editor de la nota entera con CodeMirror, sin iconos por bloque`.
 
 ### 3 · Live preview: lo inline
@@ -161,11 +170,13 @@ Cada tarea: su test primero, `npm test` y `npm run test:navegador` en verde, un 
 - `app.js`: estado «sin aplicar» (el botón Aplicar se activa con cambios; la miga dice «Editando»); Esc, Cancelar,
   cambiar de nota o de pantalla con cambios abren el diálogo propio «¿Descartar lo escrito?» (Descartar / Seguir
   editando; retiene el foco, `inert` fuera); `beforeunload` con cambios. Recarga en vivo con el editor abierto: no
-  repinta, enseña la franja «La nota cambió en el disco» con «Seguir editando» y «Recargar (pierdes lo escrito)»;
-  `api()` no recarga la nota cuando hay un 409 del editor. 409 al aplicar: el editor sigue con el texto; franja con
+  repinta; vuelve a pedir el texto de la nota y, **solo si difiere del `original`**, enseña la franja «La nota cambió
+  en el disco» con «Seguir editando» y «Recargar (pierdes lo escrito)»; `api()` no recarga la nota cuando hay un 409
+  del editor. 409 al aplicar: el editor sigue con el texto; franja con
   «Sobrescribir» (pide la nota de nuevo y escribe con ese original) y «Copiar mi texto y recargar».
 - Recorridos: «conflicto: cambiar el fichero desde fuera con el editor abierto no borra lo escrito; Sobrescribir lo
-  escribe»; «descartar: Esc con cambios pregunta, sin cambios sale»; «navegar con cambios pregunta». Adaptar
+  escribe»; «otra nota cambia en el disco mientras editas: ninguna franja»; «descartar: Esc con cambios pregunta, sin
+  cambios sale»; «navegar con cambios pregunta». Adaptar
   `diseno.test.js:117` (el diálogo de descartar retiene el foco).
 - Commit: `feat: el editor no pierde lo escrito ante conflictos, recargas y salidas`.
 
@@ -177,23 +188,29 @@ Cada tarea: su test primero, `npm test` y `npm run test:navegador` en verde, un 
 - Commit: `feat: barra de formato y atajos del editor`.
 
 ### 7 · Servidor: comentarios con cita
-- `cuaderno.js`: `comentar(rel, desde, hasta, texto, original, { cita })`: normaliza la cita (una línea, espacios
-  colapsados, recorta a 120, quita `«»`), comprueba que aparece una sola vez en el texto visible del bloque (el texto
-  del tramo sin marcadores Markdown, con la misma función que usa la app); si aparece varias veces, la amplía con las
-  palabras siguientes hasta que sea única o la descarta; título `Alumno (fecha) · «cita»`. `comentarios()` devuelve
-  `{ruta, linea, titulo, autor, fecha, cita, texto}` para los dos formatos.
-- Tests de Node: cita normal; cita repetida que se amplía; cita que no se puede hacer única (comenta sin cita);
-  cita con `«`; comentario viejo sin cita que sigue saliendo; `/api/comentario` con `cita`.
+- `cuaderno.js`: `comentar(rel, desde, hasta, texto, original, { cita })`: normaliza el formato de la cita (una
+  línea, espacios colapsados, recorta a 120, quita `«»`) y escribe el título `Alumno (fecha) · «cita»`; la unicidad no
+  es suya (la decide la app sobre el DOM, tarea 8). `cerrarComentario(rel, linea, original)`: quita el callout de esa
+  línea y las líneas en blanco que `comentar()` añadió, comprobando el original del callout; el fichero queda como
+  antes de comentar. `comentarios()` devuelve `{ruta, linea, titulo, autor, fecha, cita, texto}` para los dos formatos.
+- `servidor.js`: `POST /api/comentario` acepta `cita`; `POST /api/comentario/cerrar {ruta, linea, original}`.
+- Tests de Node: cita normal; cita con `«` y con saltos de línea; cita de más de 120; comentario viejo sin cita que
+  sigue saliendo; comentar y cerrar dejan el fichero byte a byte como estaba (sin salto final, con salto final, con
+  el bloque seguido de otro); dos comentarios del mismo bloque y cerrar el primero; `/api/comentario` con `cita` y
+  `/api/comentario/cerrar` con 409.
 - Commit: `feat: comentarios con la cita del texto seleccionado`.
 
 ### 8 · Comentar por selección, hilo y panel
-- `comentar.js`: al pintar la nota, por cada callout `comment` con cita, busca la cita en el texto visible del bloque
-  anterior y la envuelve en `<button class="comentado">` (subrayado); si no está, el callout muestra «la cita ya no está».
-  `selectionchange` en lectura dentro de un bloque de texto → botón flotante «Comentar» junto al final de la selección
-  (44 px en táctil); clic o `c` → caja con textarea («Comentar» desactivado sin texto, Esc cierra y devuelve el foco al
-  bloque); envía `cita` y el tramo del bloque. Clic o Enter en el subrayado → hilo (popover: cita, autor, fecha, texto,
-  «Cerrar»); «Cerrar» borra el callout con `/api/bloque` y aviso «Comentario cerrado · Deshacer» (5 s, vuelve a
-  escribirlo). `c` sin selección comenta el bloque enfocado como hoy.
+- `comentar.js`: al pintar la nota, por cada callout `comment` con cita, busca la cita en el texto visible del primer
+  bloque por encima que no sea un callout `comment` y la envuelve en `<button class="comentado">` (subrayado); si no
+  está, el callout muestra «la cita ya no está». `selectionchange` en lectura dentro de un bloque de texto → botón
+  flotante «Comentar» junto al final de la selección (44 px en táctil); clic o `c` → caja con textarea («Comentar»
+  desactivado sin texto, Esc cierra y devuelve el foco al bloque); antes de enviar decide la cita sobre el DOM: si
+  aparece más de una vez en el bloque la amplía con las palabras siguientes hasta que sea única, y si no lo consigue
+  manda el comentario sin cita; envía `cita` y el tramo del bloque. Clic o Enter en el subrayado → hilo (popover: cita,
+  autor, fecha, texto, «Cerrar»); «Cerrar» llama a `/api/comentario/cerrar` y avisa «Comentario cerrado · Deshacer»
+  (5 s, vuelve a comentar con la misma cita y texto). `c` sin selección comenta el bloque enfocado como hoy. Esta tarea
+  retira el icono de comentar por bloque, el diálogo `#editor` y `abrirEditor`.
 - Panel Comentarios: cita en cursiva + texto; clic salta a la nota, enfoca el subrayado y abre el hilo.
 - Estilo: `--rotulador` (claro `#ffe45c`) y oscuro un ocre medido ≥ 4,5:1 con `--tinta` y `--acento`; subrayado inferior
   de 2 px en `--tinta-suave`; marca de 3 px en el margen izquierdo del bloque; `@media (forced-colors: active)` con
@@ -202,9 +219,12 @@ Cada tarea: su test primero, `npm test` y `npm run test:navegador` en verde, un 
   uno con cita que ya no está); filas en las dos tablas del índice; fila 5 de casos → «Comentar un texto seleccionado».
 - Recorridos en `tests/navegador/comentar.test.js`: «comentar una selección: queda el callout con la cita tras el
   bloque, el texto sale subrayado y el panel lo lista con la cita»; «comentar con el teclado: Shift+flechas y c»;
-  «hilo: clic en el subrayado lo abre, Cerrar borra el callout y Deshacer lo devuelve»; «cita perdida: el hilo se ve
-  con el aviso»; «comentario viejo sin cita se pinta como antes». Adaptar `casos.test.js:33` (el bloque sin cita sigue
-  valiendo con `c`).
+  «hilo: clic en el subrayado lo abre, Cerrar deja el fichero byte a byte como antes de comentar y Deshacer lo
+  devuelve»; «dos comentarios en el mismo párrafo: los dos subrayados apuntan bien»; «cita repetida en el párrafo: la
+  app la amplía y el subrayado cae en la frase elegida»; «cita que es el alias de un wikilink»; «cita perdida: el hilo
+  se ve con el aviso»; «comentario viejo sin cita se pinta como antes». Adaptar `casos.test.js:33` (el bloque sin cita
+  sigue valiendo con `c`, ahora por la caja nueva), `diseno.test.js:42-48`, `:113` y `:135` (el diálogo `#editor` ya
+  no existe: la caja de comentar retiene el foco).
 - Crítica de diseño sobre las capturas del después (claro, oscuro, 390 px); objeciones en `docs/diseno/critica-<fecha>-comentar.md`.
 - Commit: `feat: comentar un texto seleccionado, con hilo, panel y cierre con deshacer`.
 
