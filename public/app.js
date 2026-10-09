@@ -267,8 +267,11 @@ function sinPortada() {
 // La tabla de propiedades (frontmatter) de la lectura; el editor pinta la misma, de solo lectura.
 const htmlPropiedades = fm => fm ? `<dl class="propiedades">${Object.entries(fm).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${Array.isArray(v) ? v.map(x => `<span class="etiqueta">${esc(x)}</span>`).join('') : esc(v)}</dd>`).join('')}</dl>` : '';
 let propiedadesActual = '';   // las de la nota que se ve, para el editor
-let turnoNota = 0, notaPintada = null;   // la última petición de nota es la que pinta; y lo último pintado, para no repintar lo mismo
-async function abrirNota(ruta, lineaDestino, { desdeCambios = false } = {}) {
+let turnoNota = 0, notaPintada = null, pendienteNota = null;   // la última petición de nota es la que pinta; y lo último pintado, para no repintar lo mismo
+// `await abrirNota()` vuelve siempre con la nota pintada: una llamada superada por otra más nueva espera a la última antes de volver
+// (lo que el llamante hace después, como refrescar el índice o saltar a una línea, necesita la nota en pantalla).
+function abrirNota(ruta, lineaDestino, opciones) { return (pendienteNota = abrirNotaTurno(ruta, lineaDestino, opciones)); }
+async function abrirNotaTurno(ruta, lineaDestino, { desdeCambios = false } = {}) {
   soltarEdicion();   // pintar una nota (otra, o esta recién escrita) cierra el editor que hubiera
   const turno = ++turnoNota;   // si mientras llega la respuesta se pide otra nota (o esta otra vez), esta ya no pinta: lo viejo no pisa lo nuevo
   // La misma nota otra vez (recarga en vivo, un comentario recién escrito) conserva el scroll; una nota nueva empieza arriba.
@@ -277,8 +280,8 @@ async function abrirNota(ruta, lineaDestino, { desdeCambios = false } = {}) {
   rutaActual = ruta;
   $('#panel').hidden = true; $('#nota').hidden = false; delete $('#nota').dataset.vista;
   let n;
-  try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { if (turno !== turnoNota) return; $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
-  if (turno !== turnoNota) return;
+  try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { if (turno !== turnoNota) return pendienteNota; $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
+  if (turno !== turnoNota) return pendienteNota;
   $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonCopiar(ruta) + (n.generado ? '' : botonPapelera(ruta, ruta.split('/').pop()));   // una nota que regenera el profesor no se manda a la papelera desde aquí
   ancho(!!n.esHtml, !!n.esHtml);
   propiedadesActual = htmlPropiedades(n.frontmatter);
@@ -293,7 +296,8 @@ async function abrirNota(ruta, lineaDestino, { desdeCambios = false } = {}) {
   const back = n.backlinks.length ? `<nav class="backlinks" aria-label="Notas que enlazan aquí">Enlazan aquí: ${n.backlinks.map(b => `<a class="wiki" href="#/n/${encodeURI(b)}" title="${esc(b)}">${esc(tituloDe(b))}</a>`).join('')}</nav>` : '';
   // «Tareas que la mencionan»: las casillas de otras notas que la enlazan o la nombran con #etiqueta, junto a los backlinks.
   let menciones = []; try { menciones = await api(`/api/tareas-de?p=${encodeURIComponent(ruta)}`); } catch { /* sin esta sección, la nota se lee igual */ }
-  if (rutaActual !== ruta || edicion || turno !== turnoNota) return;   // mientras llegaba la respuesta se abrió otra nota (o esta otra vez), o se pulsó «Editar» (el editor no se pisa)
+  if (turno !== turnoNota) return pendienteNota;
+  if (rutaActual !== ruta || edicion) return;   // mientras llegaba la respuesta se abrió otra nota (o esta otra vez), o se pulsó «Editar» (el editor no se pisa)
   const tareasMencion = menciones.length ? `<section class="menciones" aria-label="Tareas que la mencionan"><h2>Tareas que la mencionan <a class="wiki ver-en-tareas" href="#/tareas?nota=${encodeURIComponent(nombreNota(ruta))}">Ver en Tareas</a></h2>${menciones.map(i => `<label class="item${i.hecha ? ' hecha' : ''}"><input type="checkbox" class="casilla-mencion" data-ruta="${esc(i.ruta)}" data-linea="${i.linea}"${i.hecha ? ' checked' : ''}${i.generado ? ' disabled' : ''}><span>${i.html || esc(i.texto)}</span></label>`).join('')}</section>` : '';
   const html = n.html + tareasMencion + back;
   if (desdeCambios && recarga && html === notaPintada) { $('#nota').dataset.vista = 'nota'; return; }   // la recarga en vivo avisa de cualquier toque al fichero (también de lo que escribe la propia app): si la nota sale igual, no se repinta

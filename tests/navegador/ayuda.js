@@ -78,14 +78,14 @@ async function arrancar({ pty = null, ...opciones } = { kit: false }) {   // por
 const fallo = (pantalla, que, detalle) => new assert.AssertionError({ message: `${pantalla}: ${que}${detalle ? ` (${detalle})` : ''}` });
 
 // Repite fn hasta que devuelva algo verdadero; si se agota el tiempo, el fallo dice la pantalla y qué faltaba.
-async function hasta(fn, pantalla, que) {
+async function hasta(fn, pantalla, que) {   // `que` puede ser una función: el texto del fallo se arma al fallar, con lo último que se vio
   const fin = Date.now() + ESPERA;
   let ultimo = null;
   while (Date.now() < fin) {
     try { const v = await fn(); if (v) return v; ultimo = null; } catch (e) { ultimo = e; }
     await new Promise(r => setTimeout(r, 60));
   }
-  throw fallo(pantalla, que, ultimo && ultimo.message);
+  throw fallo(pantalla, typeof que === 'function' ? que() : que, ultimo && ultimo.message);
 }
 // El localizador tiene que verse (o dejar de verse); devuelve el primero.
 async function visible(loc, pantalla, que) { try { await loc.first().waitFor({ state: 'visible' }); } catch (e) { throw fallo(pantalla, `no aparece ${que}`, e.message.split('\n')[0]); } return loc.first(); }
@@ -93,12 +93,12 @@ async function oculto(loc, pantalla, que) { try { await loc.first().waitFor({ st
 // El texto del localizador tiene que cumplir la expresión (espera a que cambie).
 async function conTexto(loc, re, pantalla, que) {
   let texto = '';
-  await hasta(async () => { texto = (await loc.first().textContent()) || ''; return re.test(texto); }, pantalla, `${que}: se esperaba ${re}, hay «${texto.trim().slice(0, 120)}»`);
+  await hasta(async () => { texto = (await loc.first().textContent()) || ''; return re.test(texto); }, pantalla, () => `${que}: se esperaba ${re}, hay «${texto.trim().slice(0, 120)}»`);
 }
 // El fichero del cuaderno tiene que cumplir la expresión (la app escribe en disco, el test espera a que llegue).
 async function ficheroCumple(c, rel, re, pantalla) {
   let texto = '';
-  await hasta(() => { texto = c.leer(rel); return re.test(texto); }, pantalla, `${rel} no contiene ${re}; el fichero dice:\n${texto}`);
+  await hasta(() => { texto = c.leer(rel); return re.test(texto); }, pantalla, () => `${rel} no contiene ${re}; el fichero dice:\n${texto}`);
 }
 // El hash de la página tiene que cumplir la expresión.
 async function hashCumple(pagina, re, pantalla) { await hasta(() => re.test(new URL(pagina.url()).hash), pantalla, `el hash no cumple ${re}; es ${new URL(pagina.url()).hash}`); }

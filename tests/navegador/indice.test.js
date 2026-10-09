@@ -152,3 +152,16 @@ test('hoja: a 760 px y en móvil se funde con el fondo y no roba sitio con márg
     assert.ok(m.scrollH <= m.ventana, `${w} px: hay scroll horizontal`);
   }
 });
+
+test('recarga en vivo que llega durante la navegación: `await abrirNota()` vuelve con la nota pintada y el índice sale igual', async () => {
+  await e.ir('#/n/inicio.md');
+  await visible(e.pagina.locator('#nota .bloque').first(), 'navegación', 'la portada');
+  // Dos peticiones seguidas de la misma nota (la navegación y la recarga en vivo): la primera queda superada y, aun así, no vuelve hasta que la nota se ve.
+  const r = await e.pagina.evaluate(async () => {
+    const a = abrirNota('lectura/mercado-de-la-plaza.md'); abrirNota('lectura/mercado-de-la-plaza.md', null, { desdeCambios: true });
+    await a;
+    return { titulo: (document.querySelector('#nota h1') || {}).textContent, vista: document.querySelector('#nota').dataset.vista };
+  });
+  assert.match(r.titulo, /mercado de la plaza/i, 'abrirNota ha vuelto antes de pintar la nota');
+  assert.equal(r.vista, 'nota');
+});

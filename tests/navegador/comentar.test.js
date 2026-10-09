@@ -80,8 +80,10 @@ test('comentar con el teclado: Shift+flechas y c', async () => {
   assert.equal(await e.pagina.evaluate(() => document.activeElement.classList.contains('bloque')), true, 'teclado: Esc no devuelve el foco al bloque');
   // Con la selección otra vez: c, texto y Ctrl/⌘ Enter.
   await bloque.locator('p').dblclick({ position: { x: 60, y: 8 } });
+  if ((await e.pagina.evaluate(() => getSelection().toString())).endsWith(' ')) await e.pagina.keyboard.press('Shift+ArrowLeft');   // Windows: el doble clic incluye el espacio final
   for (let i = 0; i < 8; i++) await e.pagina.keyboard.press('Shift+ArrowRight');
   await e.pagina.keyboard.press('c');
+  await visible(e.pagina.locator('#comentar-caja'), 'teclado', 'la caja con c (si no, lo que se teclee iría a la página: la «e» abriría el editor)');
   await e.pagina.keyboard.type('Duda por teclado');
   await e.pagina.keyboard.press('ControlOrMeta+Enter');
   await ficheroCumple(e.c, 'c2.md', /· «capital inicial»\n> Duda por teclado\n/, 'teclado');
