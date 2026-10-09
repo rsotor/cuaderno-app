@@ -87,6 +87,17 @@ test('la API: info, árbol, nota, escrituras y el 409 cuando la nota cambió', a
     assert.match(s.c.leer('tareas.md'), /- \[x\] Comprar/);
     assert.equal((await post('/api/comentario', { ruta: 'conceptos/capital.md', desde: 0, hasta: 1, texto: 'duda', original: '# Capital' })).status, 200);
     assert.equal((await (await s.pedir('/api/comentarios')).json()).length, 1);
+    const sinCita = (await (await s.pedir('/api/comentarios')).json())[0];
+    assert.equal(sinCita.cita, null);
+    assert.equal((await post('/api/comentario', { ruta: 'conceptos/capital.md', desde: 2, hasta: 3, texto: 'con cita', cita: ' «lo que»\n pones ' })).status, 200);
+    const conCita = (await (await s.pedir('/api/comentarios')).json()).find(x => x.texto === 'con cita');
+    assert.deepEqual([conCita.cita, conCita.autor], ['lo que pones', 'Alumno']);
+    r = await post('/api/comentario/cerrar', { ruta: 'conceptos/capital.md', linea: conCita.linea, original: conCita.original + ' cambiado' });
+    assert.equal(r.status, 409);
+    assert.equal((await post('/api/comentario/cerrar', { ruta: 'conceptos/capital.md', linea: conCita.linea, original: conCita.original })).status, 200);
+    r = await post('/api/comentario/cerrar', { ruta: 'conceptos/capital.md', linea: conCita.linea, original: conCita.original });
+    assert.equal(r.status, 409);
+    assert.equal((await (await s.pedir('/api/comentarios')).json()).length, 1);
     assert.equal((await post('/api/tarea', { texto: 'Nueva' })).status, 200);
     assert.equal((await (await s.pedir('/api/tareas')).json())[0].items.length, 2);
     assert.equal((await post('/api/tarea', { texto: 'Releer [[conceptos/interes]] #repaso' })).status, 200);
