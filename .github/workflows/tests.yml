@@ -1,5 +1,5 @@
 # Tests del repo en GitHub Actions.
-#   push                → Linux: npm test + recorridos de navegador (barato, en cada commit).
+#   push (solo main)    → Linux: npm test + recorridos de navegador. En una rama, la lanza su pull request (no dos veces el mismo commit).
 #   pull_request        → Linux, macOS y Windows: lo mismo en los tres (el run de Windows compila node-pty con Node 24).
 #   workflow_dispatch   → los tres sistemas, a mano, desde la pestaña Actions.
 # Solo se lanza cuando cambia algo que afecta a los tests: código, pantalla, tests, dependencias o este fichero.
@@ -9,6 +9,7 @@ name: Tests
 
 on:
   push:
+    branches: [main]
     paths:
       - "*.js"
       - "public/**"
