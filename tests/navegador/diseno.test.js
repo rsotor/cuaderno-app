@@ -114,7 +114,7 @@ test('teclado en la nota: un solo punto de Tab, flechas entre bloques, E edita l
   await e.pagina.keyboard.press('Escape');
 });
 
-test('diálogos: Ajustes, Nueva nota y el diálogo de comentar retienen el foco con Tab y Mayús Tab, dejan lo de detrás inerte y devuelven el foco al cerrar', async () => {
+test('diálogos: Ajustes, Nueva nota, el diálogo de comentar y el de descartar retienen el foco con Tab y Mayús Tab, dejan lo de detrás inerte y devuelven el foco al cerrar', async () => {
   const dentro = id => e.pagina.evaluate(i => !!document.activeElement.closest(i), id);
   const probar = async (abrir, id, cerrar) => {
     await abrir();
@@ -133,6 +133,11 @@ test('diálogos: Ajustes, Nueva nota y el diálogo de comentar retienen el foco 
   await probar(() => e.pagina.click('#btn-nueva-nota'), '#nueva-nota', () => e.pagina.keyboard.press('Escape'));
   const bloque = e.pagina.locator('#nota .bloque').nth(1);
   await probar(async () => { await bloque.hover(); await bloque.locator('[data-accion="comentar"]').click(); }, '#editor', () => e.pagina.keyboard.press('Escape'));
+  // «¿Descartar lo escrito?»: con cambios en el editor de la nota, Esc lo abre; Esc dentro es «Seguir editando».
+  await probar(async () => { await e.pagina.click('#btn-editar'); await visible(e.pagina.locator('#edicion-cm .cm-content'), '#descartar', 'el editor de la nota'); await e.pagina.keyboard.type('x'); await e.pagina.keyboard.press('Escape'); }, '#descartar', () => e.pagina.keyboard.press('Escape'));
+  assert.equal(await e.pagina.evaluate(() => !!document.activeElement.closest('#edicion-cm')), true, '#descartar: al cerrar con Esc el foco no vuelve al editor');
+  await e.pagina.keyboard.press('Escape'); await e.pagina.locator('#descartar-ok').click();
+  await oculto(e.pagina.locator('#edicion-cm'), '#descartar', 'el editor tras descartar');
 });
 
 test('contraste en oscuro: el enlace del panel Tareas pasa de 4,5:1 y los controles nativos siguen el tema (color-scheme)', async () => {

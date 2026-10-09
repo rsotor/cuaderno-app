@@ -226,7 +226,7 @@ let vista = null;
 
 // Monta el editor en `contenedor` con `texto` (LF). `posicion`: el desplazamiento donde queda el cursor, y que se
 // trae a la vista. `plano`: sin decoraciones (el Markdown tal cual).
-export function montar(contenedor, texto, { plano = false, posicion = 0, ruta = '', propiedades = '' } = {}) {
+export function montar(contenedor, texto, { plano = false, posicion = 0, ruta = '', propiedades = '', alCambiar = null } = {}) {
   destruir();
   contexto = { ruta, cache: new Map(), alturas: new Map(), propiedades };
   const extensiones = [
@@ -236,6 +236,7 @@ export function montar(contenedor, texto, { plano = false, posicion = 0, ruta = 
     EditorView.contentAttributes.of({ 'aria-label': 'Editor de la nota', 'aria-multiline': 'true' }),
     tema,
   ];
+  if (alCambiar) extensiones.push(EditorView.updateListener.of(u => { if (u.docChanged) alCambiar(); }));
   if (!plano) extensiones.unshift(protegerPropiedades, vistaPrevia);
   let pos = Math.max(0, Math.min(posicion, texto.length));
   if (!plano) { const lineas = texto.split('\n'); if (lineas[0] === '---') { const k = lineas.indexOf('---', 1); if (k > 0) pos = Math.max(pos, Math.min(lineas.slice(0, k + 1).join('\n').length + 1, texto.length)); } }   // nunca dentro de las propiedades
@@ -246,6 +247,7 @@ export function montar(contenedor, texto, { plano = false, posicion = 0, ruta = 
 }
 
 export function destruir() { if (vista) { vista.destroy(); vista = null; } contexto = { ruta: '', cache: new Map(), alturas: new Map(), propiedades: '' }; }
+export const enfocar = () => { if (vista) vista.focus(); };
 export const texto = () => vista ? vista.state.doc.toString() : null;
 // El número de línea (desde 0) donde está el cursor.
 export const lineaDelCursor = () => vista ? vista.state.doc.lineAt(vista.state.selection.main.head).number - 1 : null;

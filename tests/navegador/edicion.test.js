@@ -5,7 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { arrancar, hasta, visible, oculto, conTexto, ficheroCumple } = require('./ayuda');
+const { arrancar, hasta, visible, oculto, conTexto, ficheroCumple, hashCumple } = require('./ayuda');
 
 let e;
 test.before(async () => { e = await arrancar({ kit: false }); });
@@ -63,7 +63,9 @@ test('editar con el teclado: e entra, Esc sale sin escribir, Ctrl/⌘ Enter apli
   await visible(e.pagina.locator('#edicion-cm .cm-content'), 'teclado', 'el editor con la tecla E');
   await e.pagina.keyboard.type('eee');   // dentro del editor, la «e» es una letra más, no entra ni sale
   await e.pagina.keyboard.press('Escape');
-  await oculto(e.pagina.locator('#edicion-cm'), 'teclado', 'el editor tras Esc');
+  await visible(e.pagina.locator('#descartar'), 'teclado', '«¿Descartar lo escrito?» con Esc y cambios');
+  await e.pagina.locator('#descartar-ok').click();
+  await oculto(e.pagina.locator('#edicion-cm'), 'teclado', 'el editor tras descartar');
   assert.equal(await e.pagina.evaluate(() => document.activeElement.id), 'btn-editar', 'teclado: el foco no vuelve a «Editar»');
   assert.equal(fichero(), original, 'teclado: Esc ha escrito en el fichero');
   // Con el foco en «Editar», Enter entra también (es un botón) y Ctrl/⌘ Enter aplica.
@@ -278,8 +280,9 @@ test('examen del ejemplo: abrir el editor, Aplicar sin tocar, el fichero no camb
   await e.pagina.locator('#btn-editar').click();
   await visible(e.pagina.locator('#edicion-cm dl.propiedades'), 'examen', 'las propiedades del examen como tabla');
   await visible(e.pagina.locator('#edicion-cm .cm-line', { hasText: 'Tienes 100' }), 'examen', 'el texto de la primera pregunta');
-  await e.pagina.locator('#edicion-aplicar').click();
-  await oculto(e.pagina.locator('#edicion-cm'), 'examen', 'el editor tras aplicar');
+  assert.equal(await e.pagina.locator('#edicion-aplicar').isDisabled(), true, 'examen: Aplicar debe estar desactivado sin cambios');
+  await e.pagina.keyboard.press('ControlOrMeta+Enter');   // Ctrl Enter sin cambios sale sin escribir
+  await oculto(e.pagina.locator('#edicion-cm'), 'examen', 'el editor tras aplicar sin tocar');
   assert.equal(fs.readFileSync(fichero, 'utf8'), antes, 'examen: Aplicar sin tocar ha cambiado el fichero');
   // Y con una edición que se deshace (escribir y borrar), igual: el texto manda y el frontmatter no se toca.
   await e.pagina.locator('#btn-editar').click();
@@ -289,4 +292,149 @@ test('examen del ejemplo: abrir el editor, Aplicar sin tocar, el fichero no camb
   await oculto(e.pagina.locator('#edicion-cm'), 'examen', 'el editor tras Ctrl Enter');
   assert.equal(fs.readFileSync(fichero, 'utf8'), antes, 'examen: escribir y borrar ha cambiado el fichero');
   await conTexto(e.pagina.locator('#nota'), /Examen · Módulo 1/, 'examen', 'el examen otra vez en su vista de formulario');
+});
+
+// ---------- lo escrito no se pierde: sin aplicar, descartar, navegar, cambios en el disco y conflicto al aplicar
+const cuerpoCm = () => e.pagina.locator('#edicion-cm .cm-line').allTextContents().then(l => l.join('\n'));
+const salirDescartando = async () => {   // deja el editor cerrado sin dejar cambios que bloqueen la siguiente recarga
+  await e.pagina.keyboard.press('Escape');
+  if (await e.pagina.locator('#descartar').isVisible()) await e.pagina.locator('#descartar-ok').click();
+  await oculto(e.pagina.locator('#edicion-cm'), 'salir', 'el editor cerrado');
+};
+
+test('sin aplicar: Aplicar se activa solo con cambios, la miga dice «Editando» y escribir y borrar lo vuelve a desactivar', async () => {
+  fs.writeFileSync(path.join(e.c.base, 'estado.md'), '# Estado\n\nUn párrafo.\n');
+  await e.ir('#/n/estado.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'estado', 'el editor');
+  assert.equal(await e.pagina.locator('#edicion-aplicar').isDisabled(), true, 'estado: Aplicar debe empezar desactivado');
+  await oculto(e.pagina.locator('#editando'), 'estado', 'la señal «Editando» sin cambios');
+  await e.pagina.keyboard.type('x');
+  assert.equal(await e.pagina.locator('#edicion-aplicar').isDisabled(), false, 'estado: Aplicar debe activarse con un cambio');
+  await conTexto(e.pagina.locator('#editando'), /Editando/, 'estado', 'la señal «Editando» con cambios');
+  await e.pagina.keyboard.press('Backspace');
+  assert.equal(await e.pagina.locator('#edicion-aplicar').isDisabled(), true, 'estado: escribir y borrar debe desactivar Aplicar otra vez');
+  await oculto(e.pagina.locator('#editando'), 'estado', 'la señal «Editando» tras deshacer el cambio');
+  // La señal de salida: el evento beforeunload solo se frena con cambios.
+  const frena = () => e.pagina.evaluate(() => { const ev = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(ev); return ev.defaultPrevented; });
+  assert.equal(await frena(), false, 'estado: beforeunload frena sin cambios');
+  await e.pagina.keyboard.type('x');
+  assert.equal(await frena(), true, 'estado: beforeunload no frena con cambios');
+  await salirDescartando();
+  assert.equal(await frena(), false, 'estado: beforeunload frena tras salir');
+});
+
+test('descartar: Esc con cambios pregunta, sin cambios sale', async () => {
+  fs.writeFileSync(path.join(e.c.base, 'descartar.md'), '# Descartar\n\nUn párrafo.\n');
+  await e.ir('#/n/descartar.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'descartar', 'el editor');
+  await e.pagina.keyboard.press('Escape');   // sin cambios: sale directo
+  await oculto(e.pagina.locator('#edicion-cm'), 'descartar', 'el editor sin cambios tras Esc');
+  assert.equal(await e.pagina.locator('#descartar').isVisible(), false, 'descartar: pregunta sin cambios');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'descartar', 'el editor otra vez');
+  await e.pagina.keyboard.type('ZZ');
+  await e.pagina.keyboard.press('Escape');
+  await visible(e.pagina.locator('#descartar'), 'descartar', '«¿Descartar lo escrito?»');
+  assert.equal(await e.pagina.evaluate(() => document.querySelector('#app').inert), true, 'descartar: lo de detrás no está inerte');
+  // Seguir editando: el editor sigue con lo escrito y el foco vuelve a él.
+  await e.pagina.locator('#descartar-seguir').click();
+  await oculto(e.pagina.locator('#descartar'), 'descartar', 'el diálogo tras «Seguir editando»');
+  assert.ok((await cuerpoCm()).includes('ZZ# Descartar'), 'descartar: «Seguir editando» ha perdido lo escrito');
+  assert.equal(await e.pagina.evaluate(() => !!document.activeElement.closest('#edicion-cm')), true, 'descartar: el foco no vuelve al editor');
+  // Cancelar pregunta igual; Descartar sale sin escribir.
+  await e.pagina.locator('#edicion-cancelar').click();
+  await visible(e.pagina.locator('#descartar'), 'descartar', 'el diálogo con Cancelar');
+  await e.pagina.locator('#descartar-ok').click();
+  await oculto(e.pagina.locator('#edicion-cm'), 'descartar', 'el editor tras descartar');
+  assert.equal(fs.readFileSync(path.join(e.c.base, 'descartar.md'), 'utf8'), '# Descartar\n\nUn párrafo.\n', 'descartar: ha escrito el fichero');
+  assert.equal(await e.pagina.evaluate(() => document.activeElement.id), 'btn-editar', 'descartar: el foco no vuelve a «Editar»');
+});
+
+test('navegar con cambios pregunta: Seguir editando deja el editor y la ruta; Descartar navega', async () => {
+  await e.ir('#/n/conceptos/capital.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'navegar', 'el editor');
+  await e.pagina.keyboard.type('ZZ');
+  const otra = e.pagina.locator('#arbol a.hoja[data-ruta="conceptos/interes.md"]');
+  if (!(await otra.isVisible())) await e.pagina.locator('#arbol summary', { hasText: 'conceptos' }).click();
+  await otra.click();
+  await visible(e.pagina.locator('#descartar'), 'navegar', '«¿Descartar lo escrito?» al clicar otra nota');
+  await e.pagina.locator('#descartar-seguir').click();
+  await hashCumple(e.pagina, /^#\/n\/conceptos\/capital\.md/, 'navegar');
+  assert.ok((await cuerpoCm()).includes('ZZ'), 'navegar: «Seguir editando» ha perdido lo escrito');
+  assert.equal(await e.pagina.locator('#arbol a.hoja.activa').getAttribute('data-ruta'), 'conceptos/capital.md', 'navegar: el árbol marca otra nota');
+  // Otra pantalla (Tareas) también pregunta; Descartar navega y el fichero no cambia.
+  await e.pagina.locator('a[data-pagina="tareas"]').click();
+  await visible(e.pagina.locator('#descartar'), 'navegar', 'el diálogo al ir a Tareas');
+  await e.pagina.locator('#descartar-ok').click();
+  await hashCumple(e.pagina, /^#\/tareas/, 'navegar');
+  await oculto(e.pagina.locator('#edicion-cm'), 'navegar', 'el editor tras descartar');
+  assert.ok(!fs.readFileSync(path.join(e.c.base, 'conceptos/capital.md'), 'utf8').includes('ZZ'), 'navegar: ha escrito el fichero');
+});
+
+test('conflicto: cambiar el fichero desde fuera con el editor abierto no borra lo escrito; Sobrescribir lo escribe', async () => {
+  const ruta = path.join(e.c.base, 'conflicto.md');
+  fs.writeFileSync(ruta, '# Conflicto\n\nUn párrafo.\n');
+  await e.ir('#/n/conflicto.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'conflicto', 'el editor');
+  await e.pagina.keyboard.type('ZZ');
+  fs.writeFileSync(ruta, '# Conflicto\n\nOtro texto, escrito desde fuera.\n');
+  await conTexto(e.pagina.locator('#franja-edicion'), /La nota cambió en el disco/, 'conflicto', 'la franja de cambio en el disco');
+  assert.ok((await cuerpoCm()).includes('ZZ# Conflicto'), 'conflicto: la recarga en vivo ha repintado el editor y ha perdido lo escrito');
+  // «Seguir editando» la cierra; Aplicar da 409 y la franja pasa a ofrecer Sobrescribir.
+  await e.pagina.locator('#franja-seguir').click();
+  await oculto(e.pagina.locator('#franja-edicion'), 'conflicto', 'la franja tras «Seguir editando»');
+  await e.pagina.locator('#edicion-aplicar').click();
+  await visible(e.pagina.locator('#franja-sobrescribir'), 'conflicto', '«Sobrescribir» tras el 409');
+  assert.ok((await cuerpoCm()).includes('ZZ# Conflicto'), 'conflicto: el 409 ha recargado la nota y perdido lo escrito');
+  assert.match(fs.readFileSync(ruta, 'utf8'), /desde fuera/, 'conflicto: el 409 ha escrito el fichero');
+  await e.pagina.locator('#franja-sobrescribir').click();
+  await oculto(e.pagina.locator('#edicion-cm'), 'conflicto', 'el editor tras sobrescribir');
+  assert.equal(fs.readFileSync(ruta, 'utf8'), 'ZZ# Conflicto\n\nUn párrafo.\n', 'conflicto: Sobrescribir no ha escrito lo del editor');
+});
+
+test('conflicto: «Copiar mi texto y recargar» copia lo escrito y enseña la nota del disco; «Recargar» descarta', async () => {
+  const ruta = path.join(e.c.base, 'conflicto2.md');
+  fs.writeFileSync(ruta, '# Conflicto dos\n\nUn párrafo.\n');
+  await e.ir('#/n/conflicto2.md');
+  await e.pagina.evaluate(() => { window.__copiado = null; Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { window.__copiado = t; return Promise.resolve(); } }, configurable: true }); });
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'conflicto', 'el editor');
+  await e.pagina.keyboard.type('ZZ');
+  fs.writeFileSync(ruta, '# Conflicto dos\n\nDel disco.\n');
+  await e.pagina.locator('#edicion-aplicar').click();   // 409 directo, sin esperar a la franja del disco
+  await visible(e.pagina.locator('#franja-copiar'), 'conflicto', '«Copiar mi texto y recargar»');
+  await e.pagina.locator('#franja-copiar').click();
+  await oculto(e.pagina.locator('#edicion-cm'), 'conflicto', 'el editor tras copiar y recargar');
+  assert.equal(await e.pagina.evaluate(() => window.__copiado), 'ZZ# Conflicto dos\n\nUn párrafo.\n', 'conflicto: no ha copiado lo escrito');
+  await conTexto(e.pagina.locator('#nota'), /Del disco\./, 'conflicto', 'la nota del disco tras recargar');
+  // «Recargar (pierdes lo escrito)» de la franja del disco.
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'conflicto', 'el editor otra vez');
+  await e.pagina.keyboard.type('YY');
+  fs.writeFileSync(ruta, '# Conflicto dos\n\nOtra vez del disco.\n');
+  await visible(e.pagina.locator('#franja-recargar'), 'conflicto', '«Recargar» en la franja del disco');
+  await e.pagina.locator('#franja-recargar').click();
+  await oculto(e.pagina.locator('#edicion-cm'), 'conflicto', 'el editor tras recargar');
+  await conTexto(e.pagina.locator('#nota'), /Otra vez del disco\./, 'conflicto', 'la nota del disco tras recargar');
+});
+
+test('otra nota cambia en el disco mientras editas: ninguna franja', async () => {
+  fs.writeFileSync(path.join(e.c.base, 'propia.md'), '# Propia\n\nUn párrafo.\n');
+  await e.ir('#/n/propia.md');
+  await e.pagina.locator('#btn-editar').click();
+  await visible(e.pagina.locator('#edicion-cm .cm-content'), 'otra nota', 'el editor');
+  await e.pagina.keyboard.type('ZZ');
+  fs.writeFileSync(path.join(e.c.base, 'ajena.md'), '# Ajena\n\nCambia mientras editas otra.\n');
+  await e.pagina.waitForTimeout(2000);   // el vigilante de ficheros avisa con retraso: que el mensaje ya haya llegado
+  assert.equal(await e.pagina.locator('#franja-edicion').isVisible(), false, 'otra nota: franja sin que cambie la nota editada');
+  assert.ok((await cuerpoCm()).includes('ZZ# Propia'), 'otra nota: el editor ha perdido lo escrito');
+  // Un cambio en la propia nota que solo cambia los finales de línea (CRLF) no cuenta como cambio.
+  fs.writeFileSync(path.join(e.c.base, 'propia.md'), '# Propia\r\n\r\nUn párrafo.\r\n');
+  await e.pagina.waitForTimeout(2000);
+  assert.equal(await e.pagina.locator('#franja-edicion').isVisible(), false, 'otra nota: franja por un cambio solo de finales de línea');
+  await salirDescartando();
 });

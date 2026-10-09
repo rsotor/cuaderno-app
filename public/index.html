@@ -77,7 +77,7 @@
     </footer>
   </aside>
   <main id="centro">
-    <div class="miga-barra"><button type="button" id="btn-desplegar" class="secundario" aria-label="Abrir la barra lateral" aria-expanded="false" aria-controls="lateral" title="Abrir la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button><button type="button" id="btn-menu" class="secundario" aria-label="Abrir el menú" aria-controls="lateral" aria-expanded="false"><svg class="icono" aria-hidden="true"><use href="#i-menu"/></svg></button><div id="miga" aria-label="Ruta de la nota"></div><button type="button" id="btn-editar" class="secundario" title="Editar la nota (E)" hidden><svg class="icono" aria-hidden="true"><use href="#i-lapiz"/></svg>Editar</button></div>
+    <div class="miga-barra"><button type="button" id="btn-desplegar" class="secundario" aria-label="Abrir la barra lateral" aria-expanded="false" aria-controls="lateral" title="Abrir la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button><button type="button" id="btn-menu" class="secundario" aria-label="Abrir el menú" aria-controls="lateral" aria-expanded="false"><svg class="icono" aria-hidden="true"><use href="#i-menu"/></svg></button><div id="miga" aria-label="Ruta de la nota"></div><span id="editando" class="editando" hidden>Editando</span><button type="button" id="btn-editar" class="secundario" title="Editar la nota (E)" hidden><svg class="icono" aria-hidden="true"><use href="#i-lapiz"/></svg>Editar</button></div>
     <article id="nota" tabindex="-1"></article>
     <section id="panel" hidden></section>
     <nav id="indice" aria-label="Índice de la nota" hidden></nav>
@@ -110,6 +110,13 @@
     <label class="oculto" for="guardar-mensaje">Mensaje del guardado</label>
     <textarea id="guardar-mensaje" rows="2" spellcheck="true"></textarea>
     <div class="pie"><span class="pista">Ctrl Enter guarda · Esc cancela</span><button type="button" id="guardar-cancelar" class="secundario">Cancelar</button><button type="button" id="guardar-ok">Guardar</button></div>
+  </div>
+</div>
+<div id="descartar" class="modal" role="dialog" aria-modal="true" aria-labelledby="descartar-titulo" hidden>
+  <div class="editor-caja estrecha">
+    <div class="cabecera"><span id="descartar-titulo">¿Descartar lo escrito?</span></div>
+    <p class="resumen">Has cambiado la nota y no la has aplicado. Si sales ahora, se pierde lo que escribiste.</p>
+    <div class="pie"><button type="button" id="descartar-seguir" class="primario">Seguir editando</button><button type="button" id="descartar-ok" class="secundario">Descartar</button></div>
   </div>
 </div>
 <div id="resultado" class="modal" role="dialog" aria-modal="true" aria-labelledby="resultado-titulo" hidden>

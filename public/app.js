@@ -462,7 +462,7 @@ document.addEventListener('keydown', e => {
 // ---------- editor de la nota entera (CodeMirror, public/live.js; Roberto, 2026-10-09)
 // «Editar» (botón de la miga o tecla E) cambia la hoja por el editor con el texto del fichero tal cual; «Aplicar» lo
 // escribe entero (/api/nota/escribir) y vuelve a la lectura, en el mismo bloque. Hasta aplicar no se toca el fichero.
-let edicion = null;   // { ruta, original (como lo sirve /fichero), linea (donde estaba el lector) }
+let edicion = null;   // { ruta, original (como lo sirve /fichero), texto0 (el mismo, con LF), linea (donde estaba el lector), hash (la ruta de la nota) }
 let live = null;      // el módulo public/live.js, la primera vez que se edita
 const teclaAplicar = MAC ? '⌘ Enter' : 'Ctrl Enter';
 const desplazamientoDeLinea = (texto, linea) => texto.split('\n').slice(0, linea).reduce((a, l) => a + l.length + 1, 0);
@@ -476,16 +476,16 @@ async function entrarEdicion() {
   try { original = await textoFichero(ruta); live = live || await import('/public/live.js'); } catch (e) { return avisarError('No se ha podido abrir el editor.', e.message); }
   if (rutaActual !== ruta || edicion) return;   // mientras llegaba se cambió de nota
   const texto = original.replace(/\r\n/g, '\n'), linea = bloque ? +bloque.dataset.desde : 0;
-  edicion = { ruta, original, linea };
+  edicion = { ruta, original, texto0: texto, linea, hash: location.hash };
   $('#btn-editar').hidden = true;
   $('#nota').dataset.vista = 'edicion';
-  $('#nota').innerHTML = `<div id="edicion-cm"></div><div class="edicion-pie"><button type="button" id="edicion-cancelar" class="secundario">Cancelar</button><button type="button" id="edicion-aplicar" class="primario">Aplicar</button><span class="pista">${teclaAplicar} aplica · Esc cancela</span></div>`;
-  live.montar($('#edicion-cm'), texto, { plano: info.configuracion.editor === 'plano', ruta, propiedades: propiedadesActual, posicion: desplazamientoDeLinea(texto, linea) });
-  $('#edicion-cancelar').onclick = () => salirEdicion();
+  $('#nota').innerHTML = `<div id="edicion-cm"></div><div class="edicion-pie"><div id="franja-edicion" role="alert" hidden></div><button type="button" id="edicion-cancelar" class="secundario">Cancelar</button><button type="button" id="edicion-aplicar" class="primario" disabled>Aplicar</button><span class="pista">${teclaAplicar} aplica · Esc cancela</span></div>`;
+  live.montar($('#edicion-cm'), texto, { plano: info.configuracion.editor === 'plano', ruta, propiedades: propiedadesActual, posicion: desplazamientoDeLinea(texto, linea), alCambiar: actualizarEstadoEdicion });
+  $('#edicion-cancelar').onclick = pedirSalida;
   $('#edicion-aplicar').onclick = aplicarEdicion;
 }
 // Cierra el editor sin repintar (otra pantalla lo sustituye).
-function soltarEdicion() { if (!edicion) return; edicion = null; if (live) live.destruir(); }
+function soltarEdicion() { if (!edicion) return; edicion = null; if (live) live.destruir(); $('#editando').hidden = true; }
 async function salirEdicion() {
   if (!edicion) return;
   const { ruta, linea } = edicion;
@@ -500,7 +500,7 @@ async function aplicarEdicion() {
   const { ruta, original } = edicion, texto = live.texto();
   if (texto === original.replace(/\r\n/g, '\n')) return salirEdicion();   // nada que escribir
   try { await api('/api/nota/escribir', { ruta, texto, original }); }
-  catch (e) { return avisarError(e.status === 409 ? 'La nota cambió en el disco mientras la editabas. Lo que has escrito sigue aquí.' : 'No se ha podido escribir la nota.', e.message); }
+  catch (e) { if (e.status === 409) return mostrarFranja('conflicto'); return avisarError('No se ha podido escribir la nota.', e.message); }
   avisar('Nota escrita');
   await salirEdicion();
   refrescarContadores();
@@ -509,9 +509,67 @@ $('#btn-editar').onclick = entrarEdicion;
 // Esc cancela y Ctrl/⌘ Enter aplica, con el foco en el editor (en captura: el editor no debe insertar una línea con Mod-Enter).
 $('#nota').addEventListener('keydown', e => {
   if (!edicion || !e.target.closest('#edicion-cm')) return;
-  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); salirEdicion(); }
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); pedirSalida(); }
   else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); aplicarEdicion(); }
 }, true);
+// ---------- lo escrito no se pierde: sin aplicar, descartar, cambios en el disco y conflicto al aplicar
+const normalizar = t => String(t).replace(/^﻿/, '').replace(/\r\n/g, '\n');   // como el servidor (escribirNota): sin BOM y con LF
+const hayCambios = () => !!(edicion && live && live.texto() !== edicion.texto0);   // el texto, no si se pulsó una tecla: escribir y borrar no es cambiar
+function actualizarEstadoEdicion() {
+  if (!edicion) return;
+  const c = hayCambios();
+  $('#edicion-aplicar').disabled = !c;
+  $('#editando').hidden = !c;
+}
+// Salir con Esc o Cancelar: con cambios, antes se pregunta.
+function pedirSalida() { if (!edicion) return; if (hayCambios()) abrirDescartar(() => salirEdicion()); else salirEdicion(); }
+let alDescartar = null, focoDescartar = null;
+function abrirDescartar(fn) {
+  if (!$('#descartar').hidden) return;
+  focoDescartar = document.activeElement; alDescartar = fn;
+  $('#descartar').hidden = false; sincronizarInerte(); $('#descartar-seguir').focus();
+}
+function cerrarDescartar(descartar) {
+  const fn = alDescartar; alDescartar = null;
+  $('#descartar').hidden = true; sincronizarInerte();
+  if (descartar) { if (fn) fn(); return; }
+  if (edicion && live) live.enfocar(); else if (focoDescartar && document.contains(focoDescartar)) focoDescartar.focus();
+}
+$('#descartar-seguir').onclick = () => cerrarDescartar(false);
+$('#descartar-ok').onclick = () => cerrarDescartar(true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#descartar').hidden) { e.preventDefault(); cerrarDescartar(false); } });
+window.addEventListener('beforeunload', e => { if (hayCambios()) { e.preventDefault(); e.returnValue = ''; } });
+// La franja fija sobre los botones: la nota cambió en el disco (recarga en vivo) o el servidor dijo 409 al aplicar.
+function mostrarFranja(tipo) {
+  const f = $('#franja-edicion'); if (!f || !edicion) return;
+  if (tipo === 'disco' && f.dataset.tipo === 'conflicto') return;   // el 409 es más grave y ya está a la vista
+  f.dataset.tipo = tipo; f.hidden = false;
+  f.innerHTML = tipo === 'disco'
+    ? '<span class="franja-texto"><b>La nota cambió en el disco.</b> Lo que has escrito sigue aquí.</span><button type="button" id="franja-seguir" class="secundario">Seguir editando</button><button type="button" id="franja-recargar">Recargar (pierdes lo escrito)</button>'
+    : '<span class="franja-texto"><b>No se ha podido aplicar: la nota cambió en el disco.</b> Lo que has escrito sigue aquí.</span><button type="button" id="franja-sobrescribir" class="primario">Sobrescribir</button><button type="button" id="franja-copiar">Copiar mi texto y recargar</button>';
+}
+async function recargarDesdeDisco() { const ruta = edicion.ruta; soltarEdicion(); await abrirNota(ruta); if (!$('#btn-editar').hidden) $('#btn-editar').focus(); }
+document.addEventListener('click', async e => {
+  const b = e.target.closest('#franja-edicion button'); if (!b || !edicion) return;
+  if (b.id === 'franja-seguir') { $('#franja-edicion').hidden = true; live.enfocar(); }
+  else if (b.id === 'franja-recargar') await recargarDesdeDisco();
+  else if (b.id === 'franja-copiar') {
+    const texto = live.texto();
+    try { await navigator.clipboard.writeText(texto); } catch { const t = document.createElement('textarea'); t.value = texto; document.body.append(t); t.select(); document.execCommand('copy'); t.remove(); }
+    avisar('Tu texto está copiado'); await recargarDesdeDisco();
+  } else if (b.id === 'franja-sobrescribir') {
+    const { ruta } = edicion, texto = live.texto();
+    try { const original = await textoFichero(ruta); await api('/api/nota/escribir', { ruta, texto, original }); }
+    catch (err) { return avisarError('No se ha podido escribir la nota.', err.message); }
+    avisar('Nota escrita'); await salirEdicion(); refrescarContadores();
+  }
+});
+// La recarga en vivo con el editor abierto no repinta: se vuelve a pedir el texto y solo si difiere del que se abrió hay franja.
+async function comprobarDisco() {
+  const ed = edicion; if (!ed) return;
+  let disco; try { disco = await textoFichero(ed.ruta); } catch { return; }
+  if (edicion === ed && normalizar(disco) !== normalizar(ed.original)) mostrarFranja('disco');
+}
 // E, con la nota a la vista y el foco fuera de un campo de texto, de otro panel o de un diálogo.
 document.addEventListener('keydown', e => {
   if (e.key.toLowerCase() !== 'e' || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.defaultPrevented) return;
@@ -524,7 +582,7 @@ document.addEventListener('keydown', e => {
 let alGuardar = null, foco = null;
 // «Guardar» es solo del repositorio (revisión de diseño 2026-10-09, hallazgo 3): el editor de un bloque escribe en la nota y lo dice con otro verbo.
 // Con un diálogo abierto, lo de detrás queda `inert` y el Tab da la vuelta dentro (hallazgo 8, WCAG 2.4.3): aria-modal no basta.
-const DIALOGOS = ['#editor', '#nueva-nota', '#guardar', '#resultado', '#ajustes'];
+const DIALOGOS = ['#editor', '#nueva-nota', '#guardar', '#resultado', '#ajustes', '#descartar'];
 const dialogoAbierto = () => DIALOGOS.map($).find(d => d && !d.hidden) || null;
 function sincronizarInerte() { const hay = !!dialogoAbierto(); for (const el of [$('#app'), $('.saltar'), $('#aviso-reinicio')]) el.inert = hay; }
 document.addEventListener('keydown', e => {
@@ -904,10 +962,20 @@ function enrutar() {
   else { rutaActual = null; $('#panel').hidden = true; $('#nota').hidden = false; sinPortada(); }
   marcarActiva();
 }
-window.addEventListener('hashchange', enrutar);
+// Con cambios sin aplicar, salir de la nota (otra nota, otra pantalla, atrás) pregunta: se vuelve a la dirección de la nota y,
+// si se descarta, se va a la que se pedía.
+window.addEventListener('hashchange', () => {
+  if (edicion && location.hash !== edicion.hash && hayCambios()) {
+    const destino = location.hash;
+    history.replaceState(null, '', edicion.hash);
+    abrirDescartar(() => { soltarEdicion(); location.hash = destino; });
+    return;
+  }
+  enrutar();
+});
 
 // ---------- recarga en vivo
-try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
+try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (rutaActual && $('#editor').hidden && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
 
 (async () => {
   info = await api('/api/info');

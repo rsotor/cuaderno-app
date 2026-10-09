@@ -433,3 +433,10 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 #edicion-cm .cm-line.live-crudo { font-family: var(--mono); font-size: 14px; background: rgba(127,127,127,.08); padding: 0 12px; }
 #edicion-cm .cm-line.live-vacia { height: .7em; line-height: .7em; }   /* la línea en blanco entre bloques no es un renglón entero (crítica 2026-10-09, 3) */
 #edicion-cm .live-marca { color: var(--tinta-suave); font-weight: 400; }   /* el «#» del título, cuando se ve, no compite con él (crítica 2026-10-09, 5) */
+/* lo escrito no se pierde: señal «Editando», franja de conflicto y botón Aplicar sin cambios */
+.editando { font-size: 12px; font-weight: 600; color: var(--aviso); background: color-mix(in srgb, var(--aviso) 12%, transparent); border-radius: 999px; padding: 1px 10px; white-space: nowrap; }
+.edicion-pie { flex-wrap: wrap; }
+#franja-edicion { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--aviso); border-left-width: 4px; border-radius: var(--radio); background: color-mix(in srgb, var(--aviso) 10%, var(--papel)); color: var(--tinta); font-size: 14px; }
+#franja-edicion[hidden] { display: none; }
+#franja-edicion .franja-texto { flex: 1 1 260px; }
+#edicion-aplicar:disabled { opacity: .45; cursor: not-allowed; filter: none; }
