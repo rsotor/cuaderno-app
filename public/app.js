@@ -150,7 +150,7 @@ $('#arbol').addEventListener('keydown', e => {
   else if (e.key === 'ArrowUp') (todos[i - 1] || $('#buscador')).focus();
 });
 document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#buscador').focus(); $('#buscador').select(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); if (lateralPlegado() && window.innerWidth > 760) plegarLateral(false, { enfocar: false }); $('#buscador').focus(); $('#buscador').select(); }
   if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); alternarTerminal(); }
   if (e.key === 'Escape' && !$('#editor').hidden) cerrarEditor();
 });
@@ -569,7 +569,7 @@ async function refrescarContadores() {
 const CAJON_DEFECTO = { derecha: 420, abajo: 320 }, CAJON_MIN = { derecha: 320, abajo: 180 }, NOTA_MIN = { derecha: 480, abajo: 240 }, LATERAL = 280;
 const posicionCajon = () => info.configuracion.panel === 'abajo' ? 'abajo' : 'derecha';
 // El tamaño máximo que cabe en esta ventana para esa posición (lo que queda tras la barra lateral y el mínimo de la nota).
-const maximoCajon = pos => (pos === 'derecha' ? window.innerWidth - LATERAL : window.innerHeight) - NOTA_MIN[pos];
+const maximoCajon = pos => (pos === 'derecha' ? window.innerWidth - anchoLateral() : window.innerHeight) - NOTA_MIN[pos];
 // El valor guardado está en píxeles y otra ventana u otro monitor pueden dejarlo fuera de rango: se acota al usarlo.
 const acotarCajon = (valor, pos) => Math.round(Math.min(Math.max(Number(valor) || CAJON_DEFECTO[pos], CAJON_MIN[pos]), Math.max(maximoCajon(pos), CAJON_MIN[pos])));
 const tamanoCajon = pos => acotarCajon(pos === 'derecha' ? info.configuracion.panel_ancho : info.configuracion.panel_alto, pos);
@@ -643,7 +643,7 @@ function crearSesion(modo) {
   const fit = new FitAddon.FitAddon(); term.loadAddon(fit); term.open(elemento);
   const s = { id: n, modo, titulo: modo === 'profesor' ? 'Profesor' : (n === 1 ? 'Terminal' : `Terminal ${n}`), term, fit, ws: null, elemento, cerrada: false };
   term.attachCustomKeyEventHandler(e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === '`') return false;   // Ctrl ` es de la app: abre y cierra el cajón
+    if ((e.ctrlKey || e.metaKey) && (e.key === '`' || e.key === '\\')) return false;   // Ctrl ` es de la app (abre y cierra el cajón); Ctrl \ la barra lateral
     // xterm manda lo mismo con Enter que con Shift+Enter, y Claude Code o Codex envían el mensaje. Shift u Option+Enter
     // mandan \n (Ctrl J), su salto de línea en cualquier terminal; en un shell es como Enter (Roberto, 2026-10-09).
     if (e.key === 'Enter' && (e.shiftKey || e.altKey) && !e.ctrlKey && !e.metaKey) {
@@ -777,6 +777,26 @@ function abrirAjustes() {
 }
 function cerrarAjustes() { $('#ajustes').hidden = true; sincronizarInerte(); if (foco) foco.focus(); }
 $('#btn-ajustes').onclick = abrirAjustes;
+// Barra lateral plegable en escritorio (Roberto, 2026-10-09): un botón en la barra, otro en la miga para volver a abrirla, Ctrl+\ o Cmd+\
+// y el estado recordado en este navegador. A ≤ 760 px sigue su menú de siempre (menuLateral); allí el plegado de escritorio no cuenta.
+const CLAVE_LATERAL = 'cuaderno-lateral-plegado';
+const lateralPlegado = () => $('#app').classList.contains('lateral-plegado');
+const anchoLateral = () => (lateralPlegado() && window.innerWidth > 760 ? 0 : LATERAL);
+function plegarLateral(plegar, { enfocar = true, recordar = true } = {}) {
+  $('#app').classList.toggle('lateral-plegado', plegar);
+  $('#btn-plegar').setAttribute('aria-expanded', String(!plegar)); $('#btn-desplegar').setAttribute('aria-expanded', String(!plegar));
+  if (recordar) { try { if (plegar) localStorage.setItem(CLAVE_LATERAL, '1'); else localStorage.removeItem(CLAVE_LATERAL); } catch { /* sin almacenamiento: no se recuerda */ } }
+  aplicarCajon();   // el cajón se acota con el ancho que queda y el índice de la nota recalcula
+  if (enfocar && window.innerWidth > 760) $(plegar ? '#btn-desplegar' : '#btn-plegar').focus();
+}
+$('#btn-plegar').onclick = () => plegarLateral(true);
+$('#btn-desplegar').onclick = () => plegarLateral(false);
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key !== '\\' || window.innerWidth <= 760) return;
+  if (e.target.closest && e.target.closest('#cajon')) return;   // en la terminal, Ctrl \ es SIGQUIT: no se toca
+  e.preventDefault(); plegarLateral(!lateralPlegado());
+});
+try { if (localStorage.getItem(CLAVE_LATERAL) === '1') { $('#app').classList.add('lateral-plegado'); $('#btn-plegar').setAttribute('aria-expanded', 'false'); } } catch { /* sin almacenamiento */ }   // el cajón y el índice se acotan solos al arrancar (aplicarCajon)
 function menuLateral(abrir) { const l = $('#lateral'); l.classList.toggle('abierto', abrir); $('#btn-menu').setAttribute('aria-expanded', String(abrir)); if (!abrir && window.innerWidth <= 760) $('#btn-menu').focus(); }
 $('#btn-menu').onclick = () => menuLateral(!$('#lateral').classList.contains('abierto'));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#lateral').classList.contains('abierto')) menuLateral(false); });

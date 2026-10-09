@@ -58,3 +58,4 @@ test del índice comprueba que el fichero existe y que tiene un recorrido que em
 | 21 | Tareas que la mencionan | `tests/navegador/menciones.test.js` | una persona: | con kit |
 | 22 | Adjuntos: vídeo, audio, al Finder, carpetas vacías | `tests/navegador/ficheros.test.js` | adjuntos: | sin kit |
 | 23 | La hoja (claro, oscuro, estrecho) y el índice de la nota, solo si cabe | `tests/navegador/indice.test.js` | índice: | sin kit |
+| 24 | Barra lateral plegable en escritorio: botón, Ctrl+\, recordada | `tests/navegador/lateral.test.js` | barra lateral: | sin kit |
