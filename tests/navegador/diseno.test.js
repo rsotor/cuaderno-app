@@ -155,6 +155,9 @@ test('casillas de una nota: toda la línea marca y la casilla tiene nombre acces
   await e.pagina.locator('#nota label.casilla-linea', { hasText: 'Hecho ya' }).click({ position: { x: 90, y: 6 } });   // sobre el texto, lejos del cuadrado
   await ficheroCumple(e.c, 'sesiones/01-01-01-sesion.md', /- \[ \] Hecho ya/, 'casillas');
   assert.equal(await casilla.isChecked(), false, 'casillas: clicar el texto no ha desmarcado la casilla');
+  // La recarga en vivo cambia el bloque por otro: se vuelve a buscar, y el bloque no se queda con fondo.
+  await e.pagina.mouse.move(5, 5);
+  await hasta(() => e.pagina.evaluate(() => { const b = document.querySelector('#nota .bloque:has(.casilla-linea)'); return b && getComputedStyle(b).backgroundColor === 'rgba(0, 0, 0, 0)'; }), 'casillas', 'el bloque de la casilla se queda con fondo tras marcarla');
 });
 
 test('errores: el aviso se queda hasta cerrarlo, dice qué pasó y pliega el detalle técnico; el diálogo de resultado, igual', async () => {

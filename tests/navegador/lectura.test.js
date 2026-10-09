@@ -104,9 +104,11 @@ test('bloques: al pasar el ratón el fondo no cambia y editar y comentar salen e
   assert.equal(await acciones.locator('button').count(), 2);
   const lapiz = await acciones.locator('button').first().boundingBox(), linea = await bloque.locator('ul li').first().boundingBox();
   assert.ok(Math.abs((lapiz.y + lapiz.height / 2) - (linea.y + linea.height / 2)) < 6, `el lápiz (centro y=${lapiz.y + lapiz.height / 2}) no está a la altura de la primera línea (y=${linea.y + linea.height / 2})`);
-  // Clicar en el texto y sacar el ratón: ni fondo ni acciones se quedan.
-  await bloque.locator('ul li').first().click({ position: { x: 200, y: 5 } });
+  // Clicar en el texto y sacar el ratón: ni fondo ni acciones se quedan. Se clica un párrafo, no una casilla: marcar una
+  // casilla escribe en el fichero y la recarga en vivo cambia el bloque por otro (esa línea se prueba en diseno.test.js).
+  const parrafo = await visible(e.pagina.locator('#nota .bloque', { hasText: 'Ver capital' }), 'nota Interés', 'el párrafo con enlaces');
+  await parrafo.click({ position: { x: 200, y: 5 } });
   await e.pagina.mouse.move(5, 5);
-  await hasta(() => acciones.evaluate(a => getComputedStyle(a).opacity === '0'), 'nota Interés', 'las acciones se quedan tras clicar en el texto y salir');
-  assert.equal(await fondo(), transparente, 'el bloque se queda marcado tras clicar en el texto');
+  await hasta(() => parrafo.locator('.acciones').evaluate(a => getComputedStyle(a).opacity === '0'), 'nota Interés', 'las acciones se quedan tras clicar en el texto y salir');
+  assert.equal(await parrafo.evaluate(b => getComputedStyle(b).backgroundColor), transparente, 'el bloque se queda marcado tras clicar en el texto');
 });
