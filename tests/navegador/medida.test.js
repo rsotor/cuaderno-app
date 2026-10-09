@@ -1,5 +1,5 @@
 'use strict';
-// Recorrido de la medida de la línea: una nota larga (lectura/nota-larga.md) se lee a 18 px, con la columna de texto
+// Recorrido de la medida de la línea: una nota larga (lectura/mercado-de-la-plaza.md) se lee a 18 px, con la columna de texto
 // en unos 800 px y unos 99 caracteres por línea (revisión de diseño 2026-10-09, hallazgo 2; Roberto: «unos
 // 800 como está ahora lo veo bien»). Medido: unos 99 caracteres por línea (más que los 80 de WCAG 1.4.8, decisión de
 // Roberto: la anchura manda sobre la referencia). El techo vigila que no empeore. Si alguien toca la letra o la columna, este test dice cuánto mide ahora la línea.
@@ -28,7 +28,7 @@ const medirLineas = () => document.querySelectorAll('#nota p').length && [...doc
 });
 
 test('lectura de una nota larga: 18 px, columna de unos 800 px y como mucho 105 caracteres por línea', async () => {
-  await e.ir('#/n/lectura/nota-larga.md');
+  await e.ir('#/n/lectura/mercado-de-la-plaza.md');
   await conTexto(e.pagina.locator('#nota h1'), /mercado de la plaza/, 'nota larga', 'el título');
   const m = await e.pagina.evaluate(`(() => { const medir = ${medirLineas.toString()}; const l = medir().sort((a, b) => a - b);
     const p = document.querySelector('#nota p:not(.resumen)'); const cs = getComputedStyle(p);
@@ -42,7 +42,7 @@ test('lectura de una nota larga: 18 px, columna de unos 800 px y como mucho 105 
 });
 
 test('lectura: el ajuste «Letra» sigue mandando sobre el cuerpo de la nota (en em, no en px)', async () => {
-  await e.ir('#/n/lectura/nota-larga.md');
+  await e.ir('#/n/lectura/mercado-de-la-plaza.md');
   await e.pagina.evaluate(() => { document.documentElement.dataset.letra = 'grande'; });
   const grande = await e.pagina.evaluate(() => parseFloat(getComputedStyle(document.querySelector('#nota p')).fontSize));
   await e.pagina.evaluate(() => { document.documentElement.dataset.letra = 'pequeña'; });
