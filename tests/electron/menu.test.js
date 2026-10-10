@@ -158,3 +158,15 @@ test('el menú de la app de escritorio: Ayuda → Diagnóstico queda en el regis
   await pulsar('acerca-de');
   await hasta(() => /diálogo saltado \(CUADERNO_SIN_DIALOGO\): Acerca de Cuaderno/.test(registro()), 'Acerca de no ha llegado al registro');
 });
+
+// El último: deja la pantalla con otro callback (ACCIONES_APP ya no atiende), así que nada va después.
+test('el menú de la app de escritorio: el preload pone un solo oyente de «accion»; llamar otra vez a alAccion sustituye el callback (una acción llega una vez y solo al último)', async () => {
+  await esperarTitulo(c);
+  await pagina.evaluate(() => { window.__recibidas = []; window.cuadernoApp.alAccion(n => window.__recibidas.push(`1:${n}`)); window.cuadernoApp.alAccion(n => window.__recibidas.push(`2:${n}`)); });
+  await pagina.locator('#link-inicio').focus();
+  await pulsar('buscar');
+  await hasta(() => pagina.evaluate(() => window.__recibidas.length >= 1), 'la acción no ha llegado al callback nuevo');
+  await dormir(300);
+  assert.deepEqual(await pagina.evaluate(() => window.__recibidas), ['2:buscar'], 'ni al primero ni dos veces');
+  assert.equal(await enfocado(), 'link-inicio', 'ACCIONES_APP ya no la atiende: el buscador no se enfoca');
+});
