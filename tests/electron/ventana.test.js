@@ -1,7 +1,9 @@
 'use strict';
 // El recorrido de la app de escritorio, con el Electron de verdad lanzado por Playwright (_electron, experimental) sobre
-// una copia del cuaderno de ejemplo: abre el último cuaderno en su ventana, el servidor se relanza si muere, y al
-// cerrar no queda ni el puerto ni ningún proceso. Va en su paso (`npm run test:electron`), no en `npm test`: necesita el
+// una copia del cuaderno de ejemplo: abre el último cuaderno en su ventana, un enlace a otra web no cambia la ventana (va al
+// navegador del sistema; en pruebas, CUADERNO_SIN_NAVEGADOR lo anota en vez de abrirlo), recargar con el editor sucio
+// pregunta (en pruebas, CUADERNO_SIN_DIALOGO=1 contesta «seguir editando»), el servidor se relanza si muere, y al cerrar
+// no queda ni el puerto ni ningún proceso. Va en su paso (`npm run test:electron`), no en `npm test`: necesita el
 // binario de Electron (`node node_modules/electron/install.js`) y, sin pantalla, `xvfb-run -a`. Configuración y userData
 // temporales (el lock de instancia única va en userData: así no choca con la app abierta de quien lo corra).
 const test = require('node:test');
@@ -63,9 +65,12 @@ test.before(async () => {
   registro = () => { try { return fs.readFileSync(path.join(configDir, 'registro.log'), 'utf8'); } catch { return ''; } };
   // Chromium crea el socket del singleton bajo TMPDIR y el sistema limita su ruta a ~108 caracteres (lo vio el spike).
   const tmp = unix && os.tmpdir().length > 40 ? '/tmp' : os.tmpdir();
-  app = await _electron.launch({ args: ['.'], cwd: RAIZ, timeout: 60_000, env: { ...process.env, TMPDIR: tmp, CUADERNO_CONFIG_DIR: configDir, CUADERNO_USERDATA: userData, CUADERNO_SIN_DIALOGO: '1' } });
+  app = await _electron.launch({ args: ['.'], cwd: RAIZ, timeout: 60_000, env: { ...process.env, TMPDIR: tmp, CUADERNO_CONFIG_DIR: configDir, CUADERNO_USERDATA: userData, CUADERNO_SIN_DIALOGO: '1', CUADERNO_SIN_NAVEGADOR: '1' } });
   pagina = await app.firstWindow();
   pagina.setDefaultTimeout(ESPERA);
+  // El beforeunload de la pantalla lo atiende Electron (will-prevent-unload, en electron/ventana.js), no un diálogo de
+  // Chromium: Playwright, que por defecto intenta cerrar todo diálogo, fallaría con «No dialog is showing» fuera de un test.
+  pagina.on('dialog', d => d.dismiss().catch(() => {}));
 });
 test.after(async () => {
   if (app) await app.close().catch(() => {});
@@ -88,6 +93,46 @@ test('la app de escritorio: abre el último cuaderno en su ventana (portada y t�
   assert.match(registro(), /\[app\] entorno de la shell: (shell -i?lc|respaldo), \d+ ms/);
   assert.match(registro(), /\[hijo\] node \d+\.\d+\.\d+ \(electron \d+\.\d+\.\d+\)/, 'el hijo corre con el Node de Electron');
   assert.ok(fs.readdirSync(userData).some(n => /Singleton/.test(n)), 'el lock de instancia única va en el userData temporal');
+});
+
+// Ir a una pantalla de la app por su hash y esperar a que pinte.
+async function ir(hash) { await pagina.evaluate(h => { location.hash = h; }, hash); await pagina.locator('#miga strong').waitFor(); }
+const hasta = async (fn, que) => { const fin = Date.now() + ESPERA; while (Date.now() < fin) { if (await fn()) return; await dormir(50); } assert.fail(que); };
+
+test('la app de escritorio: un enlace a otra web va al navegador del sistema y la ventana no cambia (y copiar al portapapeles funciona sin pedir permiso)', async () => {
+  await esperarPortada();
+  await ir('#/n/render/enlaces.md');
+  const enlace = pagina.locator('#nota a', { hasText: 'la web del curso' });
+  assert.equal(await enlace.getAttribute('href'), 'https://example.com');
+  const antes = pagina.url();
+  await enlace.click({ noWaitAfter: true });   // Playwright esperaría a una navegación que la app impide a propósito
+  await hasta(() => /navegador no abierto \(CUADERNO_SIN_NAVEGADOR\): https:\/\/example\.com\//.test(registro()), 'el enlace no ha llegado al registro como enlace fuera');
+  await dormir(200);
+  assert.equal(pagina.url(), antes, 'la ventana ha navegado');
+  assert.match(await pagina.locator('#miga strong').textContent(), /enlaces/, 'la nota sigue a la vista');
+  assert.match(registro(), /\[app\] enlace al navegador del sistema: https:\/\/example\.com\//);
+  // El portapapeles: la pantalla lo usa para «Copiar ruta»; el permiso clipboard-sanitized-write se concede sin preguntar.
+  assert.equal(await pagina.evaluate(() => navigator.clipboard.writeText('hola').then(() => 'ok', e => `${e.name}: ${e.message}`)), 'ok');
+});
+
+test('la app de escritorio: recargar con el editor sucio pregunta «¿Descartar lo escrito?»; con «seguir editando» la ventana se queda como estaba', async () => {
+  await ir('#/n/conceptos/capital.md');
+  await pagina.locator('#btn-editar').click();
+  await pagina.locator('#edicion-cm .cm-content').waitFor();
+  await pagina.keyboard.type('ZZ');
+  await hasta(() => pagina.evaluate(() => !document.querySelector('#edicion-aplicar').disabled), 'el editor no se da por sucio');
+  // Ver → Recargar (desde el proceso principal, como lo hará el menú): el beforeunload de la pantalla cancela y Electron pregunta.
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.reload());
+  await hasta(() => /diálogo saltado \(CUADERNO_SIN_DIALOGO=1\): ¿Descartar lo escrito\? → seguir editando/.test(registro()), 'el cierre con cambios no ha preguntado');
+  await dormir(300);
+  assert.ok(await pagina.locator('#edicion-cm .cm-content').isVisible(), 'la recarga se ha llevado el editor');
+  assert.match(await pagina.locator('#edicion-cm .cm-content').textContent(), /ZZ/, 'lo escrito se ha perdido');
+  // Se deja el editor limpio (Cancelar → Descartar) para que el cierre del final no tenga nada que preguntar.
+  await pagina.locator('#edicion-cancelar').click();
+  await pagina.locator('#descartar-ok').click();
+  await pagina.locator('#btn-editar').waitFor();
+  await pagina.locator('#link-inicio').click();   // de vuelta a la portada, que es donde esperan los recorridos siguientes
+  await esperarPortada();
 });
 
 test('la app de escritorio: si el servidor muere, el padre lo relanza y la ventana vuelve a la portada', { skip: !unix && 'ps solo en Mac y Linux' }, async () => {
