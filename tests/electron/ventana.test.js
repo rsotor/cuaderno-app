@@ -24,18 +24,28 @@ const base = fs.mkdtempSync(path.join(os.tmpdir(), 'cuaderno-electron-'));
 
 // ¿Está el puerto escuchando? (conectar y ver si contesta o rechaza)
 const escuchando = p => new Promise(r => { const s = net.connect(p, '127.0.0.1'); s.once('connect', () => { s.destroy(); r(true); }); s.once('error', () => r(false)); });
-// Los procesos vivos del árbol de la app (el principal y sus hijos, incluido el utilityProcess del servidor), por pid.
-function procesosDe(pid) {
-  if (!unix) return [];
-  const lineas = execFileSync('ps', ['-eo', 'pid=,ppid=,stat=,args='], { encoding: 'utf8' }).split('\n').map(l => l.trim()).filter(Boolean)
+// Lo que dice `ps` de cada proceso: pid, ppid, si es zombi (estado Z: ya ha muerto y solo espera a que lo recojan,
+// cosa que en un contenedor sin init tarda) y sus argumentos. Solo en Mac y Linux.
+function procesos() {
+  return execFileSync('ps', ['-eo', 'pid=,ppid=,stat=,args='], { encoding: 'utf8' }).split('\n').map(l => l.trim()).filter(Boolean)
     .map(l => { const [p, pp, stat, ...args] = l.split(/\s+/); return { pid: +p, ppid: +pp, zombi: /^Z/.test(stat), args: args.join(' ') }; });
-  const vivos = lineas.filter(p => !p.zombi);   // un <defunct> ya ha muerto: solo espera a que lo recojan (sin init en un contenedor, tarda)
+}
+// El árbol de procesos vivos de la app (el principal y sus descendientes, incluido el utilityProcess del servidor).
+function arbolDe(pid) {
+  const vivos = procesos().filter(p => !p.zombi);
   const arbol = new Set([pid]);
-  let creció = true;
-  while (creció) { creció = false; for (const p of vivos) if (arbol.has(p.ppid) && !arbol.has(p.pid)) { arbol.add(p.pid); creció = true; } }
+  let cambia = true;
+  while (cambia) { cambia = false; for (const p of vivos) if (arbol.has(p.ppid) && !arbol.has(p.pid)) { arbol.add(p.pid); cambia = true; } }
   return vivos.filter(p => arbol.has(p.pid));
 }
-const pidDelServidor = () => procesosDe(app.process().pid).find(p => /utility-sub-type=node\.mojom\.NodeService/.test(p.args));
+// ¿Sigue vivo este pid? Un zombi cuenta como muerto. (Los huérfanos pasan a ppid 1 al cerrar, así que no vale
+// reconstruir el árbol después: se mira cada pid de la lista tomada antes.)
+function vivo(pid) {
+  try { process.kill(pid, 0); } catch (e) { return e.code !== 'ESRCH'; }
+  const p = procesos().find(x => x.pid === pid);
+  return !!p && !p.zombi;
+}
+const pidDelServidor = () => arbolDe(app.process().pid).find(p => /utility-sub-type=node\.mojom\.NodeService/.test(p.args));
 // Espera a que la ventana enseñe la portada del cuaderno de ejemplo con su título.
 async function esperarPortada() {
   await pagina.locator('#nota h1', { hasText: 'Mi curso' }).waitFor({ state: 'visible', timeout: ESPERA });
@@ -83,7 +93,7 @@ test('la app de escritorio: abre el último cuaderno en su ventana (portada y t�
 test('la app de escritorio: si el servidor muere, el padre lo relanza y la ventana vuelve a la portada', { skip: !unix && 'ps solo en Mac y Linux' }, async () => {
   await esperarPortada();
   const servidor = pidDelServidor();
-  assert.ok(servidor, `no encuentro el utilityProcess del servidor entre ${JSON.stringify(procesosDe(app.process().pid).map(p => p.args.slice(0, 60)))}`);
+  assert.ok(servidor, `no encuentro el utilityProcess del servidor entre ${JSON.stringify(arbolDe(app.process().pid).map(p => p.args.slice(0, 60)))}`);
   const recarga = pagina.waitForEvent('load', { timeout: ESPERA });
   process.kill(servidor.pid, 'SIGKILL');
   await recarga;
@@ -96,17 +106,20 @@ test('la app de escritorio: si el servidor muere, el padre lo relanza y la venta
   assert.match(registro(), new RegExp(`\\[app\\] servidor relanzado en el puerto ${puerto}: se recarga la ventana`));
 });
 
-test('la app de escritorio: al cerrar, el servidor se para (el puerto queda libre) y no queda ningún proceso (hasta 2 s)', async () => {
+test('la app de escritorio: al cerrar, el servidor se para (el puerto queda libre) y no queda ningún proceso (hasta 2 s)', { skip: !unix && 'la lista de procesos se toma con ps: solo Mac y Linux' }, async () => {
   await esperarPortada();
   puerto = Number(new URL(pagina.url()).port);
-  const pid = app.process().pid;
+  // La lista del árbol se toma ANTES de cerrar: después los huérfanos tendrían ppid 1 y no se encontrarían.
+  const arbol = arbolDe(app.process().pid);
+  assert.ok(arbol.length >= 2, `el árbol tiene el principal y el servidor: ${arbol.length}`);
+  assert.ok(arbol.some(p => /node\.mojom\.NodeService/.test(p.args)), 'el servidor está en la lista');
   await app.close();
   app = null;
   const fin = Date.now() + 2000;
-  let vivos = procesosDe(pid), escucha = await escuchando(puerto);
-  while (Date.now() < fin && (vivos.length || escucha)) { await dormir(100); vivos = procesosDe(pid); escucha = await escuchando(puerto); }
+  let vivos = arbol.filter(p => vivo(p.pid)), escucha = await escuchando(puerto);
+  while (Date.now() < fin && (vivos.length || escucha)) { await dormir(100); vivos = arbol.filter(p => vivo(p.pid)); escucha = await escuchando(puerto); }
   assert.equal(escucha, false, `el puerto ${puerto} sigue escuchando`);
-  assert.deepEqual(vivos.map(p => p.args.slice(0, 80)), [], 'quedan procesos de la app');
+  assert.deepEqual(vivos.map(p => `${p.pid} ${p.args.slice(0, 80)}`), [], 'quedan procesos de la app');
   assert.match(registro(), /\[app\] el servidor ha salido con código/, 'la salida del hijo al cerrar queda anotada');
   assert.doesNotMatch(registro(), /FALLO/, 'cerrar no es un fallo');
 });
