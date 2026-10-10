@@ -898,7 +898,7 @@ async function abrirCuadernos() {
     // En la app de escritorio (crítica 2026-10-10, 4): los recientes primero, que es lo que se abre casi siempre, y debajo «Otro
     // cuaderno»: el diálogo del sistema («Elegir carpeta…») o la ruta escrita; un solo formulario y Enter es Abrir.
     $('#panel').innerHTML = `<h1>Cuadernos</h1><p class="resumen">Cada cuaderno es una carpeta de notas con su propio repositorio. Abre uno reciente o, abajo, otro cuaderno.</p>${recientes}
-      <section class="grupo otro-cuaderno"><form class="nueva-tarea" id="abrir-carpeta"><span class="etiqueta">Otro cuaderno:</span><button type="button" id="elegir-carpeta">Elegir carpeta…</button><span class="etiqueta">o escribe la ruta</span><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button></form></section>`;
+      <section class="grupo otro-cuaderno"><form class="nueva-tarea" id="abrir-carpeta"><span class="frase">Otro cuaderno:</span><button type="button" id="elegir-carpeta">Elegir carpeta…</button><span class="frase">o escribe la ruta</span><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button></form></section>`;
     return;
   }
   $('#panel').innerHTML = `<h1>Cuadernos</h1><p class="resumen">Cada cuaderno es una carpeta de notas con su propio repositorio. Abre uno reciente o escribe la ruta de otra carpeta.</p>

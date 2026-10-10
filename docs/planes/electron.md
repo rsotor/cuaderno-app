@@ -93,7 +93,7 @@ revisión de confirmación. Quien tome una tarea lee §1-§4 enteros y su tarea;
 | Una instancia | `app.requestSingleInstanceLock()`; la segunda apertura trae la ventana al frente y, si trae una carpeta en `argv`, la abre | Dos servidores sobre el mismo cuaderno pisarían el vigilante y la cookie |
 | Abrir carpeta | Diálogo del sistema (`dialog.showOpenDialog`), **más** `app.on('open-file')` (Mac: arrastrar al icono) y la carpeta en `argv` (Windows y Linux, y `second-instance`) | Es lo que un usuario del Finder o del Explorador espera; cuesta lo mismo que el diálogo |
 | Registro | **Registro a fichero** en la carpeta de configuración (`registro.log`, rotado a 1 MB) con lo que hoy va a `console.error`, más Ayuda → «Mostrar registro» y «Diagnóstico» (versiones, puerto, `PATH` resuelto, `node-pty` cargado o no) | Sin terminal, los errores desaparecen; es la única manera de depurar el Windows del padre a distancia |
-| Menú y atajos | Menú propio en castellano (Cuaderno, Edición, Ver, Ventana, Ayuda). Los atajos del menú **mandan un mensaje a la pantalla** (`webContents.send('accion', 'guardar')`) y la pantalla hace lo que ya sabe hacer | La lógica sigue en la pantalla; el menú solo la nombra. **Los atajos concretos los decide Roberto (§8)**: el plan arrancaba con ⌘S / Ctrl S → Guardar, ⌘, → Ajustes y ⌘O → Abrir carpeta; decididos el 2026-10-10 (§8.1; la tabla, en T5 «Hecha») |
+| Menú y atajos | Menú propio en castellano (Archivo, Edición, Ver, Ventana, Ayuda; en Mac, antes, el de la app). Los atajos del menú **mandan un mensaje a la pantalla** (`webContents.send('accion', 'guardar')`) y la pantalla hace lo que ya sabe hacer | La lógica sigue en la pantalla; el menú solo la nombra. **Los atajos concretos los decide Roberto (§8)**: el plan arrancaba con ⌘S / Ctrl S → Guardar, ⌘, → Ajustes y ⌘O → Abrir carpeta; decididos el 2026-10-10 (§8.1; la tabla, en T5 «Hecha») |
 | Icono | Se elige al crear la app entre las tres propuestas de `docs/diseno/logo/` (decisión de Roberto del 2026-10-09); electron-builder genera `.icns` e `.ico` desde un PNG de 1024 px rasterizado con el Chromium de Playwright (sin `sharp`) | Lo decidido ya; la app sin icono propio parece rota; sin dependencia nueva |
 | Nombre del producto | `Cuaderno` (`productName`), `appId` `es.cuaderno.app` (sin dominio real detrás: es un identificador) | Sin rutas ni nombres de nadie (principio 5) |
 | Actualizaciones | **Sin `autoUpdater`** (sin firma no funciona en Mac). «Buscar versión nueva» en Ayuda solo tiene sentido con el repo público (API de Releases sin token): decisión de Roberto en §8 | Con dos usuarios no compensa más |
@@ -403,15 +403,19 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
 
   | Atajo (⌘ en Mac, Ctrl en Windows y Linux) | Menú | Acción que recibe la pantalla | Qué hace |
   |---|---|---|---|
-  | ⌘O | Cuaderno → Abrir nota… | `abrir-nota` | enfoca el buscador con el texto seleccionado: nombre de nota o carpeta del cuaderno, Enter abre |
-  | ⌘F | Cuaderno → Buscar… | `buscar` | hoy lo mismo que ⌘O (el buscador busca por nombre y por texto); acción aparte porque divergirán |
-  | ⌘T | Cuaderno → Nueva tarea | `nueva-tarea` | la casilla «Nueva tarea» si está Tareas; si no, el buscador con «+ » (Enter la añade) |
-  | ⌘S | Cuaderno → Guardar | `guardar` | el botón Guardar (del repositorio) |
-  | ⇧⌘O | Cuaderno → Abrir carpeta… | `abrir-carpeta` | cambiar de cuaderno con el diálogo del sistema (T4) |
-  | — | Cuaderno → Cuadernos recientes | (el principal: `POST /api/abrir` y recarga, como open-file) | uno por reciente, el más nuevo primero; sin ninguno, «Sin recientes» deshabilitado |
-  | ⌘, | Cuaderno → Ajustes… (en Mac, menú de la app) | `ajustes` | abre Ajustes |
+  | ⌘N | Archivo → Nueva nota | `nueva-nota` | el diálogo de nueva nota (el botón de la barra lateral); crítica 2026-10-10, 8 |
+  | ⌘T | Archivo → Nueva tarea | `nueva-tarea` | la casilla «Nueva tarea» si está Tareas; si no, el buscador con «+ » (Enter la añade) |
+  | ⌘O | Archivo → Abrir nota… | `abrir-nota` | enfoca el buscador con el texto seleccionado: nombre de nota o carpeta del cuaderno, Enter abre |
+  | ⌘F | Archivo → Buscar… | `buscar` | hoy lo mismo que ⌘O (el buscador busca por nombre y por texto); acción aparte porque divergirán |
+  | ⌘S | Archivo → Guardar | `guardar` | el botón Guardar (del repositorio) |
+  | ⇧⌘O | Archivo → Abrir carpeta… | `abrir-carpeta` | cambiar de cuaderno con el diálogo del sistema (T4) |
+  | — | Archivo → Cuadernos recientes | (el principal: `POST /api/abrir` y recarga, como open-file) | uno por reciente, el más nuevo primero; sin ninguno, «Sin recientes» deshabilitado |
+  | ⌘, | Archivo → Ajustes… (en Mac, menú de la app) | `ajustes` | abre Ajustes |
+  | ⌘[ / ⌘] | Ver → Atrás / Adelante | (el principal: `webContents.navigationHistory.goBack/goForward`, si se puede) | el historial de la ventana; crítica 2026-10-10, 8 |
+  | Ctrl \\ (también en Mac) | Ver → Barra lateral | `barra-lateral` | plegar y desplegar la barra lateral, lo que ya hacía la página; con el foco en la terminal, nada; crítica 2026-10-10, 8 |
+  | Ctrl ` (también en Mac: ⌘` es «siguiente ventana») | Ver → Terminal | `terminal` | abrir y cerrar el cajón de la terminal; crítica 2026-10-10, 8 |
   | ⌘K | **reservada, sin acción** | — | será la paleta de «acciones rápidas» (bloque posterior del plan vivo); hoy la web la usa para el buscador desde la propia pantalla |
-  | ⌘R, ⌘+/−/0, pantalla completa, deshacer/cortar/copiar/pegar, Salir | Ver, Edición, Cuaderno/app | roles de Electron | — |
+  | ⌘R, ⌘+/−/0, pantalla completa, deshacer/cortar/copiar/pegar, Salir | Ver, Edición, Archivo/app | roles de Electron | — |
 
   No hay ⌘P ni «abrir página»: una nota se abre con el buscador. **Un atajo nuevo es una fila en `ATAJOS` de `menu.js` y una
   en `ACCIONES_APP` de `public/app.js`** (y su caso en `tests/electron-menu.test.js`); el test vigila que ninguno use ⌘K ni
@@ -560,6 +564,14 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
   Roberto antes del PR; decisión 3 de §8); la ronda de crítica de diseño sobre estas capturas, en una ronda aparte, con sus
   objeciones atendidas o razonadas en el plan vivo antes del PR o como tarea nueva; abrir el PR y su primer run real de CI en
   Mac y Windows (T7); §5 bis; el `grep` del kit real; las decisiones 4 a 7 de §8.
+- **Crítica de diseño hecha (2026-10-10, sobre las capturas de arriba; `docs/diseno/critica-2026-10-10-electron.md`): 10
+  objeciones, las 10 aplicadas** por decisión del director: «Arrancando…» con el fondo de la mesa y la «c» del logo (el `FONDO`
+  de la ventana pasa a `--mesa`), el icono con margen transparente (placa de 832 en 1024), el menú **Archivo**, Cuadernos
+  con los recientes primero y «Otro cuaderno» debajo (solo en la app), la ventana que abre donde se cerró (1456 × 900 por
+  defecto, mínimo 760 × 480; `ventana` en `config.json`), el título de la ventana con lo abierto, el Diagnóstico por utilidad
+  con «Copiar y cerrar», los atajos ⌘N, ⌘[ / ⌘], Ctrl \\ y Ctrl ` (tabla en T5), Ayuda por utilidad (Cómo se usa, Atajos de
+  teclado; el plan vivo al final) y las pistas de la pantalla con ⌘ en Mac. Las capturas de `docs/capturas/electron/` se
+  rehicieron con los mismos nombres (arrancando, portada, cuadernos, diagnóstico, icono y `menu.md`).
 
 ## 7. La versión web: viva, y marcada
 
