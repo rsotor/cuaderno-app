@@ -229,7 +229,7 @@ Hecho todo lo que no necesita GitHub (§0 a §4 de la guía). Falta §5 (la desc
 | **Entorno de la shell (P2)** | **Sí** | Diagnóstico: `shell -lc (/bin/zsh)`, 105-117 ms en desarrollo y **146 ms en la app empaquetada abierta desde el Finder**; nunca `respaldo`. En la terminal del cajón `which git`, `which claude` y `which node` dan lo mismo que en Terminal.app (Homebrew y nvm). Única diferencia: falta `~/.rbenv/shims` (su `init` no corre con `-lc`); menor. En desarrollo el PATH lleva además los `node_modules/.bin` de `npm run`. |
 | **`process.execPath` en el hijo** | **El principal** | Desarrollo: `…/Electron.app/Contents/MacOS/Electron`. Empaquetada: `/Applications/Cuaderno.app/Contents/MacOS/Cuaderno`, no `Cuaderno Helper`. node-pty carga. |
 | Menú | Sí | Primero el de la app y luego «Archivo» (no dos «Cuaderno»). En desarrollo el de la app y el Dock dicen «Electron» (el Info.plist es el de Electron); en el paquete, «Cuaderno». |
-| Atajos | Sí | ⌘O, ⌘F, ⌘T, ⌘N, ⇧⌘O, ⌘, y ⌘[ / ⌘] hacen lo suyo; ⌘K nada. Roberto: ⌘O y ⌘F hacen lo mismo y no tiene sentido (Inbox). |
+| Atajos | Sí, en parte a mano | A mano: ⌘O, ⌘F, ⌘T, ⌘N, ⇧⌘O y ⌘, hacen lo suyo; ⌘K nada. Sin probar a mano: ⌘[ / ⌘] y Ver → Barra lateral y Terminal (los cubren los recorridos de `tests/electron/menu.test.js`). Roberto: ⌘O y ⌘F hacen lo mismo y no tiene sentido (Inbox). |
 | **⌘S con el editor abierto** | **No → arreglado** | Roberto editó, pulsó ⌘S y la nota no se escribía (⌘S era solo el Guardar del repositorio: «nada que guardar»). **Decisión de Roberto (§8.8): con el editor abierto, ⌘S escribe la nota (como Aplicar / ⌘Enter); sin editor, Guardar del repositorio.** Con su recorrido en `tests/electron/menu.test.js`. |
 | Título de la ventana | Sí | «inicio.md — ejemplo» y cambia con la nota. |
 | Cerrar con cambios | Sí | ⌘W → «¿Descartar lo escrito?» → «Seguir editando» deja la app viva y el menú sigue llegando a la pantalla; «Descartar» cierra. Ningún proceso al cerrar; el servidor sale con código 0. |
@@ -628,13 +628,16 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
    de abrir que me abra la carpeta o nota dentro del cuaderno porque no tenemos un importar». Resolución: **⌘O Abrir
    nota…** (el buscador, por nombre de nota o carpeta), **⌘F Buscar…**, **⌘T Nueva tarea**, **⌘S Guardar**, **⇧⌘O Abrir
    carpeta…** (cambiar de cuaderno: el diálogo del sistema, lo que él ve como un «importar»), **⌘, Ajustes**, los
-   recientes; **⌘K reservada sin acción** para la paleta de acciones rápidas; sin ⌘P. La tabla completa, en T5 («Hecha»).
+   recientes; **⌘K reservada sin acción** para la paleta de acciones rápidas; sin ⌘P. La tabla completa, en T5 («Hecha»). Los que añadió la crítica de diseño (⌘N, ⌘[ / ⌘], Ver → Barra lateral y
+   Terminal): **se quedan de momento (Roberto, 2026-10-10, tras §5 bis)**; con el uso de la app saldrán cambios y se
+   revisan entonces, junto con ⌘O y ⌘F, que hoy hacen lo mismo.
 2. **El logo**: 1, 2 o 3 de `docs/diseno/logo/` (recomendación de Claude del 2026-10-09: la 1). **Decidido el
    2026-10-10: la 3** («vamos con la 3», Roberto), la «c» subrayada. Para el icono de la app va sobre un cuadrado
    redondeado del color de la hoja en claro (indicación suya: un dibujo de trazos sobre transparente queda raro en
    el Dock); cómo se genera, en T6. `public/icono.svg` (el de la web) es otro cambio, fuera de T6.
 3. **La marca de la web**: etiqueta sola con línea en el README (recomendado), Release con zip, o carpeta
-   `legado/` con un LEEME (§7).
+   `legado/` con un LEEME (§7). **Hecho (2026-10-10):** la recomendada, la etiqueta `web-0.1.0` sobre `main` con su
+   línea en el README («Arrancar»).
 4. **Dónde se construye el `.dmg` de su Mac**: en CI (descarga con cuarentena: «Abrir de todos modos») o en su
    ordenador con `npm run empaquetar` (sin cuarentena). Para el Windows de su padre, CI. **Decidido (Roberto,
    2026-10-10, tras §5 bis):** el `.dmg` de su Mac se construye en su Mac (`npm run empaquetar:instaladores`: menos de
