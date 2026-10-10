@@ -370,7 +370,7 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
   valida con `event.senderFrame.url` que empiece por `http://localhost:<puerto>/`; lo demás se rechaza y queda en el registro.
   (7) En `public/app.js`, con `window.cuadernoApp`: botón «Elegir carpeta…» junto a la casilla (que se queda), resumen de
   Cuadernos, el 403 («cierra y vuelve a abrir la app») y el `#aviso-reinicio` (se reescribe el texto al cargar, sin tocar
-  `index.html`); sin él, nada cambia. (8) El recorrido `tests/electron/carpeta.test.js` (fila 26 del ejemplo) cubre además
+  `index.html`); sin él, nada cambia. (8) El recorrido `tests/electron/carpeta.test.js` (fila 27 del ejemplo) cubre además
   la **segunda instancia real** (lanza el binario de Electron con otra carpeta y la primera la abre), que arriba no estaba
   como test. Textos del 403 del servidor y `will-prevent-unload`: siguen en T2.
 

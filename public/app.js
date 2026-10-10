@@ -815,6 +815,9 @@ function crearSesion(modo) {
   const s = { id: n, modo, titulo: modo === 'profesor' ? 'Profesor' : (n === 1 ? 'Terminal' : `Terminal ${n}`), term, fit, ws: null, elemento, cerrada: false };
   term.attachCustomKeyEventHandler(e => {
     if ((e.ctrlKey || e.metaKey) && (e.key === '`' || e.key === '\\')) return false;   // Ctrl ` es de la app (abre y cierra el cajón); Ctrl \ la barra lateral
+    // En la app de escritorio, los atajos del menú (Ctrl/⌘ S, O, F, T y coma; electron/menu.js) no se los queda xterm: en
+    // Windows y Linux Ctrl S es XOFF para la terminal y se comería el acelerador del menú antes de que llegue.
+    if (enApp() && (e.ctrlKey || e.metaKey) && !e.altKey && ['s', 'o', 'f', 't', ','].includes(e.key.toLowerCase())) return false;
     // xterm manda lo mismo con Enter que con Shift+Enter, y Claude Code o Codex envían el mensaje. Shift u Option+Enter
     // mandan \n (Ctrl J), su salto de línea en cualquier terminal; en un shell es como Enter (Roberto, 2026-10-09).
     if (e.key === 'Enter' && (e.shiftKey || e.altKey) && !e.ctrlKey && !e.metaKey) {
