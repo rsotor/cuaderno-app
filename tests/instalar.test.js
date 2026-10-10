@@ -86,6 +86,7 @@ test('plan: para si no está en main, si hay cambios, en Linux o en una arquitec
 
 test('describirPaso: pone comillas a lo que lleva espacios y no inventa orden en los pasos internos', () => {
   assert.match(describirPaso({ texto: 'Abrir', orden: ['open', '-a', '/Applications/Mi App.app'] }, 3), /3\. Abrir\n\s+\$ open -a "\/Applications\/Mi App\.app"/);
+  assert.match(describirPaso({ texto: 'Cerrar', orden: ['osascript', '-e', 'quit app "Cuaderno"'] }, 2), /\$ osascript -e 'quit app "Cuaderno"'/);
   assert.equal(describirPaso({ texto: 'Esperar', accion: 'esperar-cierre' }, 1), '  1. Esperar');
 });
 

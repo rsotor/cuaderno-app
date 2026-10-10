@@ -85,9 +85,9 @@ function planificar(estado) {
   pasos.push({ id: 'pull', texto: 'Traer los cambios (solo avance rápido)', orden: ['git', 'pull', '--ff-only'] });
 
   const dependencias = estado.lockCambiado;
-  if (dependencias) pasos.push({ id: 'npm-ci', texto: 'Instalar las dependencias (package-lock.json distinto del instalado, o falta node_modules)', orden: ['npm', 'ci'] });
+  if (dependencias) pasos.push({ id: 'npm-ci', texto: 'Instalar las dependencias (el package-lock.json no es el de la última vez, o falta node_modules)', orden: ['npm', 'ci'] });
   if (dependencias || !estado.hayDist) {   // `npm ci` borra node_modules, binario de Electron incluido
-    pasos.push({ id: 'electron', texto: 'Bajar el binario de Electron (falta node_modules/electron/dist)', orden: [node, r.instaladorElectron] });
+    pasos.push({ id: 'electron', texto: 'Bajar el binario de Electron (npm ci lo borra, o falta node_modules/electron/dist)', orden: [node, r.instaladorElectron] });
   }
   if (dependencias) pasos.push({ id: 'marcar-lock', texto: 'Anotar con qué package-lock.json quedan las dependencias', accion: 'marcar-lock' });
 
@@ -118,9 +118,15 @@ function planificar(estado) {
   return { pasos, rutas: r };
 }
 
+// Un argumento tal como se escribiría en una terminal (solo para enseñarlo): con comillas simples si lleva dobles.
+function entrecomillar(a) {
+  if (!/[\s"]/.test(a)) return a;
+  return a.includes('"') ? `'${a}'` : `"${a}"`;
+}
+
 // El texto de un paso para `--simular`.
 function describirPaso(paso, n) {
-  const detalle = paso.orden ? `\n     $ ${paso.orden.map(a => (/\s/.test(a) ? `"${a}"` : a)).join(' ')}` : '';
+  const detalle = paso.orden ? `\n     $ ${paso.orden.map(entrecomillar).join(' ')}` : '';
   return `  ${n}. ${paso.texto}${detalle}`;
 }
 
