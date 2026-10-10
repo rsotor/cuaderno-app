@@ -5,6 +5,25 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 let arbol = [], rutaActual = null, info = { cuaderno: null, configuracion: {} };
 const cuaderno = () => info.cuaderno;
 
+// En la app de escritorio (Electron) el preload deja window.cuadernoApp; sin él, la pantalla es la del navegador y nada cambia.
+const enApp = () => !!window.cuadernoApp;
+const enMac = /Mac/i.test(navigator.platform);
+// Las pistas de teclado de la pantalla: en la web, las de la página («Ctrl K»); en la app de escritorio, las del menú
+// (electron/menu.js), con ⌘ en Mac y Ctrl en los demás (crítica 2026-10-10, 10). `conAtajo` añade la pista a un título solo en la app.
+const pista = (web, app) => (enApp() ? (enMac ? `⌘${app}` : `Ctrl ${app}`) : web);
+const conAtajo = (texto, tecla) => (enApp() ? `${texto} (${pista('', tecla)})` : texto);
+// El título de la ventana: en la web, «<cuaderno> · Cuaderno»; en la app, lo que está abierto («inicio.md — cuaderno-ejemplo»,
+// «Tareas — cuaderno-ejemplo», «Cuadernos — Cuaderno»), que es lo que lee la barra de título y el selector de ventanas.
+let vistaTitulo = null;
+function pintarTitulo() {
+  const c = cuaderno();
+  if (!enApp()) { document.title = c ? `${c.nombre} · Cuaderno` : 'Cuaderno'; return; }
+  document.title = vistaTitulo === 'Cuadernos' ? 'Cuadernos — Cuaderno' : !c ? 'Cuaderno' : vistaTitulo ? `${vistaTitulo} — ${c.nombre}` : c.nombre;
+}
+const ponerVista = v => { vistaTitulo = v; pintarTitulo(); };
+// Lo que supone una terminal se dice de otra forma en la app: no hay terminal donde reiniciarla, se cierra y se vuelve a abrir.
+if (enApp()) { const a = $('#aviso-reinicio'); for (const n of [...a.childNodes]) if (n.id !== 'aviso-cerrar') n.remove(); a.prepend('La app se ha actualizado mientras estaba abierta. Cierra y vuelve a abrir la app para que todo funcione. '); }
+if (enApp()) { $('#buscador').placeholder = `Buscar… o + tarea  (${pista('Ctrl K', 'F')})`; $('#btn-nueva-nota').title = conAtajo('Crear una nota nueva', 'N'); $('#btn-ajustes').title = conAtajo('Ajustes de la app', ','); }
 // El aviso de «la app se ha actualizado» se cierra y no vuelve en esta pestaña (Roberto, 2026-10-09).
 let avisoCerrado = false;
 $('#aviso-cerrar').addEventListener('click', () => { avisoCerrado = true; $('#aviso-reinicio').hidden = true; });
@@ -15,7 +34,7 @@ async function api(p, body) {
   const d = await r.json().catch(() => ({ error: `respuesta ${r.status}` }));
   if (!r.ok) {
     if (r.status === 404 && p.startsWith('/api/') && !avisoCerrado) $('#aviso-reinicio').hidden = false;   // una ruta que el servidor no conoce: es de antes
-    if (r.status === 403) avisarError('Esta pestaña ha perdido el permiso: arranca la app desde la terminal y entra por la pestaña que abre.');
+    if (r.status === 403) avisarError(enApp() ? 'Esta ventana ha perdido el permiso: cierra y vuelve a abrir la app.' : 'Esta pestaña ha perdido el permiso: arranca la app desde la terminal y entra por la pestaña que abre.');
     if (r.status === 409 && rutaActual && !edicion) { avisarError('Esta nota cambió en el disco mientras la tenías abierta. La he vuelto a cargar: repite el cambio.'); abrirNota(rutaActual); }
     throw Object.assign(new Error(d.error || `error ${r.status}`), { status: r.status });
   }
@@ -149,8 +168,10 @@ $('#arbol').addEventListener('keydown', e => {
   if (e.key === 'ArrowDown' && todos[i + 1]) todos[i + 1].focus();
   else if (e.key === 'ArrowUp') (todos[i - 1] || $('#buscador')).focus();
 });
+// Ctrl K (y Buscar… en el menú de la app de escritorio): el buscador, desplegando la barra lateral si estaba plegada.
+function enfocarBuscador() { if (lateralPlegado() && window.innerWidth > 760) plegarLateral(false, { enfocar: false }); const b = $('#buscador'); b.focus(); b.select(); return b; }
 document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); if (lateralPlegado() && window.innerWidth > 760) plegarLateral(false, { enfocar: false }); $('#buscador').focus(); $('#buscador').select(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); enfocarBuscador(); }
   if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); alternarTerminal(); }
 });
 
@@ -261,8 +282,8 @@ function ancho(si, todo = false) { $('#nota').classList.toggle('ancha', si); $('
 
 // ---------- nota
 function sinPortada() {
-  $('#miga').innerHTML = '<strong>Cuaderno</strong>';
-  $('#nota').innerHTML = `<h1>${esc(cuaderno().nombre)}</h1><p class="resumen">Esta carpeta no tiene una nota de portada. Elige una nota en el árbol de la izquierda o busca con <kbd>Ctrl K</kbd>.</p>`;
+  $('#miga').innerHTML = '<strong>Cuaderno</strong>'; ponerVista(null);
+  $('#nota').innerHTML = `<h1>${esc(cuaderno().nombre)}</h1><p class="resumen">Esta carpeta no tiene una nota de portada. Elige una nota en el árbol de la izquierda o busca con <kbd>${pista('Ctrl K', 'F')}</kbd>.</p>`;
 }
 // La tabla de propiedades (frontmatter) de la lectura; el editor pinta la misma, de solo lectura.
 const htmlPropiedades = fm => fm ? `<dl class="propiedades">${Object.entries(fm).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${Array.isArray(v) ? v.map(x => `<span class="etiqueta">${esc(x)}</span>`).join('') : esc(v)}</dd>`).join('')}</dl>` : '';
@@ -282,6 +303,7 @@ async function abrirNotaTurno(ruta, lineaDestino, { desdeCambios = false } = {})
   let n;
   try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { if (turno !== turnoNota) return pendienteNota; $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   if (turno !== turnoNota) return pendienteNota;
+  ponerVista(ruta.split('/').pop());
   $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonCopiar(ruta) + (n.generado ? '' : botonPapelera(ruta, ruta.split('/').pop()));   // una nota que regenera el profesor no se manda a la papelera desde aquí
   ancho(!!n.esHtml, !!n.esHtml);
   propiedadesActual = htmlPropiedades(n.frontmatter);
@@ -649,7 +671,7 @@ function filtrosRecordados() { try { return localStorage.getItem(claveFiltros())
 async function abrirTareas() {
   if (location.hash === '#/tareas' && filtrosRecordados()) history.replaceState(null, '', `#/tareas?${filtrosRecordados()}`);
   $('#nota').hidden = true; $('#panel').hidden = false; rutaActual = null;
-  $('#miga').innerHTML = '<strong>Tareas</strong>';
+  $('#miga').innerHTML = '<strong>Tareas</strong>'; ponerVista('Tareas');
   const g = await api('/api/tareas');
   if (!enTareas()) return;   // mientras llegaba la respuesta se cambió de pantalla
   // Si el panel ya estaba pintado (recarga en vivo, tarea nueva), el foco y lo escrito en «Nueva tarea» se conservan.
@@ -712,7 +734,7 @@ $('#panel').addEventListener('change', async e => { const t = e.target; if (t.ty
 let comentariosPanel = [];   // los que enseña el panel, para sus botones Editar y Cerrar
 async function abrirComentarios() {
   $('#nota').hidden = true; $('#panel').hidden = false; rutaActual = null;
-  $('#miga').innerHTML = '<strong>Comentarios</strong>';
+  $('#miga').innerHTML = '<strong>Comentarios</strong>'; ponerVista('Comentarios');
   const c = comentariosPanel = await api('/api/comentarios');
   const quien = x => esc(x.cita || String(x.texto).slice(0, 40));   // de qué comentario es el botón, para el lector de pantalla
   $('#panel').innerHTML = `<h1>Comentarios</h1><p class="resumen">Lo que has anotado en las notas. Tu profesor los ve en la siguiente sesión y los convierte en dudas o aportaciones.</p>`
@@ -754,9 +776,15 @@ window.addEventListener('resize', aplicarCajon);
 // El asa: arrastrar cambia el tamaño en vivo (acotado), soltar lo guarda; las flechas lo mueven de 16 en 16; doble clic
 // vuelve al de siempre. El valor se guarda redondeado: la validación del servidor solo admite enteros.
 const ponerTamanoCajon = (pos, v) => $('#app').style.setProperty(pos === 'derecha' ? '--panel-ancho' : '--panel-alto', `${v}px`);
+// Solo manda la respuesta del último guardado: con varios en vuelo (un doble clic son dos clics y el dblclick), una
+// respuesta vieja que llegue tarde no pinta un ancho ya sustituido (CI de Windows, 2026-10-10: guardado 420, pintado 520).
+let guardadoCajon = 0;
 async function guardarTamanoCajon(pos, v) {
   v = acotarCajon(v, pos); ponerTamanoCajon(pos, v);
-  info.configuracion = await api('/api/configuracion', pos === 'derecha' ? { panel_ancho: v } : { panel_alto: v });
+  const n = ++guardadoCajon;
+  const c = await api('/api/configuracion', pos === 'derecha' ? { panel_ancho: v } : { panel_alto: v });
+  if (n !== guardadoCajon) return;
+  info.configuracion = c;
   aplicarCajon();
 }
 {
@@ -773,7 +801,8 @@ async function guardarTamanoCajon(pos, v) {
     origen.ultimo = acotarCajon(origen.pos === 'derecha' ? origen.tam + origen.x - e.clientX : origen.tam + origen.y - e.clientY, origen.pos);
     ponerTamanoCajon(origen.pos, origen.ultimo);
   });
-  const soltar = () => { if (!origen) return; const { pos, ultimo } = origen; origen = null; asa.classList.remove('arrastrando'); document.body.classList.remove('redimensionando'); guardarTamanoCajon(pos, ultimo); };
+  // Soltar sin haber movido el tamaño (un clic, o cada clic de un doble clic) no guarda nada.
+  const soltar = () => { if (!origen) return; const { pos, tam, ultimo } = origen; origen = null; asa.classList.remove('arrastrando'); document.body.classList.remove('redimensionando'); if (ultimo !== tam) guardarTamanoCajon(pos, ultimo); };
   asa.addEventListener('pointerup', soltar); asa.addEventListener('pointercancel', soltar);
   asa.addEventListener('dblclick', () => guardarTamanoCajon(posicionCajon(), CAJON_DEFECTO[posicionCajon()]));
   asa.addEventListener('keydown', e => {
@@ -809,6 +838,10 @@ function crearSesion(modo) {
   const s = { id: n, modo, titulo: modo === 'profesor' ? 'Profesor' : (n === 1 ? 'Terminal' : `Terminal ${n}`), term, fit, ws: null, elemento, cerrada: false };
   term.attachCustomKeyEventHandler(e => {
     if ((e.ctrlKey || e.metaKey) && (e.key === '`' || e.key === '\\')) return false;   // Ctrl ` es de la app (abre y cierra el cajón); Ctrl \ la barra lateral
+    // En la app de escritorio, los atajos del menú (Ctrl/⌘ S, O, F, T, N y coma; electron/menu.js) no se los queda xterm: en
+    // Windows y Linux Ctrl S es XOFF para la terminal y se comería el acelerador del menú antes de que llegue. Ctrl [ y ] (Atrás y
+    // Adelante del menú) sí se los queda: Ctrl [ es Escape en una terminal.
+    if (enApp() && (e.ctrlKey || e.metaKey) && !e.altKey && ['s', 'o', 'f', 't', 'n', ','].includes(e.key.toLowerCase())) return false;
     // xterm manda lo mismo con Enter que con Shift+Enter, y Claude Code o Codex envían el mensaje. Shift u Option+Enter
     // mandan \n (Ctrl J), su salto de línea en cualquier terminal; en un shell es como Enter (Roberto, 2026-10-09).
     if (e.key === 'Enter' && (e.shiftKey || e.altKey) && !e.ctrlKey && !e.metaKey) {
@@ -864,12 +897,19 @@ const hace = iso => { if (!iso) return 'nunca'; const d = (Date.now() - new Date
 const textoGit = g => !g ? 'sin repositorio' : `guardado ${hace(g.ultimo)}${g.cambios ? `, ${g.cambios} ${g.cambios === 1 ? 'cambio' : 'cambios'} por guardar` : ''}${g.sinSubir ? `, ${g.sinSubir} sin subir` : ''}`;
 async function abrirCuadernos() {
   rutaActual = null; $('#nota').hidden = true; $('#panel').hidden = false;
-  $('#miga').innerHTML = '<strong>Cuadernos</strong>';
+  $('#miga').innerHTML = '<strong>Cuadernos</strong>'; ponerVista('Cuadernos');
   const lista = await api('/api/cuadernos');
+  const recientes = lista.length ? lista.map(c => `<section class="grupo cuaderno${c.abiertoAhora ? ' abierto' : ''}${c.existe ? '' : ' ausente'}"><h2>${c.existe ? `<a href="#/" data-abrir="${esc(c.ruta)}">${esc(c.nombre)}</a>` : esc(c.nombre)}${c.abiertoAhora ? '<span class="solo-lectura">abierto ahora</span>' : ''}</h2><p class="ruta"><code>${esc(c.ruta)}</code></p><p class="detalle">${!c.existe ? 'La carpeta ya no está' : c.git ? textoGit(c.git) : 'No es un repositorio: desde aquí no se puede guardar'}</p><button type="button" class="secundario pequeno" data-olvidar="${esc(c.ruta)}">Quitar de la lista</button></section>`).join('')
+    : '<section class="grupo"><p>Todavía no has abierto ningún cuaderno.</p></section>';
+  if (enApp()) {
+    // En la app de escritorio (crítica 2026-10-10, 4): los recientes primero, que es lo que se abre casi siempre, y debajo «Otro
+    // cuaderno»: el diálogo del sistema («Elegir carpeta…») o la ruta escrita; un solo formulario y Enter es Abrir.
+    $('#panel').innerHTML = `<h1>Cuadernos</h1><p class="resumen">Cada cuaderno es una carpeta de notas con su propio repositorio. Abre uno reciente o, abajo, otro cuaderno.</p>${recientes}
+      <section class="grupo otro-cuaderno"><form class="nueva-tarea" id="abrir-carpeta"><span class="frase">Otro cuaderno:</span><button type="button" id="elegir-carpeta">Elegir carpeta…</button><span class="frase">o escribe la ruta</span><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button></form></section>`;
+    return;
+  }
   $('#panel').innerHTML = `<h1>Cuadernos</h1><p class="resumen">Cada cuaderno es una carpeta de notas con su propio repositorio. Abre uno reciente o escribe la ruta de otra carpeta.</p>
-    <form class="nueva-tarea" id="abrir-carpeta"><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="Ruta de la carpeta del cuaderno, por ejemplo ~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button></form>`
-    + (lista.length ? lista.map(c => `<section class="grupo cuaderno${c.abiertoAhora ? ' abierto' : ''}${c.existe ? '' : ' ausente'}"><h2>${c.existe ? `<a href="#/" data-abrir="${esc(c.ruta)}">${esc(c.nombre)}</a>` : esc(c.nombre)}${c.abiertoAhora ? '<span class="solo-lectura">abierto ahora</span>' : ''}</h2><p class="ruta"><code>${esc(c.ruta)}</code></p><p class="detalle">${!c.existe ? 'La carpeta ya no está' : c.git ? textoGit(c.git) : 'No es un repositorio: desde aquí no se puede guardar'}</p><button type="button" class="secundario pequeno" data-olvidar="${esc(c.ruta)}">Quitar de la lista</button></section>`).join('')
-      : '<section class="grupo"><p>Todavía no has abierto ningún cuaderno.</p></section>');
+    <form class="nueva-tarea" id="abrir-carpeta"><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="Ruta de la carpeta del cuaderno, por ejemplo ~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button></form>${recientes}`;
 }
 async function abrirCarpeta(ruta) {
   try { info = await api('/api/abrir', { ruta }); } catch (e) { avisarError('No se ha podido abrir esa carpeta.', e.message); return; }
@@ -878,8 +918,18 @@ async function abrirCarpeta(ruta) {
   location.hash = cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/';
   if (location.hash === '#/') enrutar();
 }
+// Solo en la app de escritorio: el diálogo del sistema (window.cuadernoApp, del preload de Electron) da la ruta, que se
+// enseña en la casilla y sigue el camino de siempre (/api/abrir). Cancelar no hace nada.
+async function elegirCarpeta() {
+  let ruta = null;
+  try { ruta = await window.cuadernoApp.elegirCarpeta(); } catch (e) { avisarError('No se ha podido abrir el diálogo de carpetas.', e.message); return; }
+  if (!ruta) return;
+  const campo = $('#ruta-carpeta'); if (campo) campo.value = ruta;
+  await abrirCarpeta(ruta);
+}
 $('#panel').addEventListener('click', async e => {
   const a = e.target.closest('a[data-abrir]'); if (a) { e.preventDefault(); return abrirCarpeta(a.dataset.abrir); }
+  if (e.target.closest('#elegir-carpeta')) return elegirCarpeta();
   const b = e.target.closest('button[data-olvidar]'); if (b) { await api('/api/olvidar', { ruta: b.dataset.olvidar }); abrirCuadernos(); }
 });
 $('#panel').addEventListener('submit', e => { if (e.target.id !== 'abrir-carpeta') return; e.preventDefault(); const v = e.target.querySelector('input').value.trim(); if (v) abrirCarpeta(v); });
@@ -973,16 +1023,48 @@ $('#ajustes form').addEventListener('change', async () => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ajustes').hidden) cerrarAjustes(); });
 
+// ---------- acciones del menú de la app de escritorio (electron/menu.js → preload → aquí; en la web no hay menú y nada cambia)
+// Cada acción hace lo que ya hace su botón o su tecla: Guardar es el botón Guardar (del repositorio, /api/guardar) y, con el
+// editor de la nota abierto, Aplicar (escribe la nota, como ⌘Enter; decisión de Roberto, 2026-10-10), Ajustes
+// el de Ajustes, Abrir carpeta… el diálogo del sistema (elegirCarpeta), Abrir nota… y Buscar… lo de Ctrl K (el buscador) y Nueva tarea el
+// camino de siempre: la casilla «Nueva tarea» si está la pantalla de Tareas, y si no el buscador con «+» delante (Enter la
+// añade). Con un diálogo abierto la acción se ignora: ⌘S sobre el propio modal de Guardar no apila otro, ni aplica la edición por detrás del de «¿Descartar lo escrito?». Un atajo nuevo
+// (plan de Electron, §8.1) es una fila en ATAJOS de menu.js y una aquí.
+const ACCIONES_APP = {
+  guardar: () => { if (edicion) return aplicarEdicion(); const b = $('#btn-guardar'); if (!cuaderno()) return avisar('No hay ningún cuaderno abierto: nada que guardar.'); if (b.disabled) return avisar(b.title); b.click(); },
+  ajustes: abrirAjustes,
+  'abrir-carpeta': elegirCarpeta,
+  // Abrir nota… y Buscar… hoy son lo mismo (el buscador busca por nombre de nota y de carpeta y por el texto; Enter abre);
+  // son dos acciones porque divergirán (menu.js lo explica).
+  buscar: () => { if (cuaderno()) enfocarBuscador(); },
+  'abrir-nota': () => { if (cuaderno()) enfocarBuscador(); },
+  'nueva-tarea': () => {
+    if (!cuaderno()) return;
+    const campo = $('#tarea-nueva');
+    if (campo && !$('#panel').hidden) return campo.focus();
+    const b = enfocarBuscador();
+    if (comandoTarea(b.value) == null) { b.value = '+ '; b.dispatchEvent(new Event('input', { bubbles: true })); }
+    b.setSelectionRange(b.value.length, b.value.length);
+  },
+  // Los de la crítica del 2026-10-10 (8): Nueva nota es el botón de la barra lateral; Barra lateral y Terminal, lo que ya
+  // hacen Ctrl \ y Ctrl ` en la página (en Mac el menú se queda esas teclas antes que la página; con el foco en la
+  // terminal, Ctrl \ no pliega nada, como en la web).
+  'nueva-nota': () => { if (cuaderno()) $('#btn-nueva-nota').click(); },
+  'barra-lateral': () => { if (window.innerWidth <= 760 || (document.activeElement && document.activeElement.closest('#cajon'))) return; plegarLateral(!lateralPlegado()); },
+  terminal: () => { if (cuaderno()) alternarTerminal(); },
+};
+if (enApp()) window.cuadernoApp.alAccion(nombre => { if (dialogoAbierto()) return; const fn = ACCIONES_APP[nombre]; if (fn) fn(); });
+
 function pintarEstado() {
   $('#aviso-reinicio').hidden = !info.desactualizada || avisoCerrado;
   const c = cuaderno();
   $('#lateral').classList.toggle('sin-cuaderno', !c);
   $('#nombre-curso').textContent = c ? c.nombre : 'Cuaderno';
-  document.title = c ? `${c.nombre} · Cuaderno` : 'Cuaderno';
+  pintarTitulo();
   $('#estado-git').textContent = c ? textoGit(c.git) : '';
   $('#lateral').classList.toggle('sin-repo', !!c && !c.git && c.kit !== 'kit');
   $('#btn-guardar').disabled = $('#btn-traer').disabled = $('#btn-deshacer').disabled = !!c && c.kit === 'salida-sin-motor';
-  $('#btn-guardar').title = c && c.kit === 'salida-sin-motor' ? 'Este cuaderno es una salida del kit sin motor: no se puede guardar desde aquí' : 'Guardar en el repositorio del cuaderno';
+  $('#btn-guardar').title = c && c.kit === 'salida-sin-motor' ? 'Este cuaderno es una salida del kit sin motor: no se puede guardar desde aquí' : conAtajo('Guardar en el repositorio del cuaderno', 'S');
   $('#link-inicio').href = c && c.portada ? `#/n/${encodeURI(c.portada)}` : '#/';
 }
 async function cargarCuaderno() {

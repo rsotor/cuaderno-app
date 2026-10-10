@@ -1,0 +1,12 @@
+Texto de Ayuda → Diagnóstico tal como lo anota la app (registro.log), 2026-10-10, Linux x64 en el contenedor de la sesión.
+Sin editar salvo la raíz del repo, que se escribe como <repo>.
+
+node-pty cargado: sí
+Entorno de la shell: shell -lc (/tmp/cuaderno-shell, 22 ms)
+PATH: /usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:/tmp/cuaderno-home/.local/bin
+Puerto del servidor: 7331
+Carpeta de configuración: /tmp/cuaderno-config
+Registro: /tmp/cuaderno-config/registro.log
+Sistema: linux x64
+Ejecutable: <repo>/node_modules/electron/dist/electron
+Cuaderno 0.1.0 · Electron 44.7.0 · Node 24.21.0 · Chromium 152.0.7977.130

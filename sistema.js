@@ -64,4 +64,16 @@ function aPapelera({ abs, plataforma = process.platform, env = process.env, exis
 }
 function ejecutarEsperando(cmd, args, opciones) { execFileSync(cmd, args, { ...opciones, stdio: ['ignore', 'ignore', 'pipe'], timeout: 15000, windowsHide: true }); }
 
-module.exports = { comandoMostrar, mostrar, comandoAbrirUrl, abrirUrl, existeEnPath, comandoPapelera, aPapelera };
+// El ayudante de node-pty (spawn-helper, Mac y Linux) tiene que poder ejecutarse: npm lo instala sin su script cuando
+// los tiene bloqueados y queda sin permiso, y la terminal fallaba con «posix_spawnp failed» (2026-10-08). Se repara al
+// arrancar, en la web (server.js) y en la app de escritorio (electron/servidor-hijo.js). Devuelve 'bien' (ya era
+// ejecutable), 'reparado', 'no-hay' (sin ayudante en este sistema: Windows, o Linux compilado) o 'no-se-puede'.
+function repararAyudantePty({ raiz = __dirname, plataforma = process.platform, arquitectura = process.arch } = {}) {
+  if (plataforma === 'win32') return 'no-hay';
+  const ayudante = path.join(raiz, 'node_modules', 'node-pty', 'prebuilds', `${plataforma}-${arquitectura}`, 'spawn-helper');
+  if (!fs.existsSync(ayudante)) return 'no-hay';
+  try { fs.accessSync(ayudante, fs.constants.X_OK); return 'bien'; } catch { /* sin permiso: se repara */ }
+  try { fs.chmodSync(ayudante, 0o755); return 'reparado'; } catch { return 'no-se-puede'; }
+}
+
+module.exports = { comandoMostrar, mostrar, comandoAbrirUrl, abrirUrl, existeEnPath, comandoPapelera, aPapelera, repararAyudantePty };

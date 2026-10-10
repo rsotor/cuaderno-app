@@ -143,6 +143,9 @@ test('pantalla de Cuadernos: el abierto sale en recientes; abrir otro por su rut
     await abrirPorRuta(otro.raiz);
     const lista = await recientes();
     assert.deepEqual([...lista].sort(), [e.c.raiz, otro.raiz].sort(), 'cuadernos: el servidor no lista los dos');
+    // En la web no hay «Elegir carpeta…» (es de la app de escritorio, con window.cuadernoApp) y el resumen es el de la web.
+    assert.equal(await e.pagina.locator('#elegir-carpeta').count(), 0, 'cuadernos: el botón «Elegir carpeta…» solo existe en la app de escritorio');
+    await conTexto(e.pagina.locator('#panel .resumen'), /Abre uno reciente o escribe la ruta de otra carpeta\.$/, 'cuadernos', 'el resumen de la web (sin «elige otra carpeta»)');
     const fila = e.pagina.locator('#panel .cuaderno', { hasText: path.basename(e.c.raiz) });
     await (await visible(fila, 'cuadernos', `el cuaderno anterior en recientes (en pantalla: «${(await e.pagina.locator('#panel').textContent()).slice(0, 200)}»)`)).locator('button[data-olvidar]').click();
     await oculto(fila, 'cuadernos', 'el cuaderno quitado de la lista');

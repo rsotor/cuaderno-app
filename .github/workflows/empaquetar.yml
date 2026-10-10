@@ -1,0 +1,89 @@
+# Empaquetar la app de escritorio (plan de Electron, T7): los instaladores sin firma de INSTALAR.md.
+#   workflow_dispatch   → a mano, desde la pestaña Actions: construye el .dmg (arm64 y x64) en macOS y el .exe (NSIS,
+#                         x64) en Windows y los deja como artefactos del run, descargables 90 días.
+#   push de etiqueta v* → lo mismo y, además, una Release de la etiqueta con esos ficheros adjuntos (gh release, con el
+#                         GITHUB_TOKEN del run; sin secretos nuevos).
+# No se lanza en los PR ni en cada push a main: un build de Mac son 6-10 minutos ×10 contra la cuota del repo privado
+# (R5); en repo público, cero. Cada sistema construye el suyo (`npm run empaquetar:instaladores`, sin --mac --win): los
+# targets están en electron-builder.js. Sin firma: en Mac la firma es ad hoc (identity "-") y CSC_IDENTITY_AUTO_DISCOVERY
+# evita que electron-builder busque certificados en el llavero. El binario de Electron lo descarga electron-builder (uno
+# por arquitectura) en la caché de @electron/get, la misma que guarda tests.yml entre runs con actions/cache.
+name: Empaquetar
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write   # crear la Release y subirle los ficheros (solo lo usa el paso de la etiqueta)
+
+concurrency:
+  group: empaquetar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  instaladores:
+    name: ${{ matrix.sistema }}
+    runs-on: ${{ matrix.sistema }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        sistema: [macos-latest, windows-latest]
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"   # Mac: sin buscar certificados; la identidad ad hoc va en electron-builder.js
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Dependencias
+        run: npm ci
+
+      - name: Versión de Electron (para la clave de la caché)
+        id: electron
+        shell: bash
+        run: echo "version=$(node -p "require('./node_modules/electron/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Caché del binario de Electron
+        uses: actions/cache@v4
+        with:
+          # La misma caché y la misma clave que tests.yml: un zip por versión y arquitectura (en Mac, dos).
+          path: |
+            ~/.cache/electron
+            ~/Library/Caches/electron
+            ~/AppData/Local/electron/Cache
+          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ steps.electron.outputs.version }}
+
+      - name: Instaladores
+        run: npm run empaquetar:instaladores
+
+      - name: Lo construido
+        shell: bash
+        run: ls -la dist-app
+
+      - name: Artefactos del run
+        uses: actions/upload-artifact@v4
+        with:
+          name: cuaderno-${{ runner.os }}
+          path: |
+            dist-app/*.dmg
+            dist-app/*.exe
+          if-no-files-found: error
+
+      - name: Release de la etiqueta
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Los dos sistemas acaban cuando acaban: el primero crea la Release y el otro la encuentra hecha (o pierde la
+          # carrera al crearla y sigue); los dos adjuntan lo suyo. --clobber por si se relanza el run.
+          shopt -s nullglob
+          etiqueta="$GITHUB_REF_NAME"
+          gh release view "$etiqueta" > /dev/null 2>&1 || gh release create "$etiqueta" --title "Cuaderno $etiqueta" --generate-notes || true
+          gh release upload "$etiqueta" dist-app/*.dmg dist-app/*.exe --clobber

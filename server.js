@@ -17,10 +17,7 @@ const puerto = Number(argumentos[1] || (/^\d+$/.test(argumentos[0] || '') ? argu
 let pty = null;
 try {
   pty = require('node-pty');
-  // npm instala node-pty sin ejecutar su script cuando los tiene bloqueados y su ayudante queda sin permiso de ejecución:
-  // la terminal fallaba con «posix_spawnp failed» (2026-10-08). Se repara aquí, que es donde se nota.
-  const ayudante = path.join(__dirname, 'node_modules', 'node-pty', 'prebuilds', `${process.platform}-${process.arch}`, 'spawn-helper');
-  try { if (process.platform !== 'win32' && fs.existsSync(ayudante)) fs.accessSync(ayudante, fs.constants.X_OK); } catch { try { fs.chmodSync(ayudante, 0o755); } catch { /* se verá al abrir la terminal */ } }
+  sistema.repararAyudantePty();   // el ayudante de node-pty puede quedar sin permiso de ejecución al instalar
 } catch { console.error('node-pty no está disponible: la app arranca sin terminal.'); }
 
 // El código de la URL es el del usuario (config.token(): fijo entre arranques); CUADERNO_TOKEN lo cambia si se fija.

@@ -8,14 +8,16 @@ const assert = require('node:assert/strict');
 const { Cuaderno } = require('../cuaderno');
 const { detectar } = require('../kit');
 const { crearServidor } = require('../servidor');
-const { crearCuaderno } = require('./ayuda');
+const { crearCuaderno, otroNode, herramientasChivatas } = require('./ayuda');
 
-async function arrancar(opciones = {}) {
+// ejecutarNode: con qué Node corren las herramientas del kit (la app de escritorio lo inyecta; null, el de este proceso).
+async function arrancar({ ejecutarNode = null, ...opciones } = {}) {
   const c = crearCuaderno(opciones);
   const kit = detectar(c.raiz);
   const lanzado = [], ejecutado = [];   // lo que la app habría lanzado en el sistema (el gestor de archivos); en los tests no se abre nada
   const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, kit.base), kit, token: 'ab'.repeat(16), lanzar: (cmd, args, o) => lanzado.push({ cmd, args, cwd: o.cwd }),
     ejecutar: (cmd, args) => { ejecutado.push({ cmd, args }); fs.rmSync(args.at(-1)); },   // la papelera, simulada: el fichero desaparece
+    ejecutarNode,
     plataforma: 'darwin' });   // fija: el resultado no depende del sistema que corre los tests (cada uno, en sistema.test.js)
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const puerto = server.address().port;
@@ -188,16 +190,23 @@ test('examen: formulario, validar sin kit guarda las marcas; con kit lanza exame
     assert.match(texto, /^---\ntipo: examen\n/); assert.match(texto, /- \[x\] b\) Baja/); assert.match(texto, /- \[x\] b\) Unidad de cuenta\n- \[ \] c\)/);
     assert.equal((await (await s.pedir('/api/examen?p=examenes/01-examen.md')).json()).preguntas[0].opciones[1].marcada, true);
   } finally { await s.cerrar(); }
-  const k = await arrancar({ kit: true });
+  // Con kit, y con el Node inyectado (ejecutarNode, como hace la app de escritorio): la revisión y la corrección tienen que
+  // correr con ese Node y su entorno. El examen.js falso apunta con qué lo han lanzado en lanzado.json.
+  const ejecutarNode = { cmd: otroNode(), env: { ELECTRON_RUN_AS_NODE: '1' } };
+  const k = await arrancar({ kit: true, ejecutarNode });
   try {
-    const falsa = `const a = process.argv.slice(2); if (a[0] === '--revision') { process.stdout.write('Revisión resuelta'); process.exit(0); } process.stdout.write('examen.js ' + JSON.stringify(a)); process.exit(0);`;
+    const falsa = `const a = process.argv.slice(2); require('fs').writeFileSync(require('path').join(__dirname, 'lanzado.json'), JSON.stringify({ execPath: process.execPath, args: a, RUN_AS_NODE: process.env.ELECTRON_RUN_AS_NODE }));
+      if (a[0] === '--revision') { process.stdout.write('Revisión resuelta'); process.exit(0); } process.stdout.write('examen.js ' + JSON.stringify(a)); process.exit(0);`;
     fs.mkdirSync(path.join(k.c.raiz, '.kit', 'herramientas'), { recursive: true });
     fs.writeFileSync(path.join(k.c.raiz, '.kit', 'herramientas', 'examen.js'), falsa);
+    const lanzado = () => { const l = JSON.parse(fs.readFileSync(path.join(k.c.raiz, '.kit', 'herramientas', 'lanzado.json'), 'utf8')); assert.equal(path.basename(l.execPath), path.basename(ejecutarNode.cmd)); assert.equal(l.RUN_AS_NODE, '1'); return l.args; };
     const ex = await (await k.pedir('/api/examen?p=examenes/01-examen.md')).json();
     assert.equal(ex.validable, true);
+    assert.deepEqual(lanzado(), ['--revision', 'estudio/examenes/01-examen.md']);
     const post = (ruta, body) => k.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     const r = await (await post('/api/examen/validar', { ruta: 'examenes/01-examen.md', respuestas: { 1: ['a'] } })).json();
     assert.deepEqual(r, { codigo: 0, corregido: true, salida: 'examen.js ["--corregir","estudio/examenes/01-examen.md"]' });
+    assert.deepEqual(lanzado(), ['--corregir', 'estudio/examenes/01-examen.md']);
     assert.match(k.c.leer('examenes/01-examen.md'), /- \[x\] a\) Sube/);
   } finally { await k.cerrar(); }
 });
@@ -314,6 +323,48 @@ test('una sola dirección: http://localhost:<puerto>/, la misma cada vez; 127.0.
   } finally { await s.cerrar(); }
 });
 
+test('en la app (enApp) el 403 sin cookie no manda a la terminal: dice que se cierre y se vuelva a abrir la app; en la web, lo de siempre', async () => {
+  const c = crearCuaderno({ kit: false });
+  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, c.base), kit: detectar(c.raiz), token: 'ab'.repeat(16), enApp: true });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  try {
+    const sin = await fetch(server.url());
+    assert.equal(sin.status, 403);
+    const texto = await sin.text();
+    assert.match(texto, /Esta ventana aún no ha entrado en la app\. Cierra y vuelve a abrir la app/);
+    assert.doesNotMatch(texto, /terminal|server\.js/);
+  } finally { await new Promise(r => server.close(r)); c.borrar(); }
+});
+
+// Una pty de mentira que anota con qué se lanza la shell; el WebSocket /pty con la cookie y el Origin propios la abre.
+function ptyFalsa() {
+  const lanzadas = [];
+  return { lanzadas, spawn(cmd, args, o) { lanzadas.push({ cmd, args, cwd: o.cwd }); return { onData() {}, onExit() {}, write() {}, resize() {}, kill() {} }; } };
+}
+async function terminalCon({ shellLogin, plataforma }) {
+  const WebSocket = require('ws');
+  const c = crearCuaderno({ kit: false }), pty = ptyFalsa();
+  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, c.base), kit: detectar(c.raiz), token: 'ab'.repeat(16), pty, plataforma, shellLogin });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const puerto = server.address().port;
+  try {
+    await new Promise((ok, mal) => { const ws = new WebSocket(`ws://127.0.0.1:${puerto}/pty`, { headers: { cookie: `cuaderno=${server.token}`, origin: `http://127.0.0.1:${puerto}` } }); ws.on('open', () => { setTimeout(() => { ws.close(); ok(); }, 50); }); ws.on('error', mal); });
+    return { lanzadas: pty.lanzadas, raiz: c.raiz };
+  } finally { await new Promise(r => server.close(r)); c.borrar(); }
+}
+
+test('shellLogin (la app): en Mac y Linux la terminal lanza la shell con -l, en la raíz del cuaderno; sin shellLogin (la web) sin argumentos; en Windows nunca cambia nada', async () => {
+  const shell = process.env.SHELL || 'bash';
+  const app = await terminalCon({ shellLogin: true, plataforma: 'darwin' });
+  assert.deepEqual(app.lanzadas, [{ cmd: shell, args: ['-l'], cwd: app.raiz }]);
+  const linux = await terminalCon({ shellLogin: true, plataforma: 'linux' });
+  assert.deepEqual(linux.lanzadas[0].args, ['-l']);
+  const web = await terminalCon({ shellLogin: false, plataforma: 'darwin' });
+  assert.deepEqual(web.lanzadas, [{ cmd: shell, args: [], cwd: web.raiz }]);
+  const windows = await terminalCon({ shellLogin: true, plataforma: 'win32' });
+  assert.deepEqual(windows.lanzadas[0], { cmd: 'powershell.exe', args: [], cwd: windows.raiz });
+});
+
 test('la cookie dura un año: con el código fijo, recargar tras reiniciar el servidor o el navegador sigue valiendo', async () => {
   const s = await arrancar();
   try {
@@ -352,7 +403,7 @@ test('rutas de lectura y de nota nueva: títulos, recorrido y crear una nota', a
   } finally { await s.cerrar(); }
 });
 
-test('rutas de guardar sin kit: propuesta, guardar, traer y deshacer, por la API', async () => {
+test('rutas de guardar sin kit: propuesta, guardar, traer y deshacer, por la API; con kit, sus herramientas con el Node inyectado', async () => {
   const { execFileSync } = require('node:child_process');
   const s = await arrancar();
   const git = (...a) => execFileSync('git', a, { cwd: s.c.raiz, encoding: 'utf8' }).trim();
@@ -372,6 +423,21 @@ test('rutas de guardar sin kit: propuesta, guardar, traer y deshacer, por la API
     const d = await post('/api/deshacer', { ver: false });
     assert.equal(d.codigo, 0); assert.doesNotMatch(s.c.leer('tareas.md'), /Por la API/, 'deshacer no ha revertido');
   } finally { await s.cerrar(); }
+  // Con kit: las rutas lanzan guardar.js y deshacer.js del kit con el Node que recibe crearServidor (ejecutarNode, la app de
+  // escritorio) y su entorno; las herramientas falsas chivan lo que reciben.
+  const ejecutarNode = { cmd: otroNode(), env: { ELECTRON_RUN_AS_NODE: '1' } };
+  const k = await arrancar({ kit: true, ejecutarNode });
+  const leerLanzado = herramientasChivatas(k.c.raiz, ['guardar.js', 'deshacer.js']);
+  const postK = (ruta, body) => k.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+  try {
+    for (const [ruta, body, args] of [['/api/guardar', { mensaje: 'Con kit' }, ['Con kit']], ['/api/traer', {}, ['--traer']], ['/api/deshacer', { ver: true }, ['--ver']], ['/api/deshacer', { ver: false }, []]]) {
+      const r = await postK(ruta, body);
+      assert.equal(r.codigo, 0, `${ruta}: ${r.salida}`);
+      const l = leerLanzado();
+      assert.deepEqual(l.args, args, ruta);
+      assert.equal(path.basename(l.execPath), path.basename(ejecutarNode.cmd), ruta); assert.equal(l.RUN_AS_NODE, '1', ruta); assert.equal(l.GIT_TERMINAL_PROMPT, '0', ruta);
+    }
+  } finally { await k.cerrar(); }
 });
 
 // Una web ajena puede lanzar un GET (una imagen, un enlace) aunque no lea la respuesta: ninguno puede cambiar el

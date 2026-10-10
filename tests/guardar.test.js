@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { guardar, traer, deshacer, proponerMensaje, cambios } = require('../guardar');
+const { otroNode, herramientasChivatas } = require('./ayuda');
 
 const git = (cwd, ...args) => { const r = spawnSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }); assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`); return r.stdout.trim(); };
 function repo() {
@@ -98,6 +99,39 @@ test('con kit: se lanzan sus herramientas con los argumentos justos y se devuelv
   assert.deepEqual(deshacer(d, KIT, { ver: true }), { codigo: 0, salida: 'deshacer.js ["--ver"]' });
   assert.deepEqual(deshacer(d, KIT, { ver: false }), { codigo: 0, salida: 'deshacer.js []' });
   fs.rmSync(d, { recursive: true, force: true });
+});
+
+// Con qué Node y con qué entorno corren las herramientas del kit (plan de Electron, T3): por defecto, los de este proceso;
+// la app de escritorio inyecta ejecutarNode = { cmd, env }. Las herramientas falsas chivan lo que reciben.
+const lanzado = r => { assert.equal(r.codigo, 0, r.salida); return JSON.parse(r.salida); };
+
+test('con kit: sin ejecutarNode, la herramienta corre con el Node de este proceso y el entorno de siempre, que ya no se congela al cargar', () => {
+  const d = repo(); herramientasChivatas(d, ['guardar.js']);
+  const pathAntes = process.env.PATH;
+  try {
+    const l = lanzado(guardar(d, KIT, 'Mi mensaje'));
+    assert.equal(l.execPath, process.execPath);
+    assert.equal(l.GIT_TERMINAL_PROMPT, '0'); assert.equal(l.LC_ALL, 'C.UTF-8'); assert.equal(l.RUN_AS_NODE, undefined);
+    // guardar.js ya está cargado (el require de arriba): lo que cambie en process.env después tiene que llegar a la
+    // herramienta. La app de escritorio recibe el PATH de la shell de login más tarde que la carga del módulo.
+    const anadido = path.join(d, 'bin-de-prueba');
+    process.env.PATH = `${pathAntes}${path.delimiter}${anadido}`;
+    assert.ok(lanzado(traer(d, KIT)).PATH.endsWith(path.delimiter + anadido), 'la herramienta no ve el PATH cambiado después de cargar guardar.js');
+  } finally { process.env.PATH = pathAntes; fs.rmSync(d, { recursive: true, force: true }); }
+});
+
+test('con kit: con ejecutarNode = { cmd, env }, las herramientas corren con ese Node y con su entorno sumado al de siempre', () => {
+  const d = repo(); herramientasChivatas(d, ['guardar.js', 'deshacer.js']);
+  const ejecutarNode = { cmd: otroNode(), env: { ELECTRON_RUN_AS_NODE: '1' } };
+  try {
+    const lanzadas = [guardar(d, KIT, 'Mi mensaje', { ejecutarNode }), traer(d, KIT, { ejecutarNode }), deshacer(d, KIT, { ver: true, ejecutarNode }), deshacer(d, KIT, { ver: false, ejecutarNode })].map(lanzado);
+    assert.deepEqual(lanzadas.map(l => l.args), [['Mi mensaje'], ['--traer'], ['--ver'], []]);
+    for (const l of lanzadas) {
+      assert.equal(path.basename(l.execPath), path.basename(ejecutarNode.cmd)); assert.notEqual(l.execPath, process.execPath);
+      assert.equal(l.RUN_AS_NODE, '1');   // lo que trae ejecutarNode.env
+      assert.equal(l.GIT_TERMINAL_PROMPT, '0'); assert.equal(l.LC_ALL, 'C.UTF-8'); assert.equal(l.PATH, process.env.PATH);   // y lo de siempre sigue
+    }
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });
 
 // Con un curso de verdad (motor del kit incluido) en CUADERNO_KIT_PRUEBA: guardar de verdad con guardar.js.

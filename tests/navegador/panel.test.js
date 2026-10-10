@@ -87,6 +87,15 @@ test('el asa: arrastrar cambia el ancho y lo guarda; no pasa del sitio de la not
   await e.pagina.dblclick('.cajon-asa');
   await hasta(async () => (await anchoGuardado()) === 420, 'panel', `doble clic en el asa no vuelve a 420 (hay ${await anchoGuardado()})`);
   assert.equal(Math.round((await caja('#cajon')).width), 420, 'panel: tras el doble clic el cajón no mide 420');
+  // Un clic sin arrastrar no guarda: antes cada clic del doble clic guardaba el ancho de antes, y en Windows una de esas
+  // respuestas llegó después de la del 420 y lo pintó en 520 (CI, 2026-10-10).
+  const guardados = [];
+  const oir = r => { if (r.method() === 'POST' && r.url().endsWith('/api/configuracion')) guardados.push(r.url()); };
+  e.pagina.on('request', oir);
+  await e.pagina.click('.cajon-asa');
+  await e.pagina.waitForTimeout(300);
+  e.pagina.off('request', oir);
+  assert.deepEqual(guardados, [], 'panel: un clic en el asa sin arrastrar ha guardado el tamaño');
   await cerrarPanel();
 });
 

@@ -45,17 +45,20 @@ function marcar(texto, respuestas) {
   return lineas.join(eol);
 }
 
-const herramienta = (raiz, args) => {
-  const r = spawnSync(process.execPath, [path.join('.kit', 'herramientas', 'examen.js'), ...args], { cwd: raiz, encoding: 'utf8', timeout: 120_000 });
+// Con qué Node se lanza examen.js: por defecto, el de este proceso. La app de escritorio inyecta ejecutarNode = { cmd, env }
+// (como en guardar.js): en Electron process.execPath es el binario de Electron, y con ELECTRON_RUN_AS_NODE=1 hace de node.
+const herramienta = (raiz, args, ejecutarNode = null) => {
+  const { cmd = process.execPath, env = {} } = ejecutarNode || {};
+  const r = spawnSync(cmd, [path.join('.kit', 'herramientas', 'examen.js'), ...args], { cwd: raiz, encoding: 'utf8', timeout: 120_000, env: { ...process.env, ...env } });
   return { codigo: r.status ?? 1, salida: `${r.stdout || ''}${r.stderr || ''}`.trim() };
 };
 // ¿Se puede validar este examen con el kit? Solo con motor y, si es de módulo o final, con la revisión resuelta.
-function validable(raiz, kit, relDesdeRaiz, frontmatter) {
+function validable(raiz, kit, relDesdeRaiz, frontmatter, { ejecutarNode = null } = {}) {
   if (kit.tipo !== 'kit') return { ok: false, motivo: kit.tipo === 'salida-sin-motor' ? 'Este cuaderno no trae el motor del kit: tus respuestas se guardan en la nota, pero aquí no se pueden corregir.' : 'Sin kit no hay quien corrija: las respuestas se guardan en la nota.' };
   if (!frontmatter || !frontmatter.tipo_examen || String(frontmatter.intentos ?? '0').trim() !== '0') return { ok: true, motivo: null };
-  const r = herramienta(raiz, ['--revision', relDesdeRaiz]);
+  const r = herramienta(raiz, ['--revision', relDesdeRaiz], ejecutarNode);
   return r.codigo === 0 ? { ok: true, motivo: null } : { ok: false, motivo: 'Este examen aún no está revisado por el profesor: pídele que lo revise antes de hacerlo.' };
 }
-function corregir(raiz, relDesdeRaiz) { return herramienta(raiz, ['--corregir', relDesdeRaiz]); }
+function corregir(raiz, relDesdeRaiz, { ejecutarNode = null } = {}) { return herramienta(raiz, ['--corregir', relDesdeRaiz], ejecutarNode); }
 
 module.exports = { leerExamen, marcar, validable, corregir, HISTORICO };
