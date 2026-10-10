@@ -7,6 +7,7 @@
 // FUSES SIN TOCAR: runAsNode y nodeCliInspect quedan como vienen (habilitados). El kit y el corrector corren con el
 // binario de Electron y ELECTRON_RUN_AS_NODE=1 (necesita runAsNode) y el recorrido de Playwright `_electron.launch`
 // necesita nodeCliInspect. No se configura `electronFuses` (plan §2 fila Node para el kit, R11, §9 objeción 5).
+const { afterPack } = require('./pruebas/permisos-empaquetado');
 const files = [
   // Lo que la app necesita en el paquete, y nada más (R6): el proceso principal y el hijo (electron/), la pantalla
   // (public/) y los módulos de la raíz de los que depende el servidor. La lista de la raíz es explícita (un `*.js`
@@ -50,6 +51,9 @@ module.exports = {
   // En Linux no hay prebuild: lo compila `npm ci` con el Node del sistema y, siendo N-API, Electron lo carga igual.
   npmRebuild: false,
   files,
+  // Antes de firmar: da permiso de ejecución al spawn-helper de node-pty del paquete (una app en cuarentena corre
+  // traslocada, en solo lectura, y no puede ponérselo en runtime; 2026-10-10). El código y el porqué: pruebas/permisos-empaquetado.js.
+  afterPack,
   directories: { output: 'dist-app' },
   mac: {
     // Firma AD HOC (plan §9 objeción 1): sin `identity`, electron-builder NO firma (no hay caída automática a ad hoc) y

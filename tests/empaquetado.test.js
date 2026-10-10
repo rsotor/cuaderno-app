@@ -104,3 +104,57 @@ test('scripts y versión: npm run empaquetar (--dir), empaquetar:instaladores (l
 test('el PNG del icono: 1024 × 1024, 8 bits, RGBA (electron-builder hace de él el .icns y el .ico)', () => {
   assert.deepEqual(leerPng(fs.readFileSync(path.join(RAIZ, 'electron', 'icono', 'icono.png'))), { anchura: 1024, altura: 1024, profundidad: 8, tipoColor: 6 });
 });
+
+test('afterPack: la config lo declara y el módulo del hook no entra en la app (pruebas/ está fuera de files)', () => {
+  assert.equal(typeof config.afterPack, 'function');
+  assert.equal(config.afterPack, require('../pruebas/permisos-empaquetado').afterPack);
+  assert.ok(incluye('!pruebas/**'), 'pruebas/** fuera de files: el hook no viaja en la app');
+});
+
+// Una carpeta con la estructura de un .app de Mac (sea cual sea el nombre del producto) y de uno de Windows.
+function montarApp(raiz) {
+  const dos = ['darwin-arm64', 'darwin-x64'];
+  const rutas = [];
+  for (const sistema of dos) {
+    const dir = path.join(raiz, 'Cualquier Nombre.app', 'Contents', 'Resources', 'app', 'node_modules', 'node-pty', 'prebuilds', sistema);
+    fs.mkdirSync(dir, { recursive: true });
+    const ayudante = path.join(dir, 'spawn-helper');
+    fs.writeFileSync(ayudante, '#!/bin/sh\n');
+    fs.chmodSync(ayudante, 0o644);
+    fs.writeFileSync(path.join(dir, 'pty.node'), 'x');
+    fs.chmodSync(path.join(dir, 'pty.node'), 0o644);
+    rutas.push(ayudante);
+  }
+  return rutas;
+}
+
+test('afterPack: deja todo spawn-helper de node-pty en 0o755 (la app traslocada no puede ponérselo) y no toca lo demás', { skip: process.platform === 'win32' && 'los permisos POSIX no existen en Windows' }, async () => {
+  const raiz = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'afterpack-'));
+  try {
+    const ayudantes = montarApp(raiz);
+    for (const a of ayudantes) assert.equal(fs.statSync(a).mode & 0o777, 0o644, 'parte sin permiso');
+    await config.afterPack({ appOutDir: raiz });
+    for (const a of ayudantes) assert.equal(fs.statSync(a).mode & 0o777, 0o755, `${a} ejecutable`);
+    assert.equal(fs.statSync(path.join(path.dirname(ayudantes[0]), 'pty.node')).mode & 0o777, 0o644, 'el .node no se toca');
+  } finally { fs.rmSync(raiz, { recursive: true, force: true }); }
+});
+
+test('afterPack: sin spawn-helper en el paquete (Windows, Linux) no hace nada ni falla; si no puede darle el permiso, lanza', t => {
+  const { darPermisoAyudantes } = require('../pruebas/permisos-empaquetado');
+  const raiz = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'afterpack-'));
+  try {
+    fs.mkdirSync(path.join(raiz, 'resources', 'app', 'node_modules', 'node-pty', 'prebuilds', 'win32-x64'), { recursive: true });
+    assert.deepEqual(darPermisoAyudantes(raiz), []);
+    assert.deepEqual(darPermisoAyudantes(path.join(raiz, 'no-existe')), []);
+    // Un «spawn-helper» que es un directorio no es un fichero: ni se busca.
+    const dir = path.join(raiz, 'node_modules', 'node-pty', 'prebuilds', 'darwin-x64');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(path.join(dir, 'spawn-helper'));
+    assert.deepEqual(darPermisoAyudantes(raiz), []);
+    // Uno que no admite el chmod hace fallar el empaquetado (mejor que un .dmg con la terminal rota).
+    fs.rmdirSync(path.join(dir, 'spawn-helper'));
+    fs.writeFileSync(path.join(dir, 'spawn-helper'), '#!/bin/sh\n');
+    t.mock.method(fs, 'chmodSync', () => { throw new Error('EROFS'); });
+    assert.throws(() => darPermisoAyudantes(raiz), /no he podido dar permiso de ejecución .*spawn-helper.*EROFS/);
+  } finally { fs.rmSync(raiz, { recursive: true, force: true }); }
+});
