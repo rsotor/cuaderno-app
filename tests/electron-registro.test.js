@@ -64,6 +64,24 @@ test('rota de verdad a 1 MB con el tope por defecto', () => {
   fs.rmSync(carpeta, { recursive: true, force: true });
 });
 
+test('con rotar: false (el hijo) nunca rota aunque pase del tope: solo el padre renombra', () => {
+  const carpeta = temporal();
+  const r = crearRegistro({ carpeta, tope: 100, rotar: false, consola: null });
+  for (let i = 0; i < 10; i++) r.escribir('z'.repeat(50));
+  assert.deepEqual(fs.readdirSync(carpeta), ['registro.log']);
+  assert.ok(fs.statSync(path.join(carpeta, 'registro.log')).size > 500);
+  assert.equal(r.leer().split('\n').filter(Boolean).length, 10);
+  fs.rmSync(carpeta, { recursive: true, force: true });
+});
+
+test('el fichero es solo del usuario (0600, como el token: lleva rutas de cuadernos)', { skip: process.platform === 'win32' && 'en Windows los permisos los da la carpeta' }, () => {
+  const carpeta = temporal();
+  const r = crearRegistro({ carpeta, consola: null });
+  r.escribir('una');
+  assert.equal(fs.statSync(r.ruta()).mode & 0o777, 0o600);
+  fs.rmSync(carpeta, { recursive: true, force: true });
+});
+
 test('sin dónde escribir no falla: la consola se queda con la línea y leer() devuelve vacío', () => {
   const consola = [];
   const r = crearRegistro({ carpeta: path.join(os.devNull, 'imposible'), consola: l => consola.push(l) });

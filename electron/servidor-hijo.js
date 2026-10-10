@@ -1,7 +1,7 @@
 'use strict';
 // El punto de entrada del utilityProcess que lanza electron/app.js: carga node-pty (y repara su ayudante), y arranca
 // el servidor con lo real (electron/hijo.js tiene la lógica, probada en Node). Lo que falla queda en el registro.
-const registro = require('./registro');
+const registro = require('./registro').crearRegistro({ rotar: false });   // rota solo el padre
 const sistema = require('../sistema');
 const { crearServidor } = require('../servidor');
 const config = require('../config');
