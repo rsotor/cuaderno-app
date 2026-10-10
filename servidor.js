@@ -51,8 +51,9 @@ function estadoGit(raiz) {
   } catch { return null; }
 }
 
-function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null, ejecutar = null, plataforma = process.platform, fuentes = [__dirname, PUBLICO] }) {
+function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null, ejecutar = null, ejecutarNode = null, plataforma = process.platform, fuentes = [__dirname, PUBLICO] }) {
   const estado = { cuaderno, kit };
+  const nodo = { ejecutarNode };   // con qué Node corren las herramientas del kit (null: el de este proceso)
   const oyentes = new Set(), terminales = new Set();   // pestañas que escuchan cambios; conexiones de terminal abiertas
   const avisarCambio = f => { for (const ws of oyentes) ws.send(JSON.stringify({ fichero: f })); };
   if (cuaderno) cuaderno.vigilar(avisarCambio);
@@ -164,7 +165,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
         const { datos } = leerFrontmatter(texto);
         const ex = formulario.leerExamen(texto.split(/\r?\n/).slice(leerFrontmatter(texto).lineas).join('\n'));
         const desplaza = leerFrontmatter(texto).lineas;
-        const v = formulario.validable(cu.raiz, estado.kit, relKit(cu.raiz, cu.dentro(rel)), datos);
+        const v = formulario.validable(cu.raiz, estado.kit, relKit(cu.raiz, cu.dentro(rel)), datos, nodo);
         return json(res, { ruta: rel, frontmatter: datos, validable: v.ok, motivo: v.motivo, cabecera: cu.md.render(ex.cabecera, {}),
           preguntas: ex.preguntas.map(q => ({ numero: q.numero, unica: q.unica, enunciado: cu.md.render(q.enunciado.replace(/^(\d+\.\s|\*\*\d+\.\*\*)\s*/, ''), {}), opciones: q.opciones.map(o => ({ letra: o.letra, marcada: o.marcada, linea: o.linea + desplaza, texto: cu.md.renderInline(o.texto, {}) })) })),
           resto: ex.resto ? cu.md.render(ex.resto, {}) : '' });
@@ -204,9 +205,9 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
           cu.invalidar();
           return json(res, { ok: true });
         }
-        if (p === '/api/guardar') return json(res, accion((raiz, k) => acciones.guardar(raiz, k, b.mensaje)));
-        if (p === '/api/traer') return json(res, accion((raiz, k) => acciones.traer(raiz, k)));
-        if (p === '/api/deshacer') return json(res, accion((raiz, k) => acciones.deshacer(raiz, k, { ver: b.ver !== false })));
+        if (p === '/api/guardar') return json(res, accion((raiz, k) => acciones.guardar(raiz, k, b.mensaje, nodo)));
+        if (p === '/api/traer') return json(res, accion((raiz, k) => acciones.traer(raiz, k, nodo)));
+        if (p === '/api/deshacer') return json(res, accion((raiz, k) => acciones.deshacer(raiz, k, { ver: b.ver !== false, ...nodo })));
         const cu = conCuaderno();
         if (p === '/api/examen/validar') {
           const abs = cu.dentro(b.ruta), texto = fs.readFileSync(abs, 'utf8');
@@ -215,9 +216,9 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
           const partes = texto.split(/(\r?\n)/);   // conserva los finales de línea
           const cabeza = partes.slice(0, lineas * 2).join(''), cuerpo = partes.slice(lineas * 2).join('');
           fs.writeFileSync(abs, cabeza + formulario.marcar(cuerpo, b.respuestas || {})); cu.invalidar();
-          const v = formulario.validable(cu.raiz, estado.kit, relKit(cu.raiz, abs), leerFrontmatter(texto).datos);
+          const v = formulario.validable(cu.raiz, estado.kit, relKit(cu.raiz, abs), leerFrontmatter(texto).datos, nodo);
           if (!v.ok) return json(res, { codigo: 0, corregido: false, salida: `Respuestas guardadas en la nota. ${v.motivo}` });
-          const r = accion(raiz => formulario.corregir(raiz, relKit(raiz, abs)));
+          const r = accion(raiz => formulario.corregir(raiz, relKit(raiz, abs), nodo));
           cu.invalidar();
           return json(res, { ...r, corregido: r.codigo === 0 });
         }
