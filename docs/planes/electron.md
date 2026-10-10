@@ -222,7 +222,7 @@ Hecho todo lo que no necesita GitHub (§0 a §4 de la guía). Falta §5 (la desc
 | Qué | Resultado | Lo visto |
 |---|---|---|
 | `npm ci` | Sí, con aviso | npm 11 no ejecuta los scripts de instalación (`allowScripts`): `spawn-helper` queda sin permiso de ejecución. En desarrollo lo arregla `sistema.js` al arrancar; en el paquete, ahora `afterPack` (abajo). |
-| Batería de Node (`test:cobertura`) | Sí, tras un arreglo | Falló 1: el test del menú esperaba el de Linux. `arrancar` acepta ya la plataforma y la pasa al menú; test nuevo para Mac. Al final: 245 tests, 243 pasan, 2 saltados por diseño, 14 s; 99,4 % líneas / 91,4 % ramas / 97,7 % funciones. |
+| Batería de Node (`test:cobertura`) | Sí, tras un arreglo | Falló 1: el test del menú esperaba el de Linux. lo arregló a la vez la sesión de la CI de Windows (`d0a52aa`: `plataforma` inyectable en `arrancar` y el menú probado en win32, linux y darwin), y el arreglo de aquí se descartó por repetido. Al final: 245 tests, 243 pasan, 2 saltados por diseño, 14 s; 99,4 % líneas / 91,4 % ramas / 97,7 % funciones. |
 | Recorridos de Electron, con pantalla real | Sí | 14 de 14 a la primera (14 s); 15 de 15 con el recorrido nuevo de ⌘S en el editor. |
 | Recorridos de navegador | Sí | 120 de 120, 45 s. |
 | Arranque (`npm run app`) | Sí | «Abriendo el cuaderno…» y la portada; el servidor escucha 0,7 s después de lanzar. |
