@@ -281,3 +281,19 @@ test('preparar pasa alCambiar al vigilante', () => {
   assert.equal(llamadas, 1);
   f.eventosApp.emit('will-quit');
 });
+
+test('«Arrancando…» (electron/arrancando.html): el fondo de la mesa del tema (FONDO = --mesa de la pantalla), texto en tinta suave a 16 px, la «c» del logo con currentColor, «Abriendo el cuaderno…» y los dos avisos a los 4 y 12 s', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'electron', 'arrancando.html'), 'utf8');
+  const estilo = fs.readFileSync(path.join(__dirname, '..', 'public', 'estilo.css'), 'utf8');
+  const mesa = tema => estilo.match(new RegExp(`${tema}[\\s\\S]*?--mesa: (#[0-9a-f]{6})`))[1];
+  assert.deepEqual(ventana.FONDO, { claro: '#e6e8ec', oscuro: '#0e0f12' });
+  assert.equal(mesa(':root \\{'), ventana.FONDO.claro, 'la mesa en claro de estilo.css'); assert.equal(mesa('prefers-color-scheme: dark'), ventana.FONDO.oscuro, 'la mesa en oscuro de estilo.css');
+  assert.match(html, /--mesa: #e6e8ec; --tinta: #1b1b1f; --tinta-suave: #5a5e66/); assert.match(html, /prefers-color-scheme: dark\) \{ :root \{ --mesa: #0e0f12; --tinta: #e6e6e6; --tinta-suave: #a0a4ab/);
+  assert.match(html, /font: 16px\/1\.5 system-ui/); assert.match(html, /color: var\(--tinta-suave\); background: var\(--mesa\)/);
+  assert.match(html, /\.arranque svg \{ width: 56px; height: 56px; color: var\(--tinta\)/);
+  assert.match(html, /<svg viewBox="0 0 64 64" fill="none" stroke="currentColor"[^>]*aria-hidden="true"><path d="M12 53l40-2\.5" stroke="#ffe45c" stroke-width="8"\/><path d="M46 14A17 17 0 1 0 46 40"\/><\/svg>/, 'la «c» de la propuesta 3, en línea');
+  assert.match(html, /<p id="estado" role="status">Abriendo el cuaderno…<\/p>/);
+  assert.match(html, /setTimeout\(\(\) => \{ estado\.textContent = 'Leyendo el entorno de tu shell…'; \}, 4000\)/);
+  assert.match(html, /setTimeout\(\(\) => \{ estado\.textContent = 'Está tardando más de lo normal\. Si no abre, mira Ayuda → Mostrar registro\.'; \}, 12000\)/);
+  assert.doesNotMatch(html, /Arrancando…/);
+});

@@ -1,9 +1,27 @@
 <!doctype html>
-<!-- La página que enseña la ventana hasta que el servidor dice su puerto (electron/app.js): el fondo lo pone la
-     ventana con el color del tema, aquí solo el texto. -->
+<!-- La página que enseña la ventana hasta que el servidor dice su puerto (electron/app.js). El fondo lo pone la ventana con
+     el color de la mesa del tema (FONDO en ventana.js = --mesa de public/estilo.css); aquí, los mismos tokens de la pantalla
+     (prefers-color-scheme sigue a nativeTheme.themeSource), la «c» del logo (docs/diseno/logo/propuesta-3.svg, con
+     currentColor) y un texto que cambia si la cosa se alarga: a los 4 s dice qué está pasando (la shell de login puede tardar
+     hasta 10 s) y a los 12 s dónde mirar (crítica de diseño 2026-10-10, 1). -->
 <html lang="es"><meta charset="utf-8"><title>Cuaderno</title>
 <style>
-  :root { color-scheme: light dark; }
-  body { margin: 0; height: 100vh; display: grid; place-items: center; font: 15px system-ui, sans-serif; color: #888; background: transparent; }
+  :root { color-scheme: light dark; --mesa: #e6e8ec; --tinta: #1b1b1f; --tinta-suave: #5a5e66; }
+  @media (prefers-color-scheme: dark) { :root { --mesa: #0e0f12; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; } }
+  body { margin: 0; height: 100vh; display: grid; place-items: center; font: 16px/1.5 system-ui, sans-serif; color: var(--tinta-suave); background: var(--mesa); }
+  .arranque { display: grid; justify-items: center; gap: 18px; text-align: center; padding: 0 24px; max-width: 32em; }
+  .arranque svg { width: 56px; height: 56px; color: var(--tinta); }
+  p { margin: 0; }
 </style>
-<body><p>Arrancando…</p></body></html>
+<body>
+  <div class="arranque">
+    <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 53l40-2.5" stroke="#ffe45c" stroke-width="8"/><path d="M46 14A17 17 0 1 0 46 40"/></svg>
+    <p id="estado" role="status">Abriendo el cuaderno…</p>
+  </div>
+  <script>
+    // Dos avisos, solo si la espera se alarga: lo normal es que la pantalla llegue antes del primero.
+    const estado = document.getElementById('estado');
+    setTimeout(() => { estado.textContent = 'Leyendo el entorno de tu shell…'; }, 4000);
+    setTimeout(() => { estado.textContent = 'Está tardando más de lo normal. Si no abre, mira Ayuda → Mostrar registro.'; }, 12000);
+  </script>
+</body></html>

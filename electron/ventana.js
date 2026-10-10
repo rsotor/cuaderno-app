@@ -19,7 +19,7 @@ const fs = require('node:fs');
 const { esquemaPermitido, temaNativo } = require('./entorno');
 
 const PERMISOS = ['clipboard-sanitized-write'];   // lo único que la pantalla pide: navigator.clipboard.writeText
-const FONDO = { claro: '#ffffff', oscuro: '#1e1e1e' };
+const FONDO = { claro: '#e6e8ec', oscuro: '#0e0f12' };   // la mesa de la pantalla (--mesa de public/estilo.css): «Arrancando…» y la pantalla comparten fondo, sin salto al cargar (crítica 2026-10-10, 1)
 const FICHERO_CONFIG = 'config.json';
 
 const permisoConcedido = permiso => PERMISOS.includes(permiso);

@@ -122,18 +122,18 @@ test('arranca en orden: userData de pruebas, instancia única, ventana con el fo
   assert.ok(m.registro.lineas.includes(`[app] servidor lanzado (pid ${h.pid})`));
 });
 
-test('sin recientes, el hijo arranca sin CUADERNO_CARPETA (pantalla de cuadernos); con tema claro, o auto sobre un sistema claro, fondo blanco', async () => {
+test('sin recientes, el hijo arranca sin CUADERNO_CARPETA (pantalla de cuadernos); con tema claro, o auto sobre un sistema claro, el fondo de la mesa en claro', async () => {
   const m = montar({ config: configFalsa({ tema: 'claro' }) });
   await tic();
   assert.equal('CUADERNO_CARPETA' in m.hijos[0].opciones.env, false);
-  assert.equal(m.ventanas[0].opciones.backgroundColor, '#ffffff');
+  assert.equal(m.ventanas[0].opciones.backgroundColor, FONDO.claro);
   assert.equal(m.electron.nativeTheme.themeSource, 'light');
   m.hijos[0].escucha(40000);
   await m.estado.listo;
   assert.ok(m.registro.lineas.includes('[app] servidor en el puerto 40000; sin cuaderno: pantalla de cuadernos'));
   const auto = montar({ config: configFalsa({ tema: 'auto' }) });
   await tic();
-  assert.equal(auto.ventanas[0].opciones.backgroundColor, '#ffffff'); assert.equal(auto.electron.nativeTheme.themeSource, 'system');
+  assert.equal(auto.ventanas[0].opciones.backgroundColor, FONDO.claro); assert.equal(auto.electron.nativeTheme.themeSource, 'system');
   auto.electron.app.emitir('will-quit');
 });
 
