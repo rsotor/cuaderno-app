@@ -5,13 +5,15 @@
 // mandan un nombre a la pantalla (`webContents.send('accion', nombre)`), que lo atiende con cuadernoApp.alAccion(cb) y
 // hace lo que ya sabe hacer (Guardar es el botón Guardar; Ajustes, el botón de Ajustes; Abrir nota… y Buscar…, el
 // buscador; Nueva tarea, su casilla; Abrir carpeta…, el diálogo del sistema de T4). Los roles estándar son de Electron (sin los de Edición, en Mac no hay copiar y pegar). Lo de Ayuda es
-// del proceso principal: el plan vivo en GitHub (shell.openExternal, el repo público), el registro (shell.openPath), el
+// del proceso principal: el README y el plan vivo en GitHub (shell.openExternal, el repo público), el registro (shell.openPath), el
 // Diagnóstico (versiones, puerto, PATH resuelto y su origen, si node-pty cargó, carpeta de configuración; nunca el token)
 // y Acerca de. Los atajos que decida Roberto (plan §8.1) se añaden a ATAJOS.
 const path = require('node:path');
 
 const REPO = 'https://github.com/rsotor/cuaderno-app';   // el repo público, sin token ni nada
-const URL_PLAN_VIVO = `${REPO}/blob/main/docs/planes/plan-vivo.md`;
+const URL_COMO_SE_USA = `${REPO}#readme`;                 // Ayuda → Cómo se usa Cuaderno: el README
+const URL_ATAJOS = `${REPO}#teclado`;                     // Ayuda → Atajos de teclado: la sección «Teclado» del README
+const URL_PLAN_VIVO = `${REPO}/blob/main/docs/planes/plan-vivo.md`;   // Ayuda → Plan vivo (para quien desarrolla)
 const CANAL = 'accion';   // el canal que escucha el preload (cuadernoApp.alAccion)
 const NOMBRE = 'Cuaderno';
 
@@ -25,13 +27,25 @@ const NOMBRE = 'Cuaderno';
 //   · Abrir carpeta… (⇧⌘O) es cambiar de cuaderno con el diálogo del sistema: lo que Roberto ve como un «importar».
 //   · **CmdOrCtrl+K queda RESERVADA y sin acción**: será la paleta de «acciones rápidas», un bloque posterior del plan vivo
 //     (hoy, en la web, Ctrl K enfoca el buscador desde la propia pantalla; el menú no la toca). Tampoco hay CmdOrCtrl+P.
+//   · Los de la crítica de diseño del 2026-10-10 (8; aprobados por el director, Roberto puede vetarlos): Nueva nota (⌘N) en
+//     Archivo; en Ver, Barra lateral y Terminal con los aceleradores de la propia página, explícitos y con Ctrl también en
+//     Mac (`Ctrl+\` y `Ctrl+\``: ⌘` en Mac es «siguiente ventana»), y Atrás / Adelante (⌘[ / ⌘]) con el historial del
+//     webContents, sin acción en la pantalla (NAVEGACION).
 const ATAJOS = [
-  { id: 'abrir-nota', label: 'Abrir nota…', accelerator: 'CmdOrCtrl+O', accion: 'abrir-nota' },
-  { id: 'buscar', label: 'Buscar…', accelerator: 'CmdOrCtrl+F', accion: 'buscar' },
-  { id: 'nueva-tarea', label: 'Nueva tarea', accelerator: 'CmdOrCtrl+T', accion: 'nueva-tarea' },
-  { id: 'guardar', label: 'Guardar', accelerator: 'CmdOrCtrl+S', accion: 'guardar' },
-  { id: 'abrir-carpeta', label: 'Abrir carpeta…', accelerator: 'CmdOrCtrl+Shift+O', accion: 'abrir-carpeta' },
-  { id: 'ajustes', label: 'Ajustes…', accelerator: 'CmdOrCtrl+,', accion: 'ajustes' },
+  { id: 'nueva-nota', label: 'Nueva nota', accelerator: 'CmdOrCtrl+N', accion: 'nueva-nota', menu: 'archivo' },
+  { id: 'nueva-tarea', label: 'Nueva tarea', accelerator: 'CmdOrCtrl+T', accion: 'nueva-tarea', menu: 'archivo' },
+  { id: 'abrir-nota', label: 'Abrir nota…', accelerator: 'CmdOrCtrl+O', accion: 'abrir-nota', menu: 'archivo' },
+  { id: 'buscar', label: 'Buscar…', accelerator: 'CmdOrCtrl+F', accion: 'buscar', menu: 'archivo' },
+  { id: 'guardar', label: 'Guardar', accelerator: 'CmdOrCtrl+S', accion: 'guardar', menu: 'archivo' },
+  { id: 'abrir-carpeta', label: 'Abrir carpeta…', accelerator: 'CmdOrCtrl+Shift+O', accion: 'abrir-carpeta', menu: 'archivo' },
+  { id: 'ajustes', label: 'Ajustes…', accelerator: 'CmdOrCtrl+,', accion: 'ajustes', menu: 'archivo' },
+  { id: 'barra-lateral', label: 'Barra lateral', accelerator: 'Ctrl+\\', accion: 'barra-lateral', menu: 'ver' },
+  { id: 'terminal', label: 'Terminal', accelerator: 'Ctrl+`', accion: 'terminal', menu: 'ver' },
+];
+// Atrás y Adelante: el historial del webContents (navigationHistory), desde el principal; la pantalla no se entera.
+const NAVEGACION = [
+  { id: 'atras', label: 'Atrás', accelerator: 'CmdOrCtrl+[', hacer: 'atras' },
+  { id: 'adelante', label: 'Adelante', accelerator: 'CmdOrCtrl+]', hacer: 'adelante' },
 ];
 const RESERVADOS = ['CmdOrCtrl+K'];   // sin asignar a propósito (acciones rápidas); el test vigila que ningún atajo lo use
 const atajo = id => ATAJOS.find(a => a.id === id);
@@ -45,20 +59,23 @@ function submenuRecientes(recientes, abrirCarpeta) {
   return lista.map(r => ({ id: `reciente:${r.ruta}`, label: r.nombre || path.basename(r.ruta), toolTip: r.ruta, click: () => abrirCarpeta(r.ruta) }));
 }
 
-// La plantilla entera. `acciones`: { accion(nombre), abrirCarpeta(ruta), planVivo(), mostrarRegistro(), diagnostico(),
-// acercaDe() }; las que falten no hacen nada (vale para pintar el menú sin app detrás).
+// La plantilla entera. `acciones`: { accion(nombre), abrirCarpeta(ruta), atras(), adelante(), comoSeUsa(), atajos(), planVivo(),
+// mostrarRegistro(), diagnostico(), acercaDe() }; las que falten no hacen nada (vale para pintar el menú sin app detrás).
 function plantillaMenu({ plataforma = process.platform, recientes = [], version = '', acciones = {} } = {}) {
   const nada = () => {};
-  const a = { accion: nada, abrirCarpeta: nada, planVivo: nada, mostrarRegistro: nada, diagnostico: nada, acercaDe: nada, ...acciones };
+  const a = { accion: nada, abrirCarpeta: nada, atras: nada, adelante: nada, comoSeUsa: nada, atajos: nada, planVivo: nada, mostrarRegistro: nada, diagnostico: nada, acercaDe: nada, ...acciones };
   const mac = plataforma === 'darwin';
   const propio = id => { const t = atajo(id); return { id: t.id, label: t.label, accelerator: t.accelerator, click: () => a.accion(t.accion) }; };
   const acercaDe = { id: 'acerca-de', label: `Acerca de ${NOMBRE}`, click: () => a.acercaDe() };
   const salir = { id: 'salir', role: 'quit', label: mac ? `Salir de ${NOMBRE}` : 'Salir' };
 
-  const cuaderno = {
-    id: 'cuaderno', label: NOMBRE,
+  // «Archivo» en los tres sistemas, como las demás apps (crítica 2026-10-10, 3): en Mac, «Cuaderno» ya es el menú de la app.
+  const archivo = {
+    id: 'archivo', label: 'Archivo',
     submenu: [
-      propio('abrir-nota'), propio('buscar'), propio('nueva-tarea'),
+      propio('nueva-nota'), propio('nueva-tarea'),
+      sep,
+      propio('abrir-nota'), propio('buscar'),
       sep,
       propio('guardar'),
       sep,
@@ -72,16 +89,23 @@ function plantillaMenu({ plataforma = process.platform, recientes = [], version 
     { role: 'undo', label: 'Deshacer' }, { role: 'redo', label: 'Rehacer' }, sep,
     { role: 'cut', label: 'Cortar' }, { role: 'copy', label: 'Copiar' }, { role: 'paste', label: 'Pegar' }, { role: 'selectAll', label: 'Seleccionar todo' },
   ] };
+  const navegar = n => ({ id: n.id, label: n.label, accelerator: n.accelerator, click: () => a[n.hacer]() });
   const ver = { id: 'ver', label: 'Ver', submenu: [
     { role: 'reload', label: 'Recargar' }, sep,
+    ...NAVEGACION.map(navegar), sep,
+    propio('barra-lateral'), propio('terminal'), sep,
     { role: 'zoomIn', label: 'Acercar' }, { role: 'zoomOut', label: 'Alejar' }, { role: 'resetZoom', label: 'Tamaño real' }, sep,
     { role: 'togglefullscreen', label: 'Pantalla completa' },
   ] };
   const ventana = { id: 'ventana', label: 'Ventana', role: 'windowMenu' };
+  // Ayuda, por utilidad para quien usa la app (crítica 2026-10-10, 9): cómo se usa y los atajos primero; lo de cuando algo
+  // falla en medio; el plan vivo, que es para quien desarrolla, al final.
   const ayuda = { id: 'ayuda', label: 'Ayuda', role: 'help', submenu: [
-    { id: 'plan-vivo', label: 'Plan vivo (en GitHub)', click: () => a.planVivo() }, sep,
+    { id: 'como-se-usa', label: `Cómo se usa ${NOMBRE}`, click: () => a.comoSeUsa() },
+    { id: 'atajos', label: 'Atajos de teclado', click: () => a.atajos() }, sep,
     { id: 'mostrar-registro', label: 'Mostrar registro', click: () => a.mostrarRegistro() },
-    { id: 'diagnostico', label: 'Diagnóstico', click: () => a.diagnostico() },
+    { id: 'diagnostico', label: 'Diagnóstico', click: () => a.diagnostico() }, sep,
+    { id: 'plan-vivo', label: 'Plan vivo (para quien desarrolla)', click: () => a.planVivo() },
     ...(mac ? [] : [sep, acercaDe]),
   ] };
   // El menú de la app en Mac: Acerca de, Ajustes, los roles de ocultar y Salir (lo que Electron pone con appMenu, en castellano).
@@ -91,7 +115,7 @@ function plantillaMenu({ plataforma = process.platform, recientes = [], version 
     { role: 'hide', label: `Ocultar ${NOMBRE}` }, { role: 'hideOthers', label: 'Ocultar otros' }, { role: 'unhide', label: 'Mostrar todo' }, sep,
     salir,
   ] };
-  return [...(mac ? [app] : []), cuaderno, edicion, ver, ventana, ayuda];
+  return [...(mac ? [app] : []), archivo, edicion, ver, ventana, ayuda];
 }
 
 // Recorre la plantilla (y sus submenús) y devuelve el primer elemento con ese id; para los tests y para `click` en pruebas.
@@ -142,13 +166,26 @@ function instalarMenu({ electron, estado, config, registro, env = process.env, a
     return Promise.resolve(dialog.showMessageBox(ventana() || undefined, { type: 'info', title: titulo, message: mensaje, detail: detalle, buttons: botones, defaultId: botones.length - 1, cancelId: botones.length - 1, noLink: true }))
       .catch(e => { anotar(`no se ha podido enseñar «${titulo}»: ${e.message}`); return { response: -1 }; });
   };
+  // Una página del repo público en el navegador del sistema (sin token ni nada en la URL); en pruebas, anotada.
+  const fuera = (url, que) => {
+    if (sinNavegador) return anotar(`navegador no abierto (CUADERNO_SIN_NAVEGADOR): ${url}`);
+    return Promise.resolve(shell.openExternal(url)).catch(e => anotar(`no se ha podido abrir ${que}: ${e.message}`));
+  };
+  // Atrás y Adelante con el historial de la ventana (webContents.navigationHistory, Electron ≥ 32); sin historial, nada.
+  const historial = (metodo, puede) => {
+    const v = ventana(), h = v && v.webContents && v.webContents.navigationHistory;
+    if (!h) return anotar(`${metodo} sin ventana, se ignora`);
+    if (typeof h[puede] === 'function' && !h[puede]()) return;
+    h[metodo]();
+  };
   const acciones = {
     accion: nombre => { anotar(`menú: ${nombre}`); mandar(nombre); },
+    atras: () => historial('goBack', 'canGoBack'),
+    adelante: () => historial('goForward', 'canGoForward'),
     abrirCarpeta: ruta => { anotar(`menú: cuaderno reciente ${ruta}`); return abrirCarpeta(ruta); },
-    planVivo: () => {
-      if (sinNavegador) return anotar(`navegador no abierto (CUADERNO_SIN_NAVEGADOR): ${URL_PLAN_VIVO}`);
-      return Promise.resolve(shell.openExternal(URL_PLAN_VIVO)).catch(e => anotar(`no se ha podido abrir el plan vivo: ${e.message}`));
-    },
+    comoSeUsa: () => fuera(URL_COMO_SE_USA, 'cómo se usa'),
+    atajos: () => fuera(URL_ATAJOS, 'los atajos de teclado'),
+    planVivo: () => fuera(URL_PLAN_VIVO, 'el plan vivo'),
     mostrarRegistro: () => {
       const f = registro.ruta();
       if (sinNavegador) return anotar(`registro no abierto (CUADERNO_SIN_NAVEGADOR): ${f}`);
@@ -183,4 +220,4 @@ function instalarMenu({ electron, estado, config, registro, env = process.env, a
   return menu;
 }
 
-module.exports = { plantillaMenu, instalarMenu, textoDiagnostico, submenuRecientes, elemento, ATAJOS, RESERVADOS, CANAL, REPO, URL_PLAN_VIVO, NOMBRE };
+module.exports = { plantillaMenu, instalarMenu, textoDiagnostico, submenuRecientes, elemento, ATAJOS, NAVEGACION, RESERVADOS, CANAL, REPO, URL_COMO_SE_USA, URL_ATAJOS, URL_PLAN_VIVO, NOMBRE };

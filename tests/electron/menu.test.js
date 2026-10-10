@@ -15,7 +15,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { _electron } = require('playwright');
 const { crearCuaderno } = require('../ayuda');
-const { ATAJOS, URL_PLAN_VIVO } = require('../../electron/menu');
+const { ATAJOS, URL_PLAN_VIVO, URL_COMO_SE_USA, URL_ATAJOS } = require('../../electron/menu');
 
 const RAIZ = path.join(__dirname, '..', '..');
 const ESPERA = 20_000;
@@ -63,7 +63,7 @@ test.after(async () => {
 
 test('el menú de la app de escritorio: en castellano, con los atajos de la tabla; Guardar (⌘S desde el principal) abre el diálogo de Guardar de la pantalla y «Guardar» hace el commit por /api/guardar', async () => {
   await esperarTitulo(c);
-  assert.deepEqual(await menu(), process.platform === 'darwin' ? ['Cuaderno', 'Cuaderno', 'Edición', 'Ver', 'Ventana', 'Ayuda'] : ['Cuaderno', 'Edición', 'Ver', 'Ventana', 'Ayuda']);
+  assert.deepEqual(await menu(), process.platform === 'darwin' ? ['Cuaderno', 'Archivo', 'Edición', 'Ver', 'Ventana', 'Ayuda'] : ['Archivo', 'Edición', 'Ver', 'Ventana', 'Ayuda']);
   const aceleradores = await app.evaluate(({ Menu }, ids) => ids.map(id => Menu.getApplicationMenu().getMenuItemById(id).accelerator), ATAJOS.map(a => a.id));
   assert.deepEqual(aceleradores, ATAJOS.map(a => a.accelerator), 'cada atajo de la tabla está en el menú instalado');
   // Un cambio en una nota (en el disco, como lo haría el editor) y Guardar desde el menú: el diálogo de la pantalla, con el cambio contado.
@@ -119,6 +119,35 @@ test('el menú de la app de escritorio: Abrir nota… y Buscar… enfocan el bus
   await pagina.locator('#ajustes').waitFor({ state: 'hidden' });
 });
 
+test('el menú de la app de escritorio: Nueva nota abre su diálogo; Ver → Barra lateral la pliega y la despliega, Terminal abre y cierra el cajón, Atrás y Adelante recorren el historial de la ventana', async () => {
+  await esperarTitulo(c);
+  await pulsar('nueva-nota');
+  await pagina.locator('#nueva-nota').waitFor({ state: 'visible' });
+  assert.equal(await enfocado(), 'nueva-nota-nombre');
+  await pulsar('nueva-nota');   // con el diálogo abierto no se apila otro
+  await pagina.locator('#nueva-nota-cancelar').click();
+  await pagina.locator('#nueva-nota').waitFor({ state: 'hidden' });
+  const plegada = () => pagina.evaluate(() => document.querySelector('#app').classList.contains('lateral-plegado'));
+  assert.equal(await plegada(), false);
+  await pulsar('barra-lateral');
+  await hasta(async () => await plegada(), 'Barra lateral no pliega');
+  await pulsar('barra-lateral');
+  await hasta(async () => !(await plegada()), 'Barra lateral no despliega');
+  await pulsar('terminal');
+  await pagina.locator('#cajon').waitFor({ state: 'visible' });
+  await pulsar('terminal');
+  await pagina.locator('#cajon').waitFor({ state: 'hidden' });
+  // Atrás y Adelante: el historial del webContents (cada cambio de hash es una entrada).
+  await pagina.evaluate(() => { location.hash = '#/n/conceptos/capital.md'; });
+  await pagina.locator('#miga strong', { hasText: 'capital' }).waitFor();
+  await pulsar('atras');
+  await hasta(() => pagina.evaluate(() => location.hash === '#/n/inicio.md' || location.hash === '' || location.hash === '#/'), 'Atrás no vuelve a la portada');
+  await pulsar('adelante');
+  await hasta(() => pagina.evaluate(() => location.hash === '#/n/conceptos/capital.md'), 'Adelante no vuelve a la nota');
+  await pagina.locator('#link-inicio').click();
+  await esperarTitulo(c);
+});
+
 test('el menú de la app de escritorio: Abrir carpeta… (el diálogo del sistema) cambia de cuaderno y el menú se reconstruye con el reciente nuevo; Cuadernos recientes vuelve al anterior', async () => {
   await esperarTitulo(c);
   assert.deepEqual(await recientes(), [path.basename(c.raiz)]);
@@ -150,8 +179,9 @@ test('el menú de la app de escritorio: Ayuda → Diagnóstico queda en el regis
   assert.match(r, /\nPATH: \S+/);
   assert.match(r, new RegExp(`Carpeta de configuración: ${escapar(configDir)}\\n`));
   assert.ok(!r.includes(token), 'el token en el registro');
-  await pulsar('plan-vivo');
+  await pulsar('plan-vivo'); await pulsar('como-se-usa'); await pulsar('atajos');
   await hasta(() => registro().includes(`navegador no abierto (CUADERNO_SIN_NAVEGADOR): ${URL_PLAN_VIVO}`), 'el plan vivo no ha llegado al registro');
+  await hasta(() => registro().includes(`navegador no abierto (CUADERNO_SIN_NAVEGADOR): ${URL_COMO_SE_USA}`) && registro().includes(`navegador no abierto (CUADERNO_SIN_NAVEGADOR): ${URL_ATAJOS}`), 'cómo se usa y los atajos no han llegado al registro');
   assert.match(URL_PLAN_VIVO, /^https:\/\/github\.com\/[^?#]+$/);
   await pulsar('mostrar-registro');
   await hasta(() => registro().includes(`registro no abierto (CUADERNO_SIN_NAVEGADOR): ${path.join(configDir, 'registro.log')}`), 'el registro no ha llegado al registro');

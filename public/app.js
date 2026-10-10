@@ -815,9 +815,10 @@ function crearSesion(modo) {
   const s = { id: n, modo, titulo: modo === 'profesor' ? 'Profesor' : (n === 1 ? 'Terminal' : `Terminal ${n}`), term, fit, ws: null, elemento, cerrada: false };
   term.attachCustomKeyEventHandler(e => {
     if ((e.ctrlKey || e.metaKey) && (e.key === '`' || e.key === '\\')) return false;   // Ctrl ` es de la app (abre y cierra el cajón); Ctrl \ la barra lateral
-    // En la app de escritorio, los atajos del menú (Ctrl/⌘ S, O, F, T y coma; electron/menu.js) no se los queda xterm: en
-    // Windows y Linux Ctrl S es XOFF para la terminal y se comería el acelerador del menú antes de que llegue.
-    if (enApp() && (e.ctrlKey || e.metaKey) && !e.altKey && ['s', 'o', 'f', 't', ','].includes(e.key.toLowerCase())) return false;
+    // En la app de escritorio, los atajos del menú (Ctrl/⌘ S, O, F, T, N y coma; electron/menu.js) no se los queda xterm: en
+    // Windows y Linux Ctrl S es XOFF para la terminal y se comería el acelerador del menú antes de que llegue. Ctrl [ y ] (Atrás y
+    // Adelante del menú) sí se los queda: Ctrl [ es Escape en una terminal.
+    if (enApp() && (e.ctrlKey || e.metaKey) && !e.altKey && ['s', 'o', 'f', 't', 'n', ','].includes(e.key.toLowerCase())) return false;
     // xterm manda lo mismo con Enter que con Shift+Enter, y Claude Code o Codex envían el mensaje. Shift u Option+Enter
     // mandan \n (Ctrl J), su salto de línea en cualquier terminal; en un shell es como Enter (Roberto, 2026-10-09).
     if (e.key === 'Enter' && (e.shiftKey || e.altKey) && !e.ctrlKey && !e.metaKey) {
@@ -1015,6 +1016,12 @@ const ACCIONES_APP = {
     if (comandoTarea(b.value) == null) { b.value = '+ '; b.dispatchEvent(new Event('input', { bubbles: true })); }
     b.setSelectionRange(b.value.length, b.value.length);
   },
+  // Los de la crítica del 2026-10-10 (8): Nueva nota es el botón de la barra lateral; Barra lateral y Terminal, lo que ya
+  // hacen Ctrl \ y Ctrl ` en la página (en Mac el menú se queda esas teclas antes que la página; con el foco en la
+  // terminal, Ctrl \ no pliega nada, como en la web).
+  'nueva-nota': () => { if (cuaderno()) $('#btn-nueva-nota').click(); },
+  'barra-lateral': () => { if (window.innerWidth <= 760 || (document.activeElement && document.activeElement.closest('#cajon'))) return; plegarLateral(!lateralPlegado()); },
+  terminal: () => { if (cuaderno()) alternarTerminal(); },
 };
 if (enApp()) window.cuadernoApp.alAccion(nombre => { if (dialogoAbierto()) return; const fn = ACCIONES_APP[nombre]; if (fn) fn(); });
 

@@ -146,7 +146,7 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
     } catch (e) { fallo(e.message); return false; }
   });
 
-  // Salir (Cuaderno → Salir, ⌘Q, app.quit() desde Playwright) o cerrar la ventana: el hijo se mata y su salida no es caída.
+  // Salir (Archivo → Salir, ⌘Q, app.quit() desde Playwright) o cerrar la ventana: el hijo se mata y su salida no es caída.
   // En `will-quit`, no en `before-quit`: ahí ya no hay vuelta atrás (un «Seguir editando» cancela el quit entre los dos).
   app.on('will-quit', () => { estado.cerrando = true; matarHijo(); });
   app.on('window-all-closed', () => { estado.cerrando = true; matarHijo(); app.quit(); });

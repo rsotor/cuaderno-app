@@ -29,7 +29,9 @@ function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false, emp
   class BrowserWindow {
     constructor(opciones) {
       this.opciones = opciones; this.cargas = []; this.minimizada = false; this.enfocada = 0; this.fondos = []; ventanas.push(this); pasos.push('ventana');
-      this.webContents = Object.assign(new EventEmitter(), { manejadorVentanas: null, mensajes: [], setWindowOpenHandler(f) { this.manejadorVentanas = f; }, send(canal, ...args) { this.mensajes.push([canal, ...args]); } });
+      const wc = Object.assign(new EventEmitter(), { manejadorVentanas: null, mensajes: [], historial: [], puedeAtras: false, setWindowOpenHandler(f) { this.manejadorVentanas = f; }, send(canal, ...args) { this.mensajes.push([canal, ...args]); } });
+      wc.navigationHistory = { canGoBack: () => wc.puedeAtras, canGoForward: () => false, goBack: () => wc.historial.push('goBack'), goForward: () => wc.historial.push('goForward') };
+      this.webContents = wc;
     }
     setBackgroundColor(c) { this.fondos.push(c); }
     async loadFile(f) { this.cargas.push({ fichero: f }); pasos.push('loadFile'); }
@@ -509,14 +511,14 @@ test('el canal IPC elegir-carpeta queda registrado y, desde nuestra pantalla, co
 });
 
 // ---------- T5: el menú (electron/menu.js enganchado por app.js; lo puro, en electron-menu.test.js)
-const { URL_PLAN_VIVO } = require('../electron/menu');
+const { URL_PLAN_VIVO, URL_COMO_SE_USA, URL_ATAJOS } = require('../electron/menu');
 const etiquetasDe = items => items.filter(e => e.type !== 'separator').map(e => e.label);
 
 test('el menú se instala con la ventana, en castellano y con los recientes de config.json; se reconstruye cuando config.json cambia de recientes (el mismo vigilante que el tema) y no cuando solo cambia el tema', async () => {
   let recientes = [{ ruta: '/cuadernos/ultimo', nombre: 'Último', abierto: '2026-10-10' }];
   const m = await arrancado({ config: configFalsa({ recientes: () => recientes }) });
   assert.equal(m.menus.length, 1, 'instalado una vez al arrancar');
-  assert.deepEqual(etiquetasDe(m.menu.items), ['Cuaderno', 'Edición', 'Ver', 'Ventana', 'Ayuda'], 'en Linux (donde corre el test) no hay menú de la app');
+  assert.deepEqual(etiquetasDe(m.menu.items), ['Archivo', 'Edición', 'Ver', 'Ventana', 'Ayuda'], 'en Linux (donde corre el test) no hay menú de la app');
   assert.deepEqual(m.menu.getMenuItemById('recientes').submenu.map(e => e.label), ['Último']);
   assert.equal(m.menu.getMenuItemById('guardar').accelerator, 'CmdOrCtrl+S');
   // Abrir otro cuaderno lo registra como reciente y el hijo reescribe config.json: el vigilante avisa y el menú se rehace.
@@ -553,16 +555,23 @@ test('si instalar el menú falla, se anota y se vuelve a intentar al siguiente c
   m.electron.app.emitir('will-quit');
 });
 
-test('Abrir nota…, Buscar…, Nueva tarea, Guardar, Abrir carpeta… y Ajustes… mandan su nombre a la pantalla por el canal «accion» (y quedan en el registro); sin ventana se ignoran y se anota', async () => {
+test('cada atajo de la tabla manda su nombre a la pantalla por el canal «accion» (y queda en el registro); Atrás y Adelante van al historial del webContents (solo si se puede); sin ventana se ignoran y se anota', async () => {
   const m = await arrancado();
   const wc = m.ventanas[0].webContents;
-  for (const id of ['abrir-nota', 'buscar', 'nueva-tarea', 'guardar', 'abrir-carpeta', 'ajustes']) m.menu.getMenuItemById(id).click();
-  assert.deepEqual(wc.mensajes, [['accion', 'abrir-nota'], ['accion', 'buscar'], ['accion', 'nueva-tarea'], ['accion', 'guardar'], ['accion', 'abrir-carpeta'], ['accion', 'ajustes']]);
+  const { ATAJOS } = require('../electron/menu');
+  for (const a of ATAJOS) m.menu.getMenuItemById(a.id).click();
+  assert.deepEqual(wc.mensajes, ATAJOS.map(a => ['accion', a.accion]));
   assert.ok(m.registro.lineas.includes('[app] menú: guardar'));
+  m.menu.getMenuItemById('atras').click(); m.menu.getMenuItemById('adelante').click();
+  assert.deepEqual(wc.historial, [], 'sin historial (canGoBack false) no se navega');
+  wc.puedeAtras = true;
+  m.menu.getMenuItemById('atras').click(); m.menu.getMenuItemById('adelante').click();
+  assert.deepEqual(wc.historial, ['goBack']);
   m.estado.ventana = null;
-  m.menu.getMenuItemById('guardar').click();
-  assert.equal(wc.mensajes.length, 6);
+  m.menu.getMenuItemById('guardar').click(); m.menu.getMenuItemById('atras').click();
+  assert.equal(wc.mensajes.length, ATAJOS.length);
   assert.ok(m.registro.lineas.includes('[app] acción del menú sin ventana, se ignora: guardar'));
+  assert.ok(m.registro.lineas.includes('[app] goBack sin ventana, se ignora'));
   m.electron.app.emitir('will-quit');
 });
 
@@ -632,10 +641,11 @@ test('Diagnóstico sin servidor aún y sin saber de node-pty lo dice; con CUADER
   roto.electron.app.emitir('will-quit');
 });
 
-test('Ayuda → Plan vivo abre la URL del repo público en el navegador del sistema (sin token); Mostrar registro abre el fichero del registro; Acerca de enseña versión y repo; con CUADERNO_SIN_NAVEGADOR se anotan en vez de abrirse', async () => {
+test('Ayuda → Cómo se usa, Atajos de teclado y Plan vivo abren páginas del repo público en el navegador del sistema (sin token); Mostrar registro abre el fichero del registro; Acerca de enseña versión y repo; con CUADERNO_SIN_NAVEGADOR se anotan en vez de abrirse', async () => {
   const m = await arrancado();
-  m.menu.getMenuItemById('plan-vivo').click(); await tic();
-  assert.deepEqual(m.abiertos, [URL_PLAN_VIVO]);
+  for (const id of ['como-se-usa', 'atajos', 'plan-vivo']) m.menu.getMenuItemById(id).click();
+  await tic();
+  assert.deepEqual(m.abiertos, [URL_COMO_SE_USA, URL_ATAJOS, URL_PLAN_VIVO]);
   assert.match(URL_PLAN_VIVO, /^https:\/\/github\.com\/[^?#]+\/docs\/planes\/plan-vivo\.md$/);
   m.menu.getMenuItemById('mostrar-registro').click(); await tic();
   assert.deepEqual(m.rutasAbiertas, ['/config/registro.log']);
@@ -653,8 +663,9 @@ test('Ayuda → Plan vivo abre la URL del repo público en el navegador del sist
   m.menu.getMenuItemById('mostrar-registro').click(); await tic();
   assert.ok(m.registro.lineas.includes('[app] no se ha podido abrir el registro /config/registro.log: sin escritorio'));
   m.electron.shell.openExternal = async () => { throw new Error('sin navegador'); };
-  m.menu.getMenuItemById('plan-vivo').click(); await tic();
+  m.menu.getMenuItemById('plan-vivo').click(); m.menu.getMenuItemById('atajos').click(); await tic();
   assert.ok(m.registro.lineas.includes('[app] no se ha podido abrir el plan vivo: sin navegador'));
+  assert.ok(m.registro.lineas.includes('[app] no se ha podido abrir los atajos de teclado: sin navegador'));
   m.electron.app.emitir('will-quit');
   const sin = await arrancado({ env: { CUADERNO_SIN_NAVEGADOR: '1' } });
   sin.menu.getMenuItemById('plan-vivo').click(); sin.menu.getMenuItemById('mostrar-registro').click(); await tic();

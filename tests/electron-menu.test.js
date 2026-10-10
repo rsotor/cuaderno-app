@@ -4,40 +4,51 @@
 // el token. Lo que engancha a Electron (instalarMenu) se prueba con el Electron falso en electron-app.test.js.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { plantillaMenu, textoDiagnostico, submenuRecientes, elemento, ATAJOS, RESERVADOS, CANAL, REPO, URL_PLAN_VIVO } = require('../electron/menu');
+const { plantillaMenu, textoDiagnostico, submenuRecientes, elemento, ATAJOS, NAVEGACION, RESERVADOS, CANAL, REPO, URL_COMO_SE_USA, URL_ATAJOS, URL_PLAN_VIVO } = require('../electron/menu');
 
 // Recorre la plantilla y devuelve todos sus elementos (menús, submenús y hojas), en orden.
 const todos = (plantilla, acc = []) => { for (const e of plantilla) { acc.push(e); if (Array.isArray(e.submenu)) todos(e.submenu, acc); } return acc; };
 const etiquetas = plantilla => plantilla.map(e => e.label);
 const roles = plantilla => todos(plantilla).map(e => e.role).filter(Boolean);
 const recientes = [{ ruta: '/cuadernos/finanzas', nombre: 'Finanzas', abierto: '2026-10-10' }, { ruta: '/cuadernos/historia', nombre: 'Historia', abierto: '2026-10-01' }];
-const anotador = () => { const l = []; const a = { lineas: l, acciones: { accion: n => l.push(`accion ${n}`), abrirCarpeta: r => l.push(`abrir ${r}`), planVivo: () => l.push('plan'), mostrarRegistro: () => l.push('registro'), diagnostico: () => l.push('diagnostico'), acercaDe: () => l.push('acerca') } }; return a; };
+const anotador = () => { const l = []; const a = { lineas: l, acciones: { accion: n => l.push(`accion ${n}`), abrirCarpeta: r => l.push(`abrir ${r}`), atras: () => l.push('atras'), adelante: () => l.push('adelante'), comoSeUsa: () => l.push('uso'), atajos: () => l.push('atajos'), planVivo: () => l.push('plan'), mostrarRegistro: () => l.push('registro'), diagnostico: () => l.push('diagnostico'), acercaDe: () => l.push('acerca') } }; return a; };
 
-test('en Windows y Linux: Cuaderno, Edición, Ver, Ventana y Ayuda, en castellano; Ajustes y Salir en Cuaderno; Acerca de en Ayuda', () => {
+test('en Windows y Linux: Archivo, Edición, Ver, Ventana y Ayuda, en castellano; Ajustes y Salir en Archivo; Acerca de en Ayuda', () => {
   for (const plataforma of ['win32', 'linux']) {
     const p = plantillaMenu({ plataforma, recientes, version: '0.1.0' });
-    assert.deepEqual(etiquetas(p), ['Cuaderno', 'Edición', 'Ver', 'Ventana', 'Ayuda'], plataforma);
-    assert.deepEqual(etiquetas(p[0].submenu).filter(Boolean), ['Abrir nota…', 'Buscar…', 'Nueva tarea', 'Guardar', 'Abrir carpeta…', 'Cuadernos recientes', 'Ajustes…', 'Salir']);
+    assert.deepEqual(etiquetas(p), ['Archivo', 'Edición', 'Ver', 'Ventana', 'Ayuda'], plataforma);
+    assert.deepEqual(etiquetas(p[0].submenu).filter(Boolean), ['Nueva nota', 'Nueva tarea', 'Abrir nota…', 'Buscar…', 'Guardar', 'Abrir carpeta…', 'Cuadernos recientes', 'Ajustes…', 'Salir']);
     assert.equal(elemento(p, 'salir').role, 'quit');
-    assert.deepEqual(etiquetas(elemento(p, 'ayuda').submenu).filter(Boolean), ['Plan vivo (en GitHub)', 'Mostrar registro', 'Diagnóstico', 'Acerca de Cuaderno']);
+    assert.deepEqual(etiquetas(elemento(p, 'ayuda').submenu).filter(Boolean), ['Cómo se usa Cuaderno', 'Atajos de teclado', 'Mostrar registro', 'Diagnóstico', 'Plan vivo (para quien desarrolla)', 'Acerca de Cuaderno'], 'por utilidad: uso y atajos, lo de cuando falla, el plan al final');
     assert.equal(elemento(p, 'ayuda').role, 'help');
     assert.equal(elemento(p, 'ventana').role, 'windowMenu');
   }
 });
 
-test('en Mac: el primero es el menú de la app (Acerca de, Ajustes, Servicios, ocultar, Salir de Cuaderno) y Cuaderno no repite Ajustes ni Salir', () => {
+test('en Mac: el primero es el menú de la app (Acerca de, Ajustes, Servicios, ocultar, Salir de Cuaderno) y el segundo es Archivo (como en los demás sistemas), sin repetir Ajustes ni Salir', () => {
   const p = plantillaMenu({ plataforma: 'darwin', recientes, version: '0.1.0' });
-  assert.deepEqual(etiquetas(p), ['Cuaderno', 'Cuaderno', 'Edición', 'Ver', 'Ventana', 'Ayuda']);
+  assert.deepEqual(etiquetas(p), ['Cuaderno', 'Archivo', 'Edición', 'Ver', 'Ventana', 'Ayuda']);
   assert.deepEqual(etiquetas(p[0].submenu).filter(Boolean), ['Acerca de Cuaderno', 'Ajustes…', 'Servicios', 'Ocultar Cuaderno', 'Ocultar otros', 'Mostrar todo', 'Salir de Cuaderno']);
   assert.deepEqual(roles([p[0]]), ['services', 'hide', 'hideOthers', 'unhide', 'quit']);
-  assert.deepEqual(etiquetas(p[1].submenu).filter(Boolean), ['Abrir nota…', 'Buscar…', 'Nueva tarea', 'Guardar', 'Abrir carpeta…', 'Cuadernos recientes']);
-  assert.deepEqual(etiquetas(elemento(p, 'ayuda').submenu).filter(Boolean), ['Plan vivo (en GitHub)', 'Mostrar registro', 'Diagnóstico'], 'Acerca de va en el menú de la app');
+  assert.deepEqual(etiquetas(p[1].submenu).filter(Boolean), ['Nueva nota', 'Nueva tarea', 'Abrir nota…', 'Buscar…', 'Guardar', 'Abrir carpeta…', 'Cuadernos recientes']);
+  assert.deepEqual(etiquetas(elemento(p, 'ayuda').submenu).filter(Boolean), ['Cómo se usa Cuaderno', 'Atajos de teclado', 'Mostrar registro', 'Diagnóstico', 'Plan vivo (para quien desarrolla)'], 'Acerca de va en el menú de la app');
   assert.equal(todos(p).filter(e => e.id === 'ajustes').length, 1, 'Ajustes una sola vez');
   assert.equal(todos(p).filter(e => e.id === 'salir').length, 1, 'Salir una sola vez');
 });
 
-test('los aceleradores (Roberto, §8.1): ⌘O abrir nota, ⌘F buscar, ⌘T nueva tarea, ⌘S guardar, ⇧⌘O abrir carpeta (cambiar de cuaderno), ⌘, ajustes (CmdOrCtrl: Electron pone la tecla de cada plataforma); la tabla ATAJOS es la fuente y ⌘K queda reservada', () => {
-  assert.deepEqual(ATAJOS.map(a => [a.id, a.accelerator, a.accion]), [['abrir-nota', 'CmdOrCtrl+O', 'abrir-nota'], ['buscar', 'CmdOrCtrl+F', 'buscar'], ['nueva-tarea', 'CmdOrCtrl+T', 'nueva-tarea'], ['guardar', 'CmdOrCtrl+S', 'guardar'], ['abrir-carpeta', 'CmdOrCtrl+Shift+O', 'abrir-carpeta'], ['ajustes', 'CmdOrCtrl+,', 'ajustes']]);
+test('los aceleradores: ⌘N nueva nota, ⌘T nueva tarea, ⌘O abrir nota, ⌘F buscar, ⌘S guardar, ⇧⌘O abrir carpeta (cambiar de cuaderno), ⌘, ajustes (Roberto, §8.1 y crítica 2026-10-10); en Ver, Ctrl \\ barra lateral y Ctrl ` terminal (Ctrl también en Mac) y ⌘[ / ⌘] atrás y adelante; la tabla ATAJOS es la fuente y ⌘K queda reservada', () => {
+  assert.deepEqual(ATAJOS.map(a => [a.id, a.accelerator, a.accion, a.menu]), [
+    ['nueva-nota', 'CmdOrCtrl+N', 'nueva-nota', 'archivo'], ['nueva-tarea', 'CmdOrCtrl+T', 'nueva-tarea', 'archivo'], ['abrir-nota', 'CmdOrCtrl+O', 'abrir-nota', 'archivo'], ['buscar', 'CmdOrCtrl+F', 'buscar', 'archivo'],
+    ['guardar', 'CmdOrCtrl+S', 'guardar', 'archivo'], ['abrir-carpeta', 'CmdOrCtrl+Shift+O', 'abrir-carpeta', 'archivo'], ['ajustes', 'CmdOrCtrl+,', 'ajustes', 'archivo'],
+    ['barra-lateral', 'Ctrl+\\', 'barra-lateral', 'ver'], ['terminal', 'Ctrl+`', 'terminal', 'ver'],
+  ]);
+  assert.deepEqual(NAVEGACION.map(n => [n.id, n.accelerator, n.hacer]), [['atras', 'CmdOrCtrl+[', 'atras'], ['adelante', 'CmdOrCtrl+]', 'adelante']]);
+  for (const plataforma of ['darwin', 'win32', 'linux']) {
+    const ver = elemento(plantillaMenu({ plataforma }), 'ver');
+    assert.deepEqual(etiquetas(ver.submenu).filter(Boolean), ['Recargar', 'Atrás', 'Adelante', 'Barra lateral', 'Terminal', 'Acercar', 'Alejar', 'Tamaño real', 'Pantalla completa'], plataforma);
+    for (const n of NAVEGACION) assert.equal(elemento([ver], n.id).accelerator, n.accelerator);
+    assert.ok(!ATAJOS.filter(a => a.menu === 'ver').some(a => /CmdOrCtrl/.test(a.accelerator)), 'Barra lateral y Terminal llevan Ctrl explícito: ⌘` en Mac es «siguiente ventana»');
+  }
   // ⌘K / Ctrl+K es de las acciones rápidas (un bloque posterior): ningún elemento del menú la lleva, en ninguna plataforma.
   assert.deepEqual(RESERVADOS, ['CmdOrCtrl+K']);
   for (const plataforma of ['darwin', 'win32', 'linux']) for (const e of todos(plantillaMenu({ plataforma, recientes }))) assert.ok(!e.accelerator || !RESERVADOS.includes(e.accelerator), `${e.label} usa ${e.accelerator}`);
@@ -55,10 +66,11 @@ test('los aceleradores (Roberto, §8.1): ⌘O abrir nota, ⌘F buscar, ⌘T nuev
 test('cada acción propia manda su nombre por `accion`, los recientes abren su carpeta y los de Ayuda llaman a lo suyo', () => {
   const a = anotador();
   const p = plantillaMenu({ plataforma: 'linux', recientes, acciones: a.acciones });
-  for (const id of ['abrir-nota', 'buscar', 'nueva-tarea', 'guardar', 'abrir-carpeta', 'ajustes']) elemento(p, id).click();
+  for (const id of ['nueva-nota', 'nueva-tarea', 'abrir-nota', 'buscar', 'guardar', 'abrir-carpeta', 'ajustes', 'barra-lateral', 'terminal']) elemento(p, id).click();
+  for (const id of ['atras', 'adelante']) elemento(p, id).click();
   elemento(p, 'reciente:/cuadernos/historia').click();
-  for (const id of ['plan-vivo', 'mostrar-registro', 'diagnostico', 'acerca-de']) elemento(p, id).click();
-  assert.deepEqual(a.lineas, ['accion abrir-nota', 'accion buscar', 'accion nueva-tarea', 'accion guardar', 'accion abrir-carpeta', 'accion ajustes', 'abrir /cuadernos/historia', 'plan', 'registro', 'diagnostico', 'acerca']);
+  for (const id of ['como-se-usa', 'atajos', 'plan-vivo', 'mostrar-registro', 'diagnostico', 'acerca-de']) elemento(p, id).click();
+  assert.deepEqual(a.lineas, ['accion nueva-nota', 'accion nueva-tarea', 'accion abrir-nota', 'accion buscar', 'accion guardar', 'accion abrir-carpeta', 'accion ajustes', 'accion barra-lateral', 'accion terminal', 'atras', 'adelante', 'abrir /cuadernos/historia', 'uso', 'atajos', 'plan', 'registro', 'diagnostico', 'acerca']);
   assert.equal(CANAL, 'accion', 'el canal que escucha el preload');
   // Sin acciones (pintar el menú sin app detrás), pulsar no falla.
   const sola = plantillaMenu({ plataforma: 'darwin', recientes });
@@ -81,7 +93,6 @@ test('Edición trae los roles estándar (sin ellos en Mac no hay copiar y pegar)
   assert.deepEqual(roles([elemento(p, 'edicion')]), ['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll']);
   assert.deepEqual(etiquetas(elemento(p, 'edicion').submenu).filter(Boolean), ['Deshacer', 'Rehacer', 'Cortar', 'Copiar', 'Pegar', 'Seleccionar todo']);
   assert.deepEqual(roles([elemento(p, 'ver')]), ['reload', 'zoomIn', 'zoomOut', 'resetZoom', 'togglefullscreen']);
-  assert.deepEqual(etiquetas(elemento(p, 'ver').submenu).filter(Boolean), ['Recargar', 'Acercar', 'Alejar', 'Tamaño real', 'Pantalla completa']);
   // Todo lo que tiene etiqueta está en castellano (sin palabras de los roles en inglés) y todo lo que no es separador tiene etiqueta o rol.
   for (const e of todos(p)) {
     if (e.type === 'separator') continue;
@@ -118,10 +129,15 @@ test('el texto del Diagnóstico lleva versión, Electron, Node, Chromium, puerto
   assert.match(textoDiagnostico({ versiones: {} }), /Entorno de la shell: sin resolver\nPATH: \(sin resolver\)/);
 });
 
-test('el plan vivo se abre en el repo público, sin token ni nada más en la URL', () => {
+test('Ayuda abre páginas del repo público, sin token ni nada más en la URL: el README (cómo se usa), su sección Teclado (atajos) y el plan vivo', () => {
   assert.equal(REPO, 'https://github.com/rsotor/cuaderno-app');
+  assert.equal(URL_COMO_SE_USA, 'https://github.com/rsotor/cuaderno-app#readme');
+  assert.equal(URL_ATAJOS, 'https://github.com/rsotor/cuaderno-app#teclado');
   assert.equal(URL_PLAN_VIVO, 'https://github.com/rsotor/cuaderno-app/blob/main/docs/planes/plan-vivo.md');
   assert.doesNotMatch(URL_PLAN_VIVO, /[?#]/);
+  for (const u of [URL_COMO_SE_USA, URL_ATAJOS, URL_PLAN_VIVO]) assert.doesNotMatch(u, /\?/);
+  // La sección del README existe con ese ancla (GitHub hace el ancla del título «## Teclado»).
+  assert.match(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'README.md'), 'utf8'), /^## Teclado$/m);
 });
 
 test('elemento() busca por id en cualquier nivel y devuelve null si no está', () => {

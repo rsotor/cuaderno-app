@@ -16,8 +16,8 @@ npm run app                              # o npm run app -- <carpeta-del-cuadern
 ```
 
 Abre el último cuaderno que usaste (o la pantalla de cuadernos, con «Elegir carpeta…» para abrir otro con el diálogo del
-sistema; arrastrar una carpeta al icono también vale). El menú va en castellano y trae los atajos de la app: ⌘O abrir nota,
-⌘F buscar, ⌘T nueva tarea, ⌘S guardar, ⇧⌘O abrir carpeta y ⌘, ajustes (Ctrl en Windows y Linux). Si algo falla, Ayuda →
+sistema; arrastrar una carpeta al icono también vale). El menú va en castellano y trae los atajos de la app (la tabla, en
+[Teclado](#teclado)). Si algo falla, Ayuda →
 «Mostrar registro» abre `registro.log` (en la carpeta de configuración) y «Diagnóstico» dice versiones, puerto, `PATH` y si
 la terminal ha cargado. Los instaladores (`.dmg` y `.exe`, sin firma: el sistema avisa la primera vez) y cómo instalarlos:
 [`INSTALAR.md`](INSTALAR.md). El plan y lo decidido: `docs/planes/electron.md`.
@@ -49,6 +49,27 @@ en un ordenador normal hace falta `npx playwright install chromium` una vez, o l
 de otro Chromium). `npm run test:electron` lanza los recorridos de la app de escritorio (necesita el binario de Electron;
 sin pantalla, `xvfb-run -a npm run test:electron`). `node pruebas/recorrido.js <carpeta>` recorre un cuaderno y lista los
 enlaces rotos.
+
+## Teclado
+
+Los atajos de la app de escritorio (⌘ en Mac; Ctrl en Windows y Linux, salvo donde se dice Ctrl, que es Ctrl en los tres).
+En la web, los de la página siguen igual (Ctrl K buscador, Ctrl \ barra lateral, Ctrl ` terminal, E editar, C comentar).
+
+| Atajo | Menú | Qué hace |
+|---|---|---|
+| ⌘N | Archivo → Nueva nota | el diálogo de nueva nota |
+| ⌘T | Archivo → Nueva tarea | la casilla «Nueva tarea» si estás en Tareas; si no, el buscador con «+ » (Enter la añade) |
+| ⌘O | Archivo → Abrir nota… | el buscador con el texto seleccionado: nombre de nota o carpeta, Enter abre |
+| ⌘F | Archivo → Buscar… | el buscador (hoy, lo mismo que ⌘O) |
+| ⌘S | Archivo → Guardar | guardar en el repositorio del cuaderno |
+| ⇧⌘O | Archivo → Abrir carpeta… | cambiar de cuaderno con el diálogo del sistema |
+| — | Archivo → Cuadernos recientes | los últimos cuadernos abiertos |
+| ⌘, | Archivo → Ajustes… (en Mac, Cuaderno → Ajustes…) | Ajustes |
+| ⌘[ / ⌘] | Ver → Atrás / Adelante | el historial de la ventana |
+| Ctrl \ | Ver → Barra lateral | plegar y desplegar la barra lateral |
+| Ctrl ` | Ver → Terminal | abrir y cerrar la terminal |
+| ⌘R, ⌘+, ⌘−, ⌘0 | Ver → Recargar, Acercar, Alejar, Tamaño real | los del sistema |
+| ⌘K | — | reservada: será la paleta de acciones rápidas |
 
 ## Estado
 
