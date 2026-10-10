@@ -114,4 +114,15 @@ function esquemaPermitido(url) {
 const TEMAS_NATIVOS = { auto: 'system', claro: 'light', oscuro: 'dark' };
 function temaNativo(tema) { return TEMAS_NATIVOS[tema] || 'system'; }
 
-module.exports = { entornoDeLaShell, ejecutarShell, nodeDelKit, esquemaPermitido, temaNativo, parsear, respaldo, MARCADOR, IMPORTAR, TOPE, ESQUEMAS };
+// Las variables de prueba de la app (sustituyen diálogos y el navegador por líneas del registro, mueven el lock de instancia
+// única): solo valen sin empaquetar (`npm run app`, los recorridos). En la app empaquetada (`app.isPackaged`) se ignoran, para
+// que nadie pueda, con una variable en su sesión, dejar la app sin diálogos o sin lock. CUADERNO_CONFIG_DIR NO está aquí:
+// cambiar de carpeta de configuración es legítimo también empaquetada (y el hijo la necesita).
+const VARIABLES_DE_PRUEBA = ['CUADERNO_SIN_DIALOGO', 'CUADERNO_SIN_NAVEGADOR', 'CUADERNO_DIALOGO_PRUEBA', 'CUADERNO_USERDATA'];
+function sinVariablesDePrueba(env) {
+  const limpio = { ...env };
+  for (const v of VARIABLES_DE_PRUEBA) delete limpio[v];
+  return limpio;
+}
+
+module.exports = { entornoDeLaShell, ejecutarShell, nodeDelKit, esquemaPermitido, temaNativo, sinVariablesDePrueba, parsear, respaldo, MARCADOR, IMPORTAR, TOPE, ESQUEMAS, VARIABLES_DE_PRUEBA };

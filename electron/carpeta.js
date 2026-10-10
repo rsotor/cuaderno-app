@@ -29,9 +29,11 @@ function carpetaDeArgv(argv, { empaquetada = false, existe, cwd = process.cwd() 
   return null;
 }
 
-// El remitente de un mensaje IPC tiene que ser nuestra pantalla: la URL de su frame empieza por http://localhost:<puerto>/.
-function remitenteValido(url, puerto) {
-  return Number.isInteger(puerto) && puerto > 0 && typeof url === 'string' && url.startsWith(`http://localhost:${puerto}/`);
+// El remitente de un mensaje IPC tiene que ser nuestra pantalla: el ORIGEN de su frame (WebFrameMain.origin, Electron 44)
+// es exactamente http://localhost:<puerto>. El origen y no la URL: un .html del cuaderno servido con CSP `sandbox` tiene
+// una URL http://localhost:<puerto>/fichero/… que pasaría, pero su origen es opaco («null») y así se rechaza.
+function remitenteValido(origen, puerto) {
+  return Number.isInteger(puerto) && puerto > 0 && typeof origen === 'string' && origen === `http://localhost:${puerto}`;
 }
 
 // Una petición HTTP al servidor hijo que resuelve con { status, cuerpo }. Inyectable en los tests.
@@ -97,10 +99,10 @@ function crearAbridor({ electron, estado, anotar, existe, recargar, env = proces
     if (c) abridor.llegada(c, 'segunda instancia');
   });
   // El diálogo del sistema, pedido por la pantalla. Solo atiende a nuestra pantalla: cualquier otro frame (un .html del
-  // cuaderno en su iframe, con origen opaco) se rechaza y queda en el registro.
+  // cuaderno en su iframe, con origen opaco «null») se rechaza y queda en el registro.
   ipcMain.handle(CANAL, async evento => {
-    const url = evento && evento.senderFrame ? evento.senderFrame.url : null;
-    if (!remitenteValido(url, estado.puerto)) { anotar(`petición de ${CANAL} de un remitente que no es la pantalla, rechazada: ${url || '(sin frame)'}`); throw new Error('remitente no permitido'); }
+    const origen = evento && evento.senderFrame ? evento.senderFrame.origin : null;
+    if (!remitenteValido(origen, estado.puerto)) { anotar(`petición de ${CANAL} de un remitente que no es la pantalla, rechazada: ${origen || '(sin frame)'}`); throw new Error('remitente no permitido'); }
     if (env.CUADERNO_DIALOGO_PRUEBA !== undefined) { anotar(`diálogo de carpeta sustituido (CUADERNO_DIALOGO_PRUEBA): ${env.CUADERNO_DIALOGO_PRUEBA || 'cancelado'}`); return env.CUADERNO_DIALOGO_PRUEBA || null; }
     const r = await dialog.showOpenDialog(estado.ventana, DIALOGO);
     return r && !r.canceled && Array.isArray(r.filePaths) && r.filePaths.length ? r.filePaths[0] : null;

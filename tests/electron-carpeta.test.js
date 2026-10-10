@@ -29,7 +29,7 @@ function montar({ argv = ['/apps/electron', '.'], env = {}, puerto = null, token
   const abridor = crearAbridor({ electron, estado, anotar: l => lineas.push(l), existe, env, argv, cwd: '/trabajo', empaquetada, peticion, recargar: () => { pasos.push('recargar'); return true; } });
   return { abridor, estado, eventos, canales, lineas, peticiones, dialogos, pasos, ventana };
 }
-const invocar = (m, url) => m.canales[CANAL]({ senderFrame: url == null ? null : { url } });
+const invocar = (m, origen) => m.canales[CANAL]({ senderFrame: origen == null ? null : { origin: origen, url: `${origen}/` } });
 
 test('carpetaDeArgv: el primer argumento que es una carpeta, saltando el ejecutable, la ruta de la app sin empaquetar (y «.») y los flags; relativas contra cwd; sin carpeta, null', () => {
   const o = { existe, cwd: '/cuadernos' };
@@ -46,50 +46,54 @@ test('carpetaDeArgv: el primer argumento que es una carpeta, saltando el ejecuta
   assert.equal(carpetaDeArgv(['/apps/electron', '.', '/cuadernos/a'], { cwd: '/', existe: () => { throw new Error('EACCES'); } }), null, 'si no se puede mirar, no se abre');
 });
 
-test('remitenteValido: solo http://localhost:<puerto>/… con nuestro puerto; sin puerto aún, nada vale', () => {
-  assert.equal(remitenteValido('http://localhost:7331/', 7331), true);
-  assert.equal(remitenteValido('http://localhost:7331/#/cuadernos', 7331), true);
-  assert.equal(remitenteValido('http://localhost:7332/', 7331), false);
-  assert.equal(remitenteValido('http://localhost:73310/', 7331), false, 'el puerto es entero, no un prefijo');
-  assert.equal(remitenteValido('http://127.0.0.1:7331/', 7331), false, 'la ventana entra por localhost');
-  assert.equal(remitenteValido('https://localhost:7331/', 7331), false);
-  assert.equal(remitenteValido('http://localhost:7331/', null), false);
-  assert.equal(remitenteValido(null, 7331), false);
+test('remitenteValido: el origen del frame tiene que ser exactamente http://localhost:<puerto>; «null» (un .html del cuaderno con CSP sandbox, origen opaco) se rechaza aunque su URL sea nuestra; sin puerto aún, nada vale', () => {
+  assert.equal(remitenteValido('http://localhost:7331', 7331), true);
+  assert.equal(remitenteValido('null', 7331), false, 'el origen opaco del iframe con sandbox');
+  assert.equal(remitenteValido('http://localhost:7331/', 7331), false, 'es un origen, no una URL');
+  assert.equal(remitenteValido('http://localhost:7331/fichero/x.html', 7331), false);
+  assert.equal(remitenteValido('http://localhost:7332', 7331), false);
+  assert.equal(remitenteValido('http://localhost:73310', 7331), false, 'el puerto es entero, no un prefijo');
+  assert.equal(remitenteValido('http://127.0.0.1:7331', 7331), false, 'la ventana entra por localhost');
+  assert.equal(remitenteValido('https://localhost:7331', 7331), false);
+  assert.equal(remitenteValido('http://localhost:7331', null), false);
+  assert.equal(remitenteValido(null, 7331), false); assert.equal(remitenteValido(undefined, 7331), false);
   assert.equal(remitenteValido('about:blank', 7331), false);
 });
 
-test('el canal elegir-carpeta: con un remitente que no es la pantalla (otro puerto, un iframe sin frame) rechaza y lo anota; nada se abre', async () => {
+test('el canal elegir-carpeta: con un remitente que no es la pantalla (otro puerto, el origen opaco «null» de un .html del cuaderno, sin frame) rechaza y lo anota; nada se abre', async () => {
   const m = montar({ puerto: 7331 });
-  await assert.rejects(invocar(m, 'http://localhost:9999/'), /remitente no permitido/);
+  await assert.rejects(invocar(m, 'http://localhost:9999'), /remitente no permitido/);
+  await assert.rejects(m.canales[CANAL]({ senderFrame: { origin: 'null', url: 'http://localhost:7331/fichero/material/pagina.html' } }), /remitente no permitido/);
   await assert.rejects(invocar(m, null), /remitente no permitido/);
   await assert.rejects(m.canales[CANAL]({}), /remitente no permitido/);
   assert.equal(m.dialogos.length, 0);
-  assert.ok(m.lineas.includes(`petición de ${CANAL} de un remitente que no es la pantalla, rechazada: http://localhost:9999/`));
+  assert.ok(m.lineas.includes(`petición de ${CANAL} de un remitente que no es la pantalla, rechazada: http://localhost:9999`));
+  assert.ok(m.lineas.includes(`petición de ${CANAL} de un remitente que no es la pantalla, rechazada: null`));
   assert.ok(m.lineas.includes(`petición de ${CANAL} de un remitente que no es la pantalla, rechazada: (sin frame)`));
 });
 
 test('el canal elegir-carpeta: CUADERNO_DIALOGO_PRUEBA con ruta devuelve la ruta sin diálogo; vacía es cancelar (null); y queda anotado', async () => {
   const con = montar({ puerto: 7331, env: { CUADERNO_DIALOGO_PRUEBA: '/cuadernos/b' } });
-  assert.equal(await invocar(con, 'http://localhost:7331/'), '/cuadernos/b');
+  assert.equal(await invocar(con, 'http://localhost:7331'), '/cuadernos/b');
   assert.equal(con.dialogos.length, 0, 'sin diálogo');
   assert.ok(con.lineas.includes('diálogo de carpeta sustituido (CUADERNO_DIALOGO_PRUEBA): /cuadernos/b'));
   const vacia = montar({ puerto: 7331, env: { CUADERNO_DIALOGO_PRUEBA: '' } });
-  assert.equal(await invocar(vacia, 'http://localhost:7331/'), null);
+  assert.equal(await invocar(vacia, 'http://localhost:7331'), null);
   assert.equal(vacia.dialogos.length, 0);
   assert.ok(vacia.lineas.includes('diálogo de carpeta sustituido (CUADERNO_DIALOGO_PRUEBA): cancelado'));
 });
 
 test('el canal elegir-carpeta sin la variable: abre el diálogo del sistema sobre la ventana, solo carpetas; devuelve la elegida, o null si se cancela', async () => {
   const elegida = montar({ puerto: 7331, dialogo: { canceled: false, filePaths: ['/cuadernos/c'] } });
-  assert.equal(await invocar(elegida, 'http://localhost:7331/'), '/cuadernos/c');
+  assert.equal(await invocar(elegida, 'http://localhost:7331'), '/cuadernos/c');
   assert.equal(elegida.dialogos.length, 1);
   assert.equal(elegida.dialogos[0].ventana, elegida.ventana);
   assert.deepEqual(elegida.dialogos[0].opciones, DIALOGO);
   assert.ok(DIALOGO.properties.includes('openDirectory') && !DIALOGO.properties.includes('openFile'));
   const cancelada = montar({ puerto: 7331 });
-  assert.equal(await invocar(cancelada, 'http://localhost:7331/'), null);
+  assert.equal(await invocar(cancelada, 'http://localhost:7331'), null);
   const rara = montar({ puerto: 7331, dialogo: { canceled: false, filePaths: [] } });
-  assert.equal(await invocar(rara, 'http://localhost:7331/'), null);
+  assert.equal(await invocar(rara, 'http://localhost:7331'), null);
 });
 
 test('la carpeta de argv queda pendiente y tomar() la da una vez (va al hijo en CUADERNO_CARPETA); sin carpeta, pendiente es null', () => {

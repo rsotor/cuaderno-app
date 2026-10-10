@@ -11,7 +11,7 @@
 // will-prevent-unload): si se matara al hijo ahí, la app seguiría viva con el servidor muerto y nadie lo relanzaría.
 const fs = require('node:fs');
 const path = require('node:path');
-const { entornoDeLaShell } = require('./entorno');
+const { entornoDeLaShell, sinVariablesDePrueba, VARIABLES_DE_PRUEBA } = require('./entorno');
 const { crearAbridor } = require('./carpeta');
 const registroPorDefecto = require('./registro');
 const ventanaApp = require('./ventana');   // lo del navegador que en la app cambia: enlaces fuera, cerrar con cambios, permisos, tema
@@ -29,11 +29,18 @@ const sinToken = texto => String(texto).replace(/\?t=[0-9a-f]+/g, '?t=…');
 // Devuelve el estado (ventana, hijo, puerto, entorno, muertes, cerrando) y `listo`, la promesa del arranque (true si
 // la ventana cargó la app). Variables de prueba: CUADERNO_USERDATA (dónde va el lock de instancia única) y
 // CUADERNO_SIN_DIALOGO (el diálogo de error se anota y se da por cerrado; en ventana.js, además, su valor fija la respuesta
-// a «¿Descartar lo escrito?») y CUADERNO_DIALOGO_PRUEBA (electron/carpeta.js). `vigilar`: el fs.watch de config.json;
+// a «¿Descartar lo escrito?») y CUADERNO_DIALOGO_PRUEBA (electron/carpeta.js); en la app empaquetada (app.isPackaged) las
+// cuatro se ignoran (entorno.sinVariablesDePrueba) y queda anotado. `vigilar`: el fs.watch de config.json;
 // `argv`, `cwd` y `peticion` son del abridor de carpetas (carpeta.js); todos inyectables para los tests.
 function arrancar({ electron, config, env = process.env, entorno = entornoDeLaShell, registro = registroPorDefecto, topePuerto = TOPE_PUERTO, tregua = TREGUA, ahora = Date.now, execPath = process.execPath, existe = r => fs.statSync(r).isDirectory(), vigilar = undefined, argv = process.argv, cwd = process.cwd(), peticion }) {
   const { app, BrowserWindow, utilityProcess, dialog } = electron;
   const anotar = linea => registro.escribir(`[app] ${sinToken(linea)}`);
+  // Empaquetada, las variables de prueba no valen: el `env` que ven carpeta.js, ventana.js, menu.js y el hijo es el limpio.
+  if (app.isPackaged) {
+    const puestas = VARIABLES_DE_PRUEBA.filter(v => v in env);
+    env = sinVariablesDePrueba(env);
+    if (puestas.length) anotar(`variables de prueba ignoradas (app empaquetada): ${puestas.join(', ')}`);
+  }
   const estado = { ventana: null, hijo: null, puerto: null, token: null, pty: null, entorno: null, muertes: [], cerrando: false, listo: null, menu: null };
 
   // userData solo para lo de Electron (el lock de instancia única va ahí); tiene que fijarse antes de `ready`.

@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { entornoDeLaShell, ejecutarShell, nodeDelKit, esquemaPermitido, temaNativo, parsear, respaldo, MARCADOR, ESQUEMAS, TOPE } = require('../electron/entorno');
+const { entornoDeLaShell, ejecutarShell, nodeDelKit, esquemaPermitido, temaNativo, sinVariablesDePrueba, parsear, respaldo, MARCADOR, ESQUEMAS, TOPE, VARIABLES_DE_PRUEBA } = require('../electron/entorno');
 
 const sinSh = process.platform === 'win32';   // las shells falsas son scripts de sh: en Windows no se ejecutan (ni hace falta)
 const base = fs.mkdtempSync(path.join(os.tmpdir(), 'cuaderno-entorno-'));
@@ -167,4 +167,12 @@ test('esquemaPermitido: solo http, https y mailto van al navegador del sistema; 
 test('temaNativo: auto → system, claro → light, oscuro → dark; cualquier otra cosa → system', () => {
   assert.equal(temaNativo('auto'), 'system'); assert.equal(temaNativo('claro'), 'light'); assert.equal(temaNativo('oscuro'), 'dark');
   for (const t of ['dark', 'light', 'system', '', null, undefined, 3, 'Oscuro']) assert.equal(temaNativo(t), 'system', String(t));
+});
+
+test('sinVariablesDePrueba: quita las cuatro variables de prueba (diálogos, navegador, diálogo de carpeta, userData) y deja CUADERNO_CONFIG_DIR y lo demás; no toca el env de partida', () => {
+  assert.deepEqual(VARIABLES_DE_PRUEBA, ['CUADERNO_SIN_DIALOGO', 'CUADERNO_SIN_NAVEGADOR', 'CUADERNO_DIALOGO_PRUEBA', 'CUADERNO_USERDATA']);
+  const env = { PATH: '/bin', CUADERNO_CONFIG_DIR: '/cfg', CUADERNO_SIN_DIALOGO: '1', CUADERNO_SIN_NAVEGADOR: '1', CUADERNO_DIALOGO_PRUEBA: '/x', CUADERNO_USERDATA: '/ud', CUADERNO_NODE: '/n' };
+  assert.deepEqual(sinVariablesDePrueba(env), { PATH: '/bin', CUADERNO_CONFIG_DIR: '/cfg', CUADERNO_NODE: '/n' });
+  assert.equal(Object.keys(env).length, 7, 'el de partida sigue entero');
+  assert.deepEqual(sinVariablesDePrueba({}), {});
 });

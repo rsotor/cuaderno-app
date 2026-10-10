@@ -22,7 +22,7 @@ const esperar = ms => new Promise(r => setTimeout(r, ms));
 // usa de webContents, session, shell y nativeTheme: aquí solo se comprueba que se enganchan; su conducta, en
 // electron-ventana.test.js; lo que menu.js usa de Menu, dialog.showMessageBox, shell y clipboard), anotando cada paso en
 // `pasos`. `fallosURL`: errores con los que loadURL rechaza, en orden, antes de empezar a cargar bien.
-function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false } = {}) {
+function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false, empaquetada = false } = {}) {
   const pasos = [], ventanas = [], hijos = [], dialogos = [], salidas = [], abiertos = [], canales = {}, menus = [], rutasAbiertas = [], portapapeles = [];
   const eventos = new EventEmitter();
   let pid = 100;
@@ -49,7 +49,7 @@ function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false } = 
     return h;
   } };
   const app = {
-    rutas: {}, setPath(k, v) { this.rutas[k] = v; }, requestSingleInstanceLock() { return lock; },
+    rutas: {}, isPackaged: empaquetada, setPath(k, v) { this.rutas[k] = v; }, requestSingleInstanceLock() { return lock; },
     whenReady() { return Promise.resolve(); }, on(e, f) { eventos.on(e, f); }, emitir(e, ...a) { eventos.emit(e, ...a); },
     // quit(): before-quit y, como nadie lo cancela en el falso, will-quit (en Electron, un «Seguir editando» corta entre los dos).
     quit() { pasos.push('quit'); salidas.push('quit'); eventos.emit('before-quit'); eventos.emit('will-quit'); }, exit(c) { pasos.push(`exit ${c}`); salidas.push(c); },
@@ -77,8 +77,8 @@ const entornoFalso = (f, { PATH = '/shell/bin:/usr/bin' } = {}) => ({ env }) => 
 
 // Monta un arranque: `lock`, `fallosURL` y `sistemaOscuro` son del Electron falso; lo demás va a `arrancar`. Sin argumentos
 // (argv solo con el ejecutable y la app), toda ruta «existe», y las peticiones al hijo (POST /api/abrir) se anotan y contestan 200.
-function montar({ env = {}, config = configFalsa(), topePuerto = 500, lock, fallosURL, sistemaOscuro, ...paraArrancar } = {}) {
-  const f = electronFalso({ lock, fallosURL, sistemaOscuro });
+function montar({ env = {}, config = configFalsa(), topePuerto = 500, lock, fallosURL, sistemaOscuro, empaquetada, ...paraArrancar } = {}) {
+  const f = electronFalso({ lock, fallosURL, sistemaOscuro, empaquetada });
   const registro = registroFalso();
   const entorno = entornoFalso(f);
   const vigilante = vigilanteFalso();
@@ -376,6 +376,31 @@ test('CUADERNO_SIN_DIALOGO: el diálogo se sustituye por una línea en el regist
   assert.ok(roto.registro.lineas.includes('[app] no se ha podido enseñar el diálogo: sin pantalla'));
 });
 
+test('app empaquetada (isPackaged): las variables de prueba se ignoran y queda anotado (userData no se toca, el diálogo de error se enseña, el hijo no las hereda); CUADERNO_CONFIG_DIR se respeta', async () => {
+  const variables = { CUADERNO_USERDATA: '/tmp/ud', CUADERNO_SIN_DIALOGO: '1', CUADERNO_SIN_NAVEGADOR: '1', CUADERNO_DIALOGO_PRUEBA: '/cuadernos/x' };
+  const m = montar({ empaquetada: true, env: { ...variables, CUADERNO_CONFIG_DIR: '/cfg' }, argv: ['/apps/Cuaderno'] });
+  await tic();
+  assert.deepEqual(m.electron.app.rutas, {}, 'userData sin tocar: el lock va donde Electron diga');
+  assert.ok(m.registro.lineas.includes('[app] variables de prueba ignoradas (app empaquetada): CUADERNO_SIN_DIALOGO, CUADERNO_SIN_NAVEGADOR, CUADERNO_DIALOGO_PRUEBA, CUADERNO_USERDATA'));
+  for (const v of Object.keys(variables)) assert.equal(v in m.hijos[0].opciones.env, false, `${v} llega al hijo`);
+  assert.equal(m.hijos[0].opciones.env.CUADERNO_CONFIG_DIR, '/cfg');
+  m.hijos[0].escucha(7331, 't0k'); await m.estado.listo;
+  // El canal de carpeta abre el diálogo de verdad (no la ruta fija) y el enlace fuera va a openExternal de verdad.
+  m.electron.dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] });
+  assert.equal(await m.canales['elegir-carpeta']({ senderFrame: { origin: 'http://localhost:7331' } }), null);
+  m.ventanas[0].webContents.emit('will-navigate', { preventDefault() {} }, 'https://example.com/'); await tic();
+  assert.deepEqual(m.abiertos, ['https://example.com/']);
+  // Y el diálogo de error se enseña (CUADERNO_SIN_DIALOGO no lo salta).
+  m.hijos[0].muere(1); await tic(); m.hijos[1].muere(1); await tic();
+  assert.equal(m.dialogos.length, 1);
+  // Sin empaquetar, las mismas variables valen (lo de siempre) y no se anota nada.
+  const dev = montar({ env: variables });
+  await tic();
+  assert.deepEqual(dev.electron.app.rutas, { userData: '/tmp/ud' });
+  assert.ok(!dev.registro.lineas.some(l => /variables de prueba ignoradas/.test(l)));
+  dev.electron.app.emitir('will-quit');
+});
+
 test('segunda instancia: sin el lock, sale sin crear nada; con el lock, second-instance trae la ventana al frente (y la restaura si está minimizada)', async () => {
   const segunda = montar({ lock: false });
   assert.equal(await segunda.estado.listo, false);
@@ -457,8 +482,9 @@ test('la segunda instancia con una carpeta en sus argumentos la abre en el servi
 test('el canal IPC elegir-carpeta queda registrado y, desde nuestra pantalla, con CUADERNO_DIALOGO_PRUEBA devuelve esa ruta sin abrir diálogo', async () => {
   const m = await arrancado({ env: { CUADERNO_DIALOGO_PRUEBA: '/cuadernos/elegida' } });
   assert.equal(typeof m.canales['elegir-carpeta'], 'function');
-  assert.equal(await m.canales['elegir-carpeta']({ senderFrame: { url: 'http://localhost:7331/' } }), '/cuadernos/elegida');
-  await assert.rejects(m.canales['elegir-carpeta']({ senderFrame: { url: 'http://localhost:7332/' } }), /remitente no permitido/);
+  assert.equal(await m.canales['elegir-carpeta']({ senderFrame: { origin: 'http://localhost:7331', url: 'http://localhost:7331/' } }), '/cuadernos/elegida');
+  await assert.rejects(m.canales['elegir-carpeta']({ senderFrame: { origin: 'http://localhost:7332', url: 'http://localhost:7332/' } }), /remitente no permitido/);
+  await assert.rejects(m.canales['elegir-carpeta']({ senderFrame: { origin: 'null', url: 'http://localhost:7331/fichero/x.html' } }), /remitente no permitido/, 'el origen opaco de un .html del cuaderno');
 });
 
 // ---------- T5: el menú (electron/menu.js enganchado por app.js; lo puro, en electron-menu.test.js)
