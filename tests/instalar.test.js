@@ -209,7 +209,7 @@ test('no reinstala dependencias si el lock coincide con el de la última npm ci;
   const lanzadas = cambiado.lanzadas();
   assert.ok(lanzadas.indexOf('npm ci') > 0 && lanzadas.indexOf('npm ci') < lanzadas.findIndex(o => o.includes('electron-builder')));
   assert.ok(lanzadas.includes('node /repo/node_modules/electron/install.js'), 'npm ci borra el binario de Electron');
-  assert.equal(cambiado.ficheros.get(`/repo/${MARCA_LOCK}`), hashDe('lock-v3'));
+  assert.equal(cambiado.ficheros.get(`/repo/${MARCA_LOCK.replace(/\\/g, '/')}`), hashDe('lock-v3'), 'la clave, con / como guarda el fs falso (en Windows MARCA_LOCK lleva \\)');
 });
 
 test('sin node_modules o sin marca del lock, instala las dependencias; sin binario de Electron, solo lo baja', () => {
