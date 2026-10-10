@@ -35,20 +35,21 @@ function chromiumFalso(anotaciones) {
   };
 }
 
-test('la página del icono: con placa, un cuadrado redondeado del color de la hoja (radio 22 %) con el SVG al 70 % centrado y la tinta como color', () => {
+test('la página del icono: la placa de 832 centrada en el lienzo de 1024 (margen transparente), del color de la hoja, radio 22 % de la placa, el SVG al 70 % de la placa y la tinta como color', () => {
   const html = icono.paginaDelIcono(SVG, 1024);
   assert.match(html, /<!doctype html><html lang="es">/);
   assert.match(html, /color:#1b1b1f/, 'currentColor vale la tinta en claro');
-  assert.match(html, /background:#fbfbfc;border-radius:225px/, 'la placa: --papel en claro y el 22 % de 1024');
-  assert.match(html, /\.placa>svg\{display:block;width:717px;height:717px\}/, 'el dibujo ocupa el 70 % del lado');
-  assert.match(html, /place-items:center/);
-  assert.ok(html.includes(`<div class="placa">${SVG}</div>`), 'el SVG va en línea dentro de la placa');
-  assert.equal(icono.FONDO, '#fbfbfc'); assert.equal(icono.TINTA, '#1b1b1f'); assert.equal(icono.RADIO, 0.22); assert.equal(icono.OCUPA, 0.7);
+  assert.match(html, /\.lienzo\{width:1024px;height:1024px;display:grid;place-items:center\}/, 'el lienzo entero, transparente, con la placa centrada');
+  assert.match(html, /\.placa\{width:832px;height:832px;display:grid;place-items:center;background:#fbfbfc;border-radius:183px;\}/, 'la placa: 832 de 1024, --papel en claro y el 22 % de 832');
+  assert.match(html, /\.placa>svg\{display:block;width:582px;height:582px\}/, 'el dibujo ocupa el 70 % de la placa');
+  assert.ok(html.includes(`<div class="lienzo"><div class="placa">${SVG}</div></div>`), 'el SVG va en línea dentro de la placa, dentro del lienzo');
+  assert.equal(icono.FONDO, '#fbfbfc'); assert.equal(icono.TINTA, '#1b1b1f'); assert.equal(icono.PLACA, 832 / 1024); assert.equal(icono.RADIO, 0.22); assert.equal(icono.OCUPA, 0.7);
 });
 
 test('la página del icono sin placa: sin fondo ni esquinas, el SVG ocupa el lado entero', () => {
   const html = icono.paginaDelIcono(SVG, 256, { fondo: null });
   assert.doesNotMatch(html, /background:#|border-radius/);
+  assert.match(html, /\.placa\{width:256px;height:256px;display:grid;place-items:center;\}/, 'sin placa no hay margen: el dibujo a lado entero');
   assert.match(html, /\.placa>svg\{display:block;width:256px;height:256px\}/);
 });
 
@@ -81,7 +82,7 @@ test('rasterizar con un Chromium falso: viewport del tamaño pedido en claro, ca
     assert.equal(salida, destino);
     assert.deepEqual(anotaciones.pagina, { viewport: { width: 128, height: 128 }, deviceScaleFactor: 1, colorScheme: 'light' });
     assert.deepEqual(anotaciones.captura, { type: 'png', omitBackground: true, clip: { x: 0, y: 0, width: 128, height: 128 } });
-    assert.match(anotaciones.html, /border-radius:28px/, 'la placa por defecto (22 % de 128)');
+    assert.match(anotaciones.html, /\.placa\{width:104px;height:104px;[^}]*border-radius:23px;\}/, 'la placa por defecto: 104 de 128 (832/1024) y el 22 % de 104');
     assert.deepEqual(icono.leerPng(fs.readFileSync(destino)), { anchura: 128, altura: 128, profundidad: 8, tipoColor: 6 });
     assert.equal(anotaciones.cerrado, true);
     assert.equal(anotaciones.lanzado, 1);

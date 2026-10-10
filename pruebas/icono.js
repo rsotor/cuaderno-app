@@ -5,9 +5,11 @@
 //
 // El logo es la propuesta 3 de docs/diseno/logo/ (la «c» subrayada; decisión de Roberto, 2026-10-10). En el Dock y en la
 // barra de Windows un dibujo de trazos sobre transparente queda raro junto a los demás iconos, así que el dibujo va sobre
-// una PLACA: un cuadrado redondeado (radio del 22 % del lado, como los iconos de macOS) del color de la hoja en claro
-// (`--papel` de public/estilo.css), con la «c» en la tinta oscura y el subrayado amarillo del propio SVG; el dibujo ocupa
-// el 70 % del lado, centrado; sin degradados. Sin placa (--sin-fondo), el dibujo ocupa el lado entero sobre transparente.
+// una PLACA: un cuadrado redondeado de 832 px centrado en el lienzo de 1024 (el margen transparente que llevan los iconos de
+// macOS: así en el Dock no sale más grande que los vecinos; crítica de diseño 2026-10-10, 2), con el radio del 22 % del lado
+// de la placa, del color de la hoja en claro (`--papel` de public/estilo.css), con la «c» en la tinta oscura y el subrayado
+// amarillo del propio SVG; el dibujo ocupa el 70 % de la placa, centrado; sin degradados. Sin placa (--sin-fondo), el
+// dibujo ocupa el lado entero sobre transparente.
 //   npm run icono                                              → docs/diseno/logo/propuesta-3.svg, con placa
 //   node pruebas/icono.js docs/diseno/logo/propuesta-1.svg     → cambiar de logo es esta línea (y hacer commit del PNG)
 //   node pruebas/icono.js [svg] [destino] [tamaño] [--fondo=#rrggbb | --sin-fondo]
@@ -23,8 +25,9 @@ const DESTINO = path.join(RAIZ, 'electron', 'icono', 'icono.png');
 const TAMANO = 1024;
 const TINTA = '#1b1b1f';    // la tinta en claro (--tinta de public/estilo.css): lo que vale `currentColor`
 const FONDO = '#fbfbfc';    // la hoja en claro (--papel de public/estilo.css): el color de la placa
-const RADIO = 0.22;         // radio de las esquinas de la placa, en fracción del lado (como los iconos de macOS)
-const OCUPA = 0.7;          // cuánto del lado ocupa el dibujo sobre la placa
+const PLACA = 832 / 1024;   // cuánto del lienzo ocupa la placa (el resto, margen transparente, como los iconos de macOS)
+const RADIO = 0.22;         // radio de las esquinas de la placa, en fracción del lado de la placa (como los iconos de macOS)
+const OCUPA = 0.7;          // cuánto del lado de la placa ocupa el dibujo
 
 // Rasteriza el SVG (texto) a un PNG cuadrado de `tamano` px en `destino` (crea la carpeta si falta). Devuelve el destino.
 // `fondo`: el color de la placa, o null para dibujar sin placa sobre transparente. `chromium` es inyectable para no abrir
@@ -44,16 +47,18 @@ async function rasterizar(svg, destino = DESTINO, tamano = TAMANO, { fondo = FON
   } finally { await navegador.close(); }
 }
 
-// La página que se fotografía: la placa ocupa el viewport entero (lo de fuera de sus esquinas queda transparente) y el
-// SVG va centrado dentro; sin placa, el SVG ocupa el viewport.
+// La página que se fotografía: el lienzo es el viewport, transparente; la placa (el 81,25 % del lado: 832 de 1024) va
+// centrada en él y el SVG centrado dentro de la placa; sin placa, el SVG ocupa el viewport entero.
 function paginaDelIcono(svg, tamano, { fondo = FONDO, tinta = TINTA } = {}) {
-  const lado = fondo ? Math.round(tamano * OCUPA) : tamano;
-  const placa = fondo ? `background:${fondo};border-radius:${Math.round(tamano * RADIO)}px;` : '';
+  const ladoPlaca = fondo ? Math.round(tamano * PLACA) : tamano;
+  const lado = fondo ? Math.round(ladoPlaca * OCUPA) : tamano;
+  const placa = fondo ? `background:${fondo};border-radius:${Math.round(ladoPlaca * RADIO)}px;` : '';
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><style>
 html,body{margin:0;padding:0;background:transparent;color:${tinta};width:${tamano}px;height:${tamano}px;overflow:hidden}
-.placa{width:${tamano}px;height:${tamano}px;display:grid;place-items:center;${placa}}
+.lienzo{width:${tamano}px;height:${tamano}px;display:grid;place-items:center}
+.placa{width:${ladoPlaca}px;height:${ladoPlaca}px;display:grid;place-items:center;${placa}}
 .placa>svg{display:block;width:${lado}px;height:${lado}px}
-</style></head><body><div class="placa">${svg}</div></body></html>`;
+</style></head><body><div class="lienzo"><div class="placa">${svg}</div></div></body></html>`;
 }
 
 // Las dimensiones de un PNG (su IHDR: anchura y altura en los bytes 16-23, tipo de color en el 25; 6 = RGBA, con
@@ -85,4 +90,4 @@ async function main(argv) {
 
 if (require.main === module) main(process.argv.slice(2)).catch(e => { console.error(e.message); process.exit(1); });
 
-module.exports = { rasterizar, paginaDelIcono, leerPng, leerArgumentos, ORIGEN, DESTINO, TAMANO, TINTA, FONDO, RADIO, OCUPA };
+module.exports = { rasterizar, paginaDelIcono, leerPng, leerArgumentos, ORIGEN, DESTINO, TAMANO, TINTA, FONDO, PLACA, RADIO, OCUPA };
