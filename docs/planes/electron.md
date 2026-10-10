@@ -261,6 +261,9 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
   cierra comprobando puerto libre y `ps` limpio.
 
 ### T2 · Lo del navegador que en la app cambia
+- **Añadido tras T1 (2026-10-10):** `entornoDeLaShell` pasa a asíncrona (`spawn` con promesa en vez de `spawnSync`): hoy
+  el proceso principal no atiende eventos mientras espera a la shell (hasta 10 s; en Linux son 25 ms, el Mac sin medir) y
+  en Mac eso es el menú sin responder. Y el `backgroundColor` con tema `auto` deja de ser blanco: sigue a `nativeTheme`.
 - **Qué:** `setWindowOpenHandler` y `will-navigate` con `esquemaPermitido`; `will-prevent-unload` con el diálogo
   «¿Descartar lo escrito?»; `setPermissionRequestHandler`; `partition` en memoria; `nativeTheme.themeSource = temaNativo(config.tema)` (`auto`/`claro`/`oscuro` → `system`/`light`/`dark`) y
   `backgroundColor` desde `config.tema` (también al cambiar Ajustes: la pantalla avisa por IPC o el padre relee la
@@ -278,6 +281,13 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
 - **Estimación:** un día. **Depende de:** T1.
 
 ### T3 · Guardar y corregir con kit desde la app: el Node del kit
+- **Hecha (2026-10-10, en un árbol aparte, integrada en `7532d26`):** el código lo dejó el spike (`5b613eb`) y T3 lo limpió
+  (`341caf2`) y lo fijó con tests (`f073545`, `cff9a1b`): herramientas del kit y corrector lanzados con el Node inyectado y el
+  entorno fusionado, el entorno de `guardar.js` ya no se congela al cargar (los tests fallan contra el código anterior),
+  `crearServidor({ ejecutarNode })` llega a las rutas de guardar, traer, deshacer, revisión y corrección. Ayudantes en
+  `tests/ayuda.js` (`otroNode()`, copia portable del binario; `herramientasChivatas()`). 117 → tests en verde; ramas de
+  `guardar.js` 82 → 85 %. Visto de paso y fuera de T3, al Inbox del plan vivo: `formulario.js` no pone
+  `GIT_TERMINAL_PROMPT=0` ni trata el tiempo agotado al corregir (debería reutilizar el `ejecutar` de `guardar.js`).
 - **Qué:** `crearServidor({ ejecutarNode })`; `guardar.js` y `formulario.js` dejan de leer `process.execPath` y de
   congelar `ENV` al cargar (función perezosa) y usan lo inyectado (por defecto, lo de siempre: la web no cambia);
   `entorno.js` → `nodeDelKit(env)` devuelve `{ cmd: env.CUADERNO_NODE || process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' } }`
