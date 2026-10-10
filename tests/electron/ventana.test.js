@@ -167,4 +167,8 @@ test('la app de escritorio: al cerrar, el servidor se para (el puerto queda libr
   assert.deepEqual(vivos.map(p => `${p.pid} ${p.args.slice(0, 80)}`), [], 'quedan procesos de la app');
   assert.match(registro(), /\[app\] el servidor ha salido con código/, 'la salida del hijo al cerrar queda anotada');
   assert.doesNotMatch(registro(), /FALLO/, 'cerrar no es un fallo');
+  // Al cerrar, dónde y cuánto medía la ventana queda en config.json (ventana), para abrir igual la próxima vez.
+  const guardada = JSON.parse(fs.readFileSync(path.join(configDir, 'config.json'), 'utf8')).ventana;
+  assert.ok(guardada && Number.isInteger(guardada.x) && Number.isInteger(guardada.y) && guardada.width >= 760 && guardada.height >= 480, `la ventana guardada: ${JSON.stringify(guardada)}`);
+  assert.match(registro(), /\[app\] ventana \d+ × \d+: (el tamaño por defecto|el 90 % del área de trabajo)/, 'al arrancar sin ventana guardada, el tamaño por defecto o el del área');
 });

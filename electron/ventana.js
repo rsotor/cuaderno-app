@@ -21,6 +21,9 @@ const { esquemaPermitido, temaNativo } = require('./entorno');
 const PERMISOS = ['clipboard-sanitized-write'];   // lo único que la pantalla pide: navigator.clipboard.writeText
 const FONDO = { claro: '#e6e8ec', oscuro: '#0e0f12' };   // la mesa de la pantalla (--mesa de public/estilo.css): «Arrancando…» y la pantalla comparten fondo, sin salto al cargar (crítica 2026-10-10, 1)
 const FICHERO_CONFIG = 'config.json';
+// La ventana por defecto (crítica 2026-10-10, 5): 1456 × 900, o el 90 % del área de trabajo si es menor; nunca menos de 760 × 480.
+const VENTANA = { width: 1456, height: 900, minWidth: 760, minHeight: 480 };
+const VISIBLE = 100;   // px de la ventana que tienen que caer en el área de trabajo para dar la posición guardada por buena
 
 const permisoConcedido = permiso => PERMISOS.includes(permiso);
 
@@ -76,6 +79,31 @@ function vigilarTema({ nativeTheme, config, ventana = null, anotar, vigilar = fs
   return { cerrar: () => { if (vigilante) { try { vigilante.close(); } catch { /* ya cerrado */ } vigilante = null; } }, revisar };
 }
 
+// Dónde y cuánto de grande abre la ventana. Con límites guardados (config.json, `ventana`) que caen dentro de una pantalla
+// (la que más los solapa, screen.getDisplayMatching: la barra de título a la vista y al menos VISIBLE px dentro del área de
+// trabajo), ahí, recortados al área si la pantalla es ahora más pequeña; si no, el tamaño por defecto (o el 90 % del área de
+// trabajo de la pantalla principal si es menor) y Electron la centra. Devuelve lo que se pasa a BrowserWindow más `origen`.
+function limitesDeVentana({ screen, guardado = null }) {
+  const area = d => (d && (d.workArea || d.bounds)) || null;
+  if (guardado && Number.isInteger(guardado.x) && Number.isInteger(guardado.y) && Number.isInteger(guardado.width) && Number.isInteger(guardado.height)) {
+    let wa = null;
+    try { wa = area(screen.getDisplayMatching(guardado)); } catch { /* sin pantallas: por defecto */ }
+    if (wa && dentroDelArea(guardado, wa)) {
+      return { x: guardado.x, y: guardado.y, width: Math.max(VENTANA.minWidth, Math.min(guardado.width, wa.width)), height: Math.max(VENTANA.minHeight, Math.min(guardado.height, wa.height)), origen: 'guardado' };
+    }
+  }
+  let wa = null;
+  try { wa = area(screen.getPrimaryDisplay()); } catch { /* sin pantallas */ }
+  if (!wa) return { width: VENTANA.width, height: VENTANA.height, origen: 'defecto' };
+  const width = Math.max(VENTANA.minWidth, Math.min(VENTANA.width, Math.round(wa.width * 0.9))), height = Math.max(VENTANA.minHeight, Math.min(VENTANA.height, Math.round(wa.height * 0.9)));
+  return { width, height, origen: width < VENTANA.width || height < VENTANA.height ? 'area' : 'defecto' };
+}
+// ¿Cae la ventana dentro del área de trabajo? Su borde de arriba (la barra de título) dentro del área, y al menos VISIBLE
+// px de ancho y de alto a la vista: así una ventana de una pantalla desconectada no se abre fuera de la vista.
+function dentroDelArea(v, wa) {
+  return v.y >= wa.y && v.y <= wa.y + wa.height - VISIBLE && v.x + v.width >= wa.x + VISIBLE && v.x <= wa.x + wa.width - VISIBLE;
+}
+
 // Los permisos de la sesión de la partición: solo escribir en el portapapeles.
 function permisos({ session, anotar }) {
   session.setPermissionRequestHandler((webContents, permiso, callback) => {
@@ -122,4 +150,4 @@ function preparar({ ventana, electron, config, env, particion, puerto, anotar, v
   return vigilante;
 }
 
-module.exports = { preparar, prepararVentana, aplicarTema, vigilarTema, colorDeFondo, permisos, permisoConcedido, preguntarDescartar, tratarEnlace, esPropia, esLocalAjena, PERMISOS, FONDO };
+module.exports = { preparar, prepararVentana, aplicarTema, vigilarTema, colorDeFondo, limitesDeVentana, dentroDelArea, permisos, permisoConcedido, preguntarDescartar, tratarEnlace, esPropia, esLocalAjena, PERMISOS, FONDO, VENTANA };

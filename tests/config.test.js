@@ -76,3 +76,19 @@ test('cuadernoAlArrancar: la carpeta pasada manda; si no, el reciente más nuevo
   assert.deepEqual(config.cuadernoAlArrancar(null, recientes, todas, true), { carpeta: null, origen: null });
   assert.deepEqual(config.cuadernoAlArrancar('/x', recientes, todas, true), { carpeta: '/x', origen: 'argumento' });
 });
+
+test('ventana (la de la app de escritorio): se guarda con guardarVentana y se lee; lo que no es {x, y, width, height} entero, o es más pequeño que 760 × 480, vuelve a null; ajustar no la toca', () => {
+  assert.equal(config.leer().ventana, null);
+  assert.deepEqual(config.VENTANA_MINIMA, { width: 760, height: 480 });
+  const c = config.guardarVentana({ x: 40, y: 60, width: 1456, height: 900, extra: 'fuera' });
+  assert.deepEqual(c.ventana, { x: 40, y: 60, width: 1456, height: 900 });
+  assert.deepEqual(config.leer().ventana, { x: 40, y: 60, width: 1456, height: 900 });
+  assert.deepEqual(config.ajustar({ tema: 'claro', ventana: { x: 0, y: 0, width: 800, height: 600 } }).ventana, { x: 40, y: 60, width: 1456, height: 900 }, 'el navegador no cambia la ventana');
+  for (const mala of [null, 'grande', [1, 2, 3, 4], { x: 0, y: 0 }, { x: 0.5, y: 0, width: 800, height: 600 }, { x: 0, y: 0, width: 759, height: 600 }, { x: 0, y: 0, width: 800, height: 479 }, { x: -10, y: 0, width: '800', height: 600 }]) {
+    assert.deepEqual(config.guardarVentana(mala).ventana, { x: 40, y: 60, width: 1456, height: 900 }, `no se guarda ${JSON.stringify(mala)}`);
+  }
+  assert.deepEqual(config.guardarVentana({ x: -10, y: 0, width: 760, height: 480 }).ventana, { x: -10, y: 0, width: 760, height: 480 }, 'x negativa vale (segunda pantalla a la izquierda); el mínimo justo vale');
+  fs.writeFileSync(path.join(config.carpeta(), 'config.json'), JSON.stringify({ ventana: { x: 0, y: 0, width: 100, height: 100 } }));
+  assert.equal(config.leer().ventana, null, 'lo que hay escrito y no vale se lee como null');
+  fs.rmSync(process.env.CUADERNO_CONFIG_DIR, { recursive: true, force: true });
+});

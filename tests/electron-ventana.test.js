@@ -297,3 +297,29 @@ test('«Arrancando…» (electron/arrancando.html): el fondo de la mesa del tema
   assert.match(html, /setTimeout\(\(\) => \{ estado\.textContent = 'Está tardando más de lo normal\. Si no abre, mira Ayuda → Mostrar registro\.'; \}, 12000\)/);
   assert.doesNotMatch(html, /Arrancando…/);
 });
+
+test('limitesDeVentana: por defecto 1456 × 900 (mínimo 760 × 480); en un área de trabajo menor, el 90 % de ella; sin pantallas, el defecto', () => {
+  const pantalla = wa => ({ getPrimaryDisplay: () => ({ workArea: wa }), getDisplayMatching: () => ({ workArea: wa }) });
+  assert.deepEqual(ventana.VENTANA, { width: 1456, height: 900, minWidth: 760, minHeight: 480 });
+  assert.deepEqual(ventana.limitesDeVentana({ screen: pantalla({ x: 0, y: 25, width: 2560, height: 1415 }) }), { width: 1456, height: 900, origen: 'defecto' });
+  assert.deepEqual(ventana.limitesDeVentana({ screen: pantalla({ x: 0, y: 0, width: 1440, height: 877 }) }), { width: 1296, height: 789, origen: 'area' }, 'el 90 % del área de un portátil');
+  assert.deepEqual(ventana.limitesDeVentana({ screen: pantalla({ x: 0, y: 0, width: 800, height: 500 }) }), { width: 760, height: 480, origen: 'area' }, 'nunca menos que el mínimo');
+  assert.deepEqual(ventana.limitesDeVentana({ screen: { getPrimaryDisplay() { throw new Error('sin pantallas'); }, getDisplayMatching() { throw new Error('sin pantallas'); } }, guardado: { x: 0, y: 0, width: 1000, height: 700 } }), { width: 1456, height: 900, origen: 'defecto' });
+  assert.deepEqual(ventana.limitesDeVentana({ screen: { getPrimaryDisplay: () => ({ bounds: { x: 0, y: 0, width: 1280, height: 800 } }) } }), { width: 1152, height: 720, origen: 'area' }, 'sin workArea vale bounds');
+});
+
+test('limitesDeVentana con límites guardados: si caen en la pantalla que más los solapa (barra de título a la vista, 100 px dentro), se restauran recortados al área; fuera de toda pantalla o incompletos, el defecto', () => {
+  const wa = { x: 0, y: 25, width: 1920, height: 1055 };
+  const screen = { getPrimaryDisplay: () => ({ workArea: wa }), getDisplayMatching: () => ({ workArea: wa }) };
+  assert.deepEqual(ventana.limitesDeVentana({ screen, guardado: { x: 120, y: 80, width: 1200, height: 800 } }), { x: 120, y: 80, width: 1200, height: 800, origen: 'guardado' });
+  assert.deepEqual(ventana.limitesDeVentana({ screen, guardado: { x: 1820, y: 80, width: 1200, height: 800 } }), { x: 1820, y: 80, width: 1200, height: 800, origen: 'guardado' }, '100 px a la vista por la derecha: vale');
+  assert.equal(ventana.limitesDeVentana({ screen, guardado: { x: 1830, y: 80, width: 1200, height: 800 } }).origen, 'defecto', 'solo 90 px a la vista por la derecha');
+  assert.deepEqual(ventana.limitesDeVentana({ screen, guardado: { x: 2000, y: 80, width: 1200, height: 800 } }), { width: 1456, height: 900, origen: 'defecto' }, 'a la derecha de la pantalla (un monitor desconectado)');
+  assert.deepEqual(ventana.limitesDeVentana({ screen, guardado: { x: 100, y: 10, width: 1200, height: 800 } }), { width: 1456, height: 900, origen: 'defecto' }, 'la barra de título bajo la barra de menús (y < área)');
+  assert.deepEqual(ventana.limitesDeVentana({ screen, guardado: { x: 100, y: 1000, width: 1200, height: 800 } }), { width: 1456, height: 900, origen: 'defecto' }, 'la barra de título por debajo del área');
+  assert.deepEqual(ventana.limitesDeVentana({ screen, guardado: { x: -1150, y: 80, width: 1200, height: 800 } }), { width: 1456, height: 900, origen: 'defecto' }, 'solo 50 px asoman por la izquierda');
+  assert.deepEqual(ventana.limitesDeVentana({ screen, guardado: { x: -1100, y: 80, width: 1200, height: 800 } }), { x: -1100, y: 80, width: 1200, height: 800, origen: 'guardado' }, '100 px asoman: vale');
+  assert.deepEqual(ventana.limitesDeVentana({ screen, guardado: { x: 0, y: 25, width: 2560, height: 1440 } }), { x: 0, y: 25, width: 1920, height: 1055, origen: 'guardado' }, 'de una pantalla más grande: recortada al área');
+  assert.deepEqual(ventana.limitesDeVentana({ screen, guardado: { x: 0, y: 25, width: 800 } }), { width: 1456, height: 900, origen: 'defecto' }, 'incompletos: el defecto');
+  assert.deepEqual(ventana.limitesDeVentana({ screen, guardado: null }), { width: 1456, height: 900, origen: 'defecto' });
+});

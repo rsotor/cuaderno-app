@@ -22,7 +22,8 @@ const { FONDO } = ventanaApp;   // el fondo hasta que carga la pantalla, según 
 const TOPE_PUERTO = 15_000;   // ms que se espera el puerto del hijo
 const TREGUA = 60_000;        // ms: dos muertes del hijo en menos de esto y la app se rinde
 // El preload corre en el sandbox y solo expone window.cuadernoApp (electron/preload.js); la versión le llega como argumento.
-const PANTALLA = { width: 1280, height: 800, title: 'Cuaderno', webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, partition: 'cuaderno', preload: path.join(__dirname, 'preload.js'), additionalArguments: [`--cuaderno-version=${VERSION}`] } };
+// Tamaño y posición: los guardados en config.json si caen en una pantalla, o 1456 × 900 (ventana.limitesDeVentana); nunca menos de 760 × 480.
+const PANTALLA = { ...ventanaApp.VENTANA, title: 'Cuaderno', webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, partition: 'cuaderno', preload: path.join(__dirname, 'preload.js'), additionalArguments: [`--cuaderno-version=${VERSION}`] } };
 // El token nunca va al registro ni a un diálogo: los mensajes de Electron de un loadURL fallido traen la URL entera.
 const sinToken = texto => String(texto).replace(/\?t=[0-9a-f]+/g, '?t=…');
 
@@ -127,8 +128,12 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
 
   estado.listo = app.whenReady().then(async () => {
     const { color } = ventanaApp.aplicarTema({ nativeTheme: electron.nativeTheme, config });   // themeSource según config.tema antes del primer píxel: sin flash blanco en oscuro
-    const ventana = new BrowserWindow({ ...PANTALLA, backgroundColor: color });
+    const { origen: origenLimites, ...limites } = ventanaApp.limitesDeVentana({ screen: electron.screen, guardado: config.leer().ventana });
+    const ventana = new BrowserWindow({ ...PANTALLA, ...limites, backgroundColor: color });
     estado.ventana = ventana;
+    anotar(`ventana ${limites.width} × ${limites.height}${'x' in limites ? ` en (${limites.x}, ${limites.y})` : ''}: ${origenLimites === 'guardado' ? 'la última posición' : origenLimites === 'area' ? 'el 90 % del área de trabajo' : 'el tamaño por defecto'}`);
+    // Al cerrar, dónde y cuánto medía, para abrir igual la próxima vez (minimizada no: sus límites no son de verdad).
+    ventana.on('close', () => { try { if (!ventana.isMinimized()) config.guardarVentana(ventana.getBounds()); } catch (e) { anotar(`no se ha podido guardar la ventana: ${e.message}`); } });
     // El menú, antes del primer píxel; sus recientes se reconstruyen cuando cambia config.json (el mismo vigilante que el tema).
     estado.menu = instalarMenu({ electron, estado, config, registro, env, anotar, version: VERSION, execPath, abrirCarpeta: ruta => carpetas.llegada(ruta, 'menú') });
     ventanaApp.preparar({ ventana, electron, config, env, particion: PANTALLA.webPreferences.partition, puerto: () => estado.puerto, anotar, vigilar, alCambiar: () => estado.menu.reconstruir() });

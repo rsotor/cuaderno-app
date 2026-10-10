@@ -1,13 +1,17 @@
 'use strict';
 // La configuración del usuario: igual para todos sus cuadernos y fuera de los repos. Tema, letra, fuente, el panel
-// (dónde va y cuánto mide), los cuadernos recientes y lo que es de esta máquina (comando del agente sin kit). Un JSON en la carpeta de
+// (dónde va y cuánto mide), los cuadernos recientes, la ventana de la app de escritorio y lo que es de esta máquina (comando del agente sin kit). Un JSON en la carpeta de
 // configuración del sistema; CUADERNO_CONFIG_DIR la cambia (los tests la ponen en una carpeta temporal).
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const POR_DEFECTO = { tema: 'auto', letra: 'media', fuente: 'sistema', comando_agente: '', editor: 'vista', panel: 'derecha', panel_ancho: 420, panel_alto: 320, recientes: [], ocultas: {} };
+const POR_DEFECTO = { tema: 'auto', letra: 'media', fuente: 'sistema', comando_agente: '', editor: 'vista', panel: 'derecha', panel_ancho: 420, panel_alto: 320, recientes: [], ocultas: {}, ventana: null };
+// La ventana de la app de escritorio (dónde y cuánto medía al cerrar; electron/app.js la guarda y la restaura): enteros, y
+// nunca más pequeña que lo que la app admite (minWidth y minHeight de la ventana). La web no la toca.
+const VENTANA_MINIMA = { width: 760, height: 480 };
+const ventanaValida = v => !!v && typeof v === 'object' && !Array.isArray(v) && ['x', 'y', 'width', 'height'].every(k => Number.isInteger(v[k])) && v.width >= VENTANA_MINIMA.width && v.height >= VENTANA_MINIMA.height;
 const TEMAS = ['auto', 'claro', 'oscuro'], LETRAS = ['pequeña', 'media', 'grande'], FUENTES = ['sistema', 'serif'], EDITORES = ['vista', 'plano'];
 const PANELES = ['derecha', 'abajo'];
 // Tamaños del panel en píxeles: enteros dentro de un tope amplio. El límite fino (que la nota conserve su sitio en
@@ -36,6 +40,7 @@ function leer() {
   if (!Array.isArray(c.recientes)) c.recientes = [];
   if (!c.ocultas || typeof c.ocultas !== 'object' || Array.isArray(c.ocultas)) c.ocultas = {};
   if (typeof c.comando_agente !== 'string') c.comando_agente = '';
+  c.ventana = ventanaValida(c.ventana) ? { x: c.ventana.x, y: c.ventana.y, width: c.ventana.width, height: c.ventana.height } : null;
   return c;
 }
 function escribir(c) {
@@ -52,6 +57,14 @@ function ajustar(cambios) {
   if (PANELES.includes(cambios.panel)) c.panel = cambios.panel;
   for (const campo of Object.keys(TAMANOS_PANEL)) if (tamanoValido(campo, cambios[campo])) c[campo] = cambios[campo];
   if (typeof cambios.comando_agente === 'string') c.comando_agente = cambios.comando_agente.trim();
+  escribir(c);
+  return c;
+}
+// Los límites de la ventana de la app al cerrar (getBounds()); lo que no vale no se guarda.
+function guardarVentana(limites) {
+  const c = leer();
+  if (!ventanaValida(limites)) return c;
+  c.ventana = { x: limites.x, y: limites.y, width: limites.width, height: limites.height };
   escribir(c);
   return c;
 }
@@ -105,4 +118,4 @@ function cuadernoAlArrancar(argCarpeta, recientes, existe, elegir = false) {
 }
 const apariencia = c => ({ tema: c.tema, letra: c.letra, fuente: c.fuente, comando_agente: c.comando_agente, editor: c.editor, panel: c.panel, panel_ancho: c.panel_ancho, panel_alto: c.panel_alto });
 
-module.exports = { leer, ajustar, registrarReciente, olvidarReciente, apariencia, carpeta, ocultas, ocultar, token, cuadernoAlArrancar, POR_DEFECTO };
+module.exports = { leer, ajustar, registrarReciente, olvidarReciente, guardarVentana, apariencia, carpeta, ocultas, ocultar, token, cuadernoAlArrancar, POR_DEFECTO, VENTANA_MINIMA };

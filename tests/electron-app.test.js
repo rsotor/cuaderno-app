@@ -22,13 +22,14 @@ const esperar = ms => new Promise(r => setTimeout(r, ms));
 // usa de webContents, session, shell y nativeTheme: aquí solo se comprueba que se enganchan; su conducta, en
 // electron-ventana.test.js; lo que menu.js usa de Menu, dialog.showMessageBox, shell y clipboard), anotando cada paso en
 // `pasos`. `fallosURL`: errores con los que loadURL rechaza, en orden, antes de empezar a cargar bien.
-function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false, empaquetada = false } = {}) {
+function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false, empaquetada = false, areaDeTrabajo = { x: 0, y: 25, width: 2560, height: 1415 } } = {}) {
   const pasos = [], ventanas = [], hijos = [], dialogos = [], salidas = [], abiertos = [], canales = {}, menus = [], rutasAbiertas = [], portapapeles = [];
   const eventos = new EventEmitter();
   let pid = 100;
   class BrowserWindow {
     constructor(opciones) {
-      this.opciones = opciones; this.cargas = []; this.minimizada = false; this.enfocada = 0; this.fondos = []; ventanas.push(this); pasos.push('ventana');
+      this.opciones = opciones; this.cargas = []; this.minimizada = false; this.enfocada = 0; this.fondos = []; this.eventos = new EventEmitter(); ventanas.push(this); pasos.push('ventana');
+      this.limites = { x: opciones.x ?? 300, y: opciones.y ?? 200, width: opciones.width, height: opciones.height };   // sin x, y, Electron la centra: aquí un sitio cualquiera
       const wc = Object.assign(new EventEmitter(), { manejadorVentanas: null, mensajes: [], historial: [], puedeAtras: false, setWindowOpenHandler(f) { this.manejadorVentanas = f; }, send(canal, ...args) { this.mensajes.push([canal, ...args]); } });
       wc.navigationHistory = { canGoBack: () => wc.puedeAtras, canGoForward: () => false, goBack: () => wc.historial.push('goBack'), goForward: () => wc.historial.push('goForward') };
       this.webContents = wc;
@@ -37,6 +38,8 @@ function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false, emp
     async loadFile(f) { this.cargas.push({ fichero: f }); pasos.push('loadFile'); }
     async loadURL(u) { pasos.push(`loadURL ${u}`); if (fallosURL.length) throw fallosURL.shift(); this.cargas.push({ url: u }); }
     isMinimized() { return this.minimizada; }
+    on(e, f) { this.eventos.on(e, f); } emitir(e, ...a) { this.eventos.emit(e, ...a); }
+    getBounds() { return { ...this.limites }; }
     restore() { this.minimizada = false; pasos.push('restore'); }
     focus() { this.enfocada++; pasos.push('focus'); }
     static getAllWindows() { return ventanas; }
@@ -63,14 +66,16 @@ function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false, emp
   const session = { fromPartition(p) { sesiones[p] = sesiones[p] || { manejadorPermisos: null, setPermissionRequestHandler(f) { this.manejadorPermisos = f; } }; return sesiones[p]; } };
   const shell = { async openExternal(u) { abiertos.push(u); }, async openPath(r) { rutasAbiertas.push(r); return ''; } };
   const ipcMain = { handle(canal, f) { canales[canal] = f; } };
+  // screen: una sola pantalla con ese área de trabajo (la principal, y la que «más solapa» cualquier rectángulo).
+  const screen = { getPrimaryDisplay: () => ({ workArea: areaDeTrabajo }), getDisplayMatching: () => ({ workArea: areaDeTrabajo }) };
   // Menu: buildFromTemplate devuelve la plantilla tal cual (con `getMenuItemById` como el de verdad) y setApplicationMenu la anota.
   const buscar = (items, id) => { for (const e of items) { if (e.id === id) return e; if (Array.isArray(e.submenu)) { const h = buscar(e.submenu, id); if (h) return h; } } return null; };
   const Menu = { buildFromTemplate(plantilla) { return { items: plantilla, getMenuItemById: id => buscar(plantilla, id) }; }, setApplicationMenu(m) { menus.push(m); pasos.push('menú'); } };
   const clipboard = { writeText(t) { portapapeles.push(t); } };
-  return { electron: { app, BrowserWindow, utilityProcess, dialog, nativeTheme, session, shell, ipcMain, Menu, clipboard }, pasos, ventanas, hijos, dialogos, salidas, sesiones, abiertos, canales, menus, rutasAbiertas, portapapeles };
+  return { electron: { app, BrowserWindow, utilityProcess, dialog, nativeTheme, session, shell, ipcMain, Menu, clipboard, screen }, pasos, ventanas, hijos, dialogos, salidas, sesiones, abiertos, canales, menus, rutasAbiertas, portapapeles };
 }
 // Una configuración de mentira; `recientes` puede ser una función para que cambie entre el arranque y una caída.
-const configFalsa = ({ tema = 'auto', recientes = [] } = {}) => ({ leer: () => ({ tema, recientes: typeof recientes === 'function' ? recientes() : recientes }), cuadernoAlArrancar: require('../config').cuadernoAlArrancar, carpeta: () => carpetaConfig });
+const configFalsa = ({ tema = 'auto', recientes = [], ventana = null } = {}) => { const c = { leer: () => ({ tema, recientes: typeof recientes === 'function' ? recientes() : recientes, ventana: c.ventana }), cuadernoAlArrancar: require('../config').cuadernoAlArrancar, carpeta: () => carpetaConfig, ventana, guardadas: [], guardarVentana(l) { c.guardadas.push(l); c.ventana = l; return c.leer(); } }; return c; };
 // Un fs.watch de mentira: anota qué carpeta se vigila y deja disparar el cambio a mano.
 const vigilanteFalso = () => { const v = { carpetas: [], avisar: null, cerrado: 0 }; v.vigilar = (dir, f) => { v.carpetas.push(dir); v.avisar = f; return { close() { v.cerrado++; } }; }; return v; };
 const registroFalso = () => { const lineas = []; return { lineas, escribir: l => lineas.push(l), ruta: () => '/config/registro.log' }; };
@@ -79,8 +84,8 @@ const entornoFalso = (f, { PATH = '/shell/bin:/usr/bin' } = {}) => ({ env }) => 
 
 // Monta un arranque: `lock`, `fallosURL` y `sistemaOscuro` son del Electron falso; lo demás va a `arrancar`. Sin argumentos
 // (argv solo con el ejecutable y la app), toda ruta «existe», y las peticiones al hijo (POST /api/abrir) se anotan y contestan 200.
-function montar({ env = {}, config = configFalsa(), topePuerto = 500, lock, fallosURL, sistemaOscuro, empaquetada, ...paraArrancar } = {}) {
-  const f = electronFalso({ lock, fallosURL, sistemaOscuro, empaquetada });
+function montar({ env = {}, config = configFalsa(), topePuerto = 500, lock, fallosURL, sistemaOscuro, empaquetada, areaDeTrabajo, ...paraArrancar } = {}) {
+  const f = electronFalso({ lock, fallosURL, sistemaOscuro, empaquetada, areaDeTrabajo });
   const registro = registroFalso();
   const entorno = entornoFalso(f);
   const vigilante = vigilanteFalso();
@@ -122,6 +127,43 @@ test('arranca en orden: userData de pruebas, instancia única, ventana con el fo
   assert.ok(m.registro.lineas.some(l => l === '[app] entorno de la shell: shell -lc, 7 ms'), m.registro.lineas.join('\n'));
   assert.ok(m.registro.lineas.includes('[app] servidor en el puerto 7331; el último cuaderno: /cuadernos/ultimo'));
   assert.ok(m.registro.lineas.includes(`[app] servidor lanzado (pid ${h.pid})`));
+});
+
+test('la ventana abre a 1456 × 900 con mínimo 760 × 480 (sin posición: Electron la centra) en un área de trabajo grande; en una pequeña, al 90 % del área; y queda en el registro', async () => {
+  const m = await arrancado();
+  const o = m.ventanas[0].opciones;
+  assert.deepEqual([o.width, o.height, o.minWidth, o.minHeight, 'x' in o, 'y' in o], [1456, 900, 760, 480, false, false]);
+  assert.ok(m.registro.lineas.includes('[app] ventana 1456 × 900: el tamaño por defecto'));
+  m.electron.app.emitir('will-quit');
+  const portatil = await arrancado({ areaDeTrabajo: { x: 0, y: 0, width: 1440, height: 877 } });
+  assert.deepEqual([portatil.ventanas[0].opciones.width, portatil.ventanas[0].opciones.height], [1296, 789]);
+  assert.ok(portatil.registro.lineas.includes('[app] ventana 1296 × 789: el 90 % del área de trabajo'));
+  portatil.electron.app.emitir('will-quit');
+});
+
+test('la ventana se abre donde se cerró: al cerrar se guardan sus límites en config.json (ventana) salvo minimizada, y al arrancar se restauran si caen en una pantalla; si no (un monitor que ya no está), el tamaño por defecto', async () => {
+  const config = configFalsa();
+  const m = await arrancado({ config });
+  const v = m.ventanas[0];
+  v.limites = { x: 140, y: 90, width: 1300, height: 820 };
+  v.minimizada = true; v.emitir('close');
+  assert.deepEqual(config.guardadas, [], 'minimizada no se guarda');
+  v.minimizada = false; v.emitir('close');
+  assert.deepEqual(config.guardadas, [{ x: 140, y: 90, width: 1300, height: 820 }]);
+  m.electron.app.emitir('will-quit');
+  const otra = await arrancado({ config });
+  const o = otra.ventanas[0].opciones;
+  assert.deepEqual([o.x, o.y, o.width, o.height, o.minWidth, o.minHeight], [140, 90, 1300, 820, 760, 480]);
+  assert.ok(otra.registro.lineas.includes('[app] ventana 1300 × 820 en (140, 90): la última posición'));
+  otra.electron.app.emitir('will-quit');
+  const configFuera = configFalsa({ ventana: { x: 3000, y: 90, width: 1300, height: 820 } });
+  const fuera = await arrancado({ config: configFuera });
+  assert.deepEqual([fuera.ventanas[0].opciones.width, fuera.ventanas[0].opciones.height, 'x' in fuera.ventanas[0].opciones], [1456, 900, false]);
+  // Un guardarVentana que falla (disco lleno, carpeta sin permiso) se anota y no para el cierre.
+  configFuera.guardarVentana = () => { throw new Error('sin disco'); };
+  fuera.ventanas[0].emitir('close');
+  assert.ok(fuera.registro.lineas.includes('[app] no se ha podido guardar la ventana: sin disco'));
+  fuera.electron.app.emitir('will-quit');
 });
 
 test('sin recientes, el hijo arranca sin CUADERNO_CARPETA (pantalla de cuadernos); con tema claro, o auto sobre un sistema claro, el fondo de la mesa en claro', async () => {
