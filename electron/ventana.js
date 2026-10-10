@@ -49,14 +49,16 @@ function aplicarTema({ nativeTheme, config, ventana = null }) {
   if (ventana && typeof ventana.setBackgroundColor === 'function') { try { ventana.setBackgroundColor(color); } catch { /* ventana ya cerrada */ } }
   return { tema, fuente, color };
 }
-// Vigila config.json (en realidad su carpeta: así vale aunque el fichero aún no exista) y reaplica el tema cuando cambia.
+// Vigila config.json (en realidad su carpeta: así vale aunque el fichero aún no exista) y reaplica el tema cuando cambia;
+// `alCambiar()` se llama además en cada cambio del fichero (el menú reconstruye sus recientes con él: un solo fs.watch).
 // Devuelve { cerrar }. Si no se puede vigilar (carpeta sin permiso), se anota y el tema queda el del arranque.
-function vigilarTema({ nativeTheme, config, ventana = null, anotar, vigilar = fs.watch, carpeta = config.carpeta }) {
+function vigilarTema({ nativeTheme, config, ventana = null, anotar, vigilar = fs.watch, carpeta = config.carpeta, alCambiar = null }) {
   let actual = temaNativo(config.leer().tema), vigilante = null;
   const revisar = (evento, nombre) => {
     if (nombre && nombre !== FICHERO_CONFIG) return;
     const { tema, fuente } = aplicarTema({ nativeTheme, config, ventana });
     if (fuente !== actual) { actual = fuente; anotar(`tema cambiado en config.json: ${tema} → themeSource ${fuente}`); }
+    if (alCambiar) { try { alCambiar(); } catch (e) { anotar(`al cambiar config.json: ${e.message}`); } }
   };
   try {
     const dir = carpeta();
@@ -102,12 +104,12 @@ function prepararVentana({ ventana, electron, env, puerto, anotar, abrirFuera = 
   wc.on('will-prevent-unload', e => { if (preguntarDescartar({ dialog, ventana, env, anotar })) e.preventDefault(); });
 }
 
-// Todo lo de la ventana principal de una vez: tratos de la ventana, permisos de la sesión y vigilancia del tema. Devuelve
-// el vigilante del tema (se cierra solo al salir).
-function preparar({ ventana, electron, config, env, particion, puerto, anotar, vigilar }) {
+// Todo lo de la ventana principal de una vez: tratos de la ventana, permisos de la sesión y vigilancia del tema (y de lo
+// demás de config.json, con `alCambiar`). Devuelve el vigilante (se cierra solo al salir).
+function preparar({ ventana, electron, config, env, particion, puerto, anotar, vigilar, alCambiar = null }) {
   prepararVentana({ ventana, electron, env, puerto, anotar });
   permisos({ session: electron.session.fromPartition(particion), anotar });
-  const vigilante = vigilarTema({ nativeTheme: electron.nativeTheme, config, ventana, anotar, ...(vigilar ? { vigilar } : {}) });
+  const vigilante = vigilarTema({ nativeTheme: electron.nativeTheme, config, ventana, anotar, alCambiar, ...(vigilar ? { vigilar } : {}) });
   electron.app.on('before-quit', vigilante.cerrar);
   return vigilante;
 }

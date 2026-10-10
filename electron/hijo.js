@@ -3,7 +3,8 @@
 // el mismo crearServidor de la web, con el Node del kit inyectado (nodeDelKit) y el cuaderno que decidió el padre
 // (CUADERNO_CARPETA); escucha en 7331 y, si está ocupado (una `npm start` abierta), en uno libre: comprobar antes
 // tendría carrera, así que se escucha y se reacciona al EADDRINUSE. El puerto se manda al padre solo en 'listening',
-// junto con el token (el padre no lee el fichero del token: lo recibe de aquí). Para parar el servidor el padre mata
+// junto con el token (el padre no lee el fichero del token: lo recibe de aquí) y si node-pty cargó (para Ayuda →
+// Diagnóstico: solo este proceso lo sabe). Para parar el servidor el padre mata
 // el proceso (plan §2, filas «Dónde corre el servidor» y «Puerto»): no hay órdenes por parentPort.
 const { nodeDelKit } = require('./entorno');
 
@@ -25,7 +26,7 @@ function arrancarHijo({ crearServidor, config, parentPort, registro, pty = null,
   });
   server.on('listening', () => {
     anotar(`escuchando en el puerto ${server.address().port}`);
-    parentPort.postMessage({ puerto: server.address().port, token: server.token });
+    parentPort.postMessage({ puerto: server.address().port, token: server.token, pty: !!pty });
   });
   server.listen(puerto, '127.0.0.1');
   return server;

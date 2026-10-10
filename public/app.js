@@ -988,6 +988,17 @@ $('#ajustes form').addEventListener('change', async () => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ajustes').hidden) cerrarAjustes(); });
 
+// ---------- acciones del menú de la app de escritorio (electron/menu.js → preload → aquí; en la web no hay menú y nada cambia)
+// Cada acción hace lo que ya hace su botón: Guardar es el botón Guardar (del repositorio, /api/guardar), Ajustes el de
+// Ajustes y Abrir carpeta… el diálogo del sistema (elegirCarpeta). Con un diálogo abierto la acción se ignora: ⌘S sobre el
+// propio modal de Guardar no apila otro. Un atajo nuevo (plan de Electron, §8.1) es una fila en ATAJOS de menu.js y una aquí.
+const ACCIONES_APP = {
+  guardar: () => { const b = $('#btn-guardar'); if (!cuaderno()) return avisar('No hay ningún cuaderno abierto: nada que guardar.'); if (b.disabled) return avisar(b.title); b.click(); },
+  ajustes: abrirAjustes,
+  'abrir-carpeta': elegirCarpeta,
+};
+if (enApp()) window.cuadernoApp.alAccion(nombre => { if (dialogoAbierto()) return; const fn = ACCIONES_APP[nombre]; if (fn) fn(); });
+
 function pintarEstado() {
   $('#aviso-reinicio').hidden = !info.desactualizada || avisoCerrado;
   const c = cuaderno();

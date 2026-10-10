@@ -13,6 +13,7 @@ const { entornoDeLaShell } = require('./entorno');
 const { crearAbridor } = require('./carpeta');
 const registroPorDefecto = require('./registro');
 const ventanaApp = require('./ventana');   // lo del navegador que en la app cambia: enlaces fuera, cerrar con cambios, permisos, tema
+const { instalarMenu } = require('./menu');   // el menú en castellano: sus atajos mandan acciones a la pantalla; Ayuda es del principal
 const { version: VERSION } = require('../package.json');
 
 const { FONDO } = ventanaApp;   // el fondo hasta que carga la pantalla, según el tema (con auto, el del sistema)
@@ -31,7 +32,7 @@ const sinToken = texto => String(texto).replace(/\?t=[0-9a-f]+/g, '?t=…');
 function arrancar({ electron, config, env = process.env, entorno = entornoDeLaShell, registro = registroPorDefecto, topePuerto = TOPE_PUERTO, tregua = TREGUA, ahora = Date.now, execPath = process.execPath, existe = r => fs.statSync(r).isDirectory(), vigilar = undefined, argv = process.argv, cwd = process.cwd(), peticion }) {
   const { app, BrowserWindow, utilityProcess, dialog } = electron;
   const anotar = linea => registro.escribir(`[app] ${sinToken(linea)}`);
-  const estado = { ventana: null, hijo: null, puerto: null, token: null, entorno: null, muertes: [], cerrando: false, listo: null };
+  const estado = { ventana: null, hijo: null, puerto: null, token: null, pty: null, entorno: null, muertes: [], cerrando: false, listo: null, menu: null };
 
   // userData solo para lo de Electron (el lock de instancia única va ahí); tiene que fijarse antes de `ready`.
   if (env.CUADERNO_USERDATA) app.setPath('userData', env.CUADERNO_USERDATA);
@@ -88,7 +89,7 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
     const acabar = (fn, valor) => { if (listo) return; listo = true; clearTimeout(temporizador); fn(valor); };
     const temporizador = setTimeout(() => acabar(rechazar, new Error(`el servidor no ha dicho su puerto en ${topePuerto / 1000} s`)), topePuerto);
     hijo.once('spawn', () => anotar(`servidor lanzado (pid ${hijo.pid})`));
-    hijo.on('message', m => { if (m && m.puerto) acabar(resolver, { puerto: m.puerto, token: m.token }); });
+    hijo.on('message', m => { if (m && m.puerto) { estado.pty = typeof m.pty === 'boolean' ? m.pty : null; acabar(resolver, { puerto: m.puerto, token: m.token }); } });
     hijo.on('error', e => { anotar(`error del servidor: ${e.message}`); acabar(rechazar, e); });
     hijo.on('exit', codigo => {
       anotar(`el servidor ha salido con código ${codigo}`);
@@ -113,7 +114,9 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
     const { color } = ventanaApp.aplicarTema({ nativeTheme: electron.nativeTheme, config });   // themeSource según config.tema antes del primer píxel: sin flash blanco en oscuro
     const ventana = new BrowserWindow({ ...PANTALLA, backgroundColor: color });
     estado.ventana = ventana;
-    ventanaApp.preparar({ ventana, electron, config, env, particion: PANTALLA.webPreferences.partition, puerto: () => estado.puerto, anotar, vigilar });
+    // El menú, antes del primer píxel; sus recientes se reconstruyen cuando cambia config.json (el mismo vigilante que el tema).
+    estado.menu = instalarMenu({ electron, estado, config, registro, env, anotar, version: VERSION, abrirCarpeta: ruta => carpetas.llegada(ruta, 'menú') });
+    ventanaApp.preparar({ ventana, electron, config, env, particion: PANTALLA.webPreferences.partition, puerto: () => estado.puerto, anotar, vigilar, alCambiar: () => estado.menu.reconstruir() });
     await ventana.loadFile(path.join(__dirname, 'arrancando.html'));
     const r = await entorno({ env });   // asíncrono: el proceso principal sigue atendiendo eventos mientras la shell contesta (hasta 10 s)
     estado.entorno = { origen: r.origen, ms: r.ms, shell: r.shell, error: r.error, PATH: r.env.PATH, env: r.env };

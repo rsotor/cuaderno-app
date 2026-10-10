@@ -1,6 +1,6 @@
 'use strict';
-// El servidor dentro del utilityProcess (electron/hijo.js) con un parentPort falso: manda { puerto, token } solo al
-// escuchar; con el puerto ocupado, escucha en otro; abre el cuaderno del padre.
+// El servidor dentro del utilityProcess (electron/hijo.js) con un parentPort falso: manda { puerto, token, pty } solo al
+// escuchar (pty: si node-pty cargó, para el Diagnóstico de T5); con el puerto ocupado, escucha en otro; abre el cuaderno del padre.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -31,6 +31,7 @@ test('escucha en el puerto pedido y manda { puerto, token } al padre al escuchar
   const m = await parentPort.primerMensaje();
   assert.equal(m.puerto, server.address().port);
   assert.equal(m.token, config.token());
+  assert.equal(m.pty, false, 'sin node-pty, el padre lo sabe (Diagnóstico)');
   assert.ok(registro.lineas.some(l => /^\[hijo\] escuchando en el puerto \d+$/.test(l)), registro.lineas.join('\n'));
   assert.ok(registro.lineas.some(l => /^\[hijo\] node \d+/.test(l) && l.includes(`el kit corre con ${process.execPath}`)));
   await cerrar(server);
@@ -75,7 +76,7 @@ test('el Node del kit que recibe crearServidor es el de CUADERNO_NODE con ELECTR
   const pty = { spawn() {} };
   arrancarHijo({ crearServidor: crearFalso, config, parentPort, registro: registroFalso(), pty, env: { CUADERNO_NODE: '/apps/Cuaderno' }, puerto: 7331 });
   const m = await parentPort.primerMensaje();
-  assert.deepEqual(m, { puerto: 4321, token: config.token() });
+  assert.deepEqual(m, { puerto: 4321, token: config.token(), pty: true });
   assert.deepEqual(recibido[0].ejecutarNode, { cmd: '/apps/Cuaderno', env: { ELECTRON_RUN_AS_NODE: '1' } });
   assert.equal(recibido[0].pty, pty);
   assert.equal(recibido[0].shellLogin, true, 'la terminal de la app lanza la shell de login');
