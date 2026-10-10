@@ -16,13 +16,15 @@ const FONDO = { claro: '#ffffff', oscuro: '#1e1e1e', auto: '#ffffff' };   // el 
 const TOPE_PUERTO = 15_000;   // ms que se espera el puerto del hijo
 const TREGUA = 60_000;        // ms: dos muertes del hijo en menos de esto y la app se rinde
 const PANTALLA = { width: 1280, height: 800, title: 'Cuaderno', webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, partition: 'cuaderno' } };   // sin preload hasta T4
+// El token nunca va al registro ni a un diálogo: los mensajes de Electron de un loadURL fallido traen la URL entera.
+const sinToken = texto => String(texto).replace(/\?t=[0-9a-f]+/g, '?t=…');
 
 // Devuelve el estado (ventana, hijo, puerto, entorno, muertes, cerrando) y `listo`, la promesa del arranque (true si
 // la ventana cargó la app). Variables de prueba: CUADERNO_USERDATA (dónde va el lock de instancia única) y
 // CUADERNO_SIN_DIALOGO (el diálogo de error se anota y se da por cerrado).
 function arrancar({ electron, config, env = process.env, entorno = entornoDeLaShell, registro = registroPorDefecto, topePuerto = TOPE_PUERTO, tregua = TREGUA, ahora = Date.now, execPath = process.execPath, existe = r => fs.statSync(r).isDirectory() }) {
   const { app, BrowserWindow, utilityProcess, dialog } = electron;
-  const anotar = linea => registro.escribir(`[app] ${linea}`);
+  const anotar = linea => registro.escribir(`[app] ${sinToken(linea)}`);
   const estado = { ventana: null, hijo: null, puerto: null, token: null, entorno: null, muertes: [], cerrando: false, listo: null };
 
   // userData solo para lo de Electron (el lock de instancia única va ahí); tiene que fijarse antes de `ready`.
@@ -34,10 +36,12 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
   const matarHijo = () => { if (estado.hijo) { try { estado.hijo.kill(); } catch { /* ya muerto */ } } };
   const avisar = (mensaje, detalle) => {
     if (env.CUADERNO_SIN_DIALOGO) return anotar(`diálogo saltado (CUADERNO_SIN_DIALOGO): ${mensaje}`);
-    try { dialog.showMessageBoxSync({ type: 'error', title: 'Cuaderno', message: mensaje, detail: detalle }); } catch (e) { anotar(`no se ha podido enseñar el diálogo: ${e.message}`); }
+    try { dialog.showMessageBoxSync({ type: 'error', title: 'Cuaderno', message: mensaje, detail: sinToken(detalle) }); } catch (e) { anotar(`no se ha podido enseñar el diálogo: ${e.message}`); }
   };
-  // Sin servidor no hay app: se anota, se avisa y se sale con 1.
+  // Sin servidor no hay app: se anota, se avisa y se sale con 1. Si ya se está cerrando (la persona cerró la ventana
+  // durante «Arrancando…» o con un relanzado en vuelo), la salida del hijo no es un fallo: solo se anota.
   const fallo = motivo => {
+    if (estado.cerrando) return anotar(`durante el cierre: ${motivo}`);
     anotar(`FALLO: ${motivo}`);
     estado.cerrando = true;
     matarHijo();
@@ -45,8 +49,30 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
     app.exit(1);
   };
 
+  // El entorno del hijo: el de la shell con CUADERNO_NODE y el cuaderno que toca ahora (sin argumentos: el último
+  // reciente; abrir uno lo registra, así que tras una caída se vuelve al que estaba abierto, no al del arranque). El
+  // kit hereda este entorno entero, con CUADERNO_* y ELECTRON_RUN_AS_NODE: no se filtra a propósito, y
+  // CUADERNO_CONFIG_DIR TIENE que viajar (el hijo lee el token y los recientes de esa carpeta).
+  const entornoDelHijo = () => {
+    const { carpeta, origen } = config.cuadernoAlArrancar(null, config.leer().recientes, existe);
+    const e = { ...estado.entorno.env, CUADERNO_NODE: execPath };
+    if (carpeta) e.CUADERNO_CARPETA = carpeta;
+    return { env: e, carpeta, origen };
+  };
+  // La ventana entra por la URL de entrada. Un ERR_ABORTED (otra carga la ha pisado: una recarga, un enlace) no es
+  // fallo; otro error se reintenta una vez y, si no, fallo. Los mensajes llevan la URL con el token: se limpia.
+  const cargarVentana = async (ventana, reintento = false) => {
+    try { await ventana.loadURL(urlEntrada()); return true; } catch (e) {
+      const motivo = sinToken(e.message);
+      if (e.code === 'ERR_ABORTED' || /ERR_ABORTED/.test(motivo)) { anotar(`carga de la ventana interrumpida por otra (no es fallo): ${motivo}`); return true; }
+      if (!reintento) { anotar(`la ventana no ha cargado (${motivo}): se reintenta`); return cargarVentana(ventana, true); }
+      fallo(`La ventana no ha podido cargar la app: ${motivo}`);
+      return false;
+    }
+  };
+
   // Lanza servidor-hijo.js y resuelve con { puerto, token } cuando el hijo ya escucha; rechaza si antes sale, da
-  // error o pasa el tope. Una salida posterior es una caída (salvo que se esté cerrando).
+  // error o pasa el tope. Una salida posterior es una caída (salvo que se esté cerrando o el hijo ya sea otro).
   const lanzarHijo = entornoHijo => new Promise((resolver, rechazar) => {
     const hijo = utilityProcess.fork(path.join(__dirname, 'servidor-hijo.js'), [], { env: entornoHijo, stdio: 'inherit', serviceName: 'servidor del cuaderno' });
     estado.hijo = hijo;
@@ -59,18 +85,19 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
     hijo.on('exit', codigo => {
       anotar(`el servidor ha salido con código ${codigo}`);
       if (!listo) return acabar(rechazar, new Error(`el servidor ha salido con código ${codigo} antes de escuchar`));
-      if (estado.cerrando || hijo !== estado.hijo) return;
-      caida(codigo, entornoHijo);
+      if (estado.cerrando || hijo !== estado.hijo) return;   // cierre, o la salida tardía de un hijo ya sustituido
+      caida(codigo);
     });
   });
-  const caida = (codigo, entornoHijo) => {
+  const caida = codigo => {
     const t = ahora();
     const reciente = estado.muertes.some(m => t - m < tregua);
     estado.muertes.push(t);
     if (reciente) return fallo(`El servidor se ha caído dos veces en menos de un minuto (código ${codigo}).`);
-    anotar('se relanza el servidor con el mismo entorno');
+    const { env: entornoHijo, carpeta } = entornoDelHijo();
+    anotar(`se relanza el servidor con el mismo entorno${carpeta ? ` y el cuaderno ${carpeta}` : ''}`);
     lanzarHijo(entornoHijo)
-      .then(({ puerto, token }) => { estado.puerto = puerto; estado.token = token; anotar(`servidor relanzado en el puerto ${puerto}: se recarga la ventana`); return estado.ventana && estado.ventana.loadURL(urlEntrada()); })
+      .then(({ puerto, token }) => { estado.puerto = puerto; estado.token = token; anotar(`servidor relanzado en el puerto ${puerto}: se recarga la ventana`); return estado.ventana && cargarVentana(estado.ventana); })
       .catch(e => fallo(`El servidor no ha vuelto a arrancar: ${e.message}`));
   };
 
@@ -80,17 +107,14 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
     estado.ventana = ventana;
     await ventana.loadFile(path.join(__dirname, 'arrancando.html'));
     const r = entorno({ env });
-    estado.entorno = { origen: r.origen, ms: r.ms, shell: r.shell, error: r.error, PATH: r.env.PATH };
+    estado.entorno = { origen: r.origen, ms: r.ms, shell: r.shell, error: r.error, PATH: r.env.PATH, env: r.env };
     anotar(`entorno de la shell: ${r.origen}, ${r.ms} ms${r.error ? ` (${r.error})` : ''}`);
-    // El cuaderno lo decide el padre como server.js (sin argumentos: el último); el hijo lo abre antes de escuchar.
-    const { carpeta, origen } = config.cuadernoAlArrancar(null, config.leer().recientes, existe);
-    const entornoHijo = { ...r.env, CUADERNO_NODE: execPath, ...(carpeta ? { CUADERNO_CARPETA: carpeta } : {}) };
+    const { env: entornoHijo, carpeta, origen } = entornoDelHijo();
     try {
       const { puerto, token } = await lanzarHijo(entornoHijo);
       estado.puerto = puerto; estado.token = token;
       anotar(`servidor en el puerto ${puerto}; ${carpeta ? `${origen === 'reciente' ? 'el último cuaderno' : 'la carpeta'}: ${carpeta}` : 'sin cuaderno: pantalla de cuadernos'}`);
-      await ventana.loadURL(urlEntrada());
-      return true;
+      return cargarVentana(ventana);
     } catch (e) { fallo(e.message); return false; }
   });
 
@@ -100,4 +124,4 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
   return estado;
 }
 
-module.exports = { arrancar, FONDO, TOPE_PUERTO, TREGUA };
+module.exports = { arrancar, sinToken, FONDO, TOPE_PUERTO, TREGUA };

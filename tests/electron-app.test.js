@@ -1,25 +1,26 @@
 'use strict';
 // El proceso principal de la app de escritorio (electron/app.js) con un Electron falso y un hijo falso: el orden del
 // arranque (ventana antes del entorno), qué recibe el hijo, la URL de entrada, el relanzado del hijo que muere, el
-// cierre (sin relanzar) y los fallos con diálogo y salida.
+// cierre (sin relanzar, también a medio arrancar) y los fallos con diálogo y salida, sin que el token se filtre.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
-const { arrancar, FONDO } = require('../electron/app');
+const { arrancar, sinToken, FONDO } = require('../electron/app');
 
 const tic = () => new Promise(r => setImmediate(r));
 const esperar = ms => new Promise(r => setTimeout(r, ms));
 
 // Un Electron de mentira: lo que app.js usa de app, BrowserWindow, utilityProcess y dialog, anotando cada paso en `pasos`.
-function electronFalso({ lock = true } = {}) {
+// `fallosURL`: errores con los que loadURL rechaza, en orden, antes de empezar a cargar bien.
+function electronFalso({ lock = true, fallosURL = [] } = {}) {
   const pasos = [], ventanas = [], hijos = [], dialogos = [], salidas = [];
   const eventos = new EventEmitter();
   let pid = 100;
   class BrowserWindow {
     constructor(opciones) { this.opciones = opciones; this.cargas = []; this.minimizada = false; this.enfocada = 0; ventanas.push(this); pasos.push('ventana'); }
     async loadFile(f) { this.cargas.push({ fichero: f }); pasos.push('loadFile'); }
-    async loadURL(u) { this.cargas.push({ url: u }); pasos.push(`loadURL ${u}`); }
+    async loadURL(u) { pasos.push(`loadURL ${u}`); if (fallosURL.length) throw fallosURL.shift(); this.cargas.push({ url: u }); }
     isMinimized() { return this.minimizada; }
     restore() { this.minimizada = false; pasos.push('restore'); }
     focus() { this.enfocada++; pasos.push('focus'); }
@@ -42,18 +43,23 @@ function electronFalso({ lock = true } = {}) {
   const dialog = { showMessageBoxSync(o) { dialogos.push(o); pasos.push('diálogo'); return 0; } };
   return { electron: { app, BrowserWindow, utilityProcess, dialog }, pasos, ventanas, hijos, dialogos, salidas };
 }
-const configFalsa = ({ tema = 'auto', recientes = [] } = {}) => ({ leer: () => ({ tema, recientes }), cuadernoAlArrancar: require('../config').cuadernoAlArrancar });
+// Una configuración de mentira; `recientes` puede ser una función para que cambie entre el arranque y una caída.
+const configFalsa = ({ tema = 'auto', recientes = [] } = {}) => ({ leer: () => ({ tema, recientes: typeof recientes === 'function' ? recientes() : recientes }), cuadernoAlArrancar: require('../config').cuadernoAlArrancar });
 const registroFalso = () => { const lineas = []; return { lineas, escribir: l => lineas.push(l), ruta: () => '/config/registro.log' }; };
 // Un entorno de la shell de mentira: anota cuántas ventanas había al llamarlo y devuelve un PATH propio.
 const entornoFalso = (f, { PATH = '/shell/bin:/usr/bin' } = {}) => ({ env }) => { f.vistas = f.ventanas.length; return { env: { ...env, PATH, LANG: 'es_ES.UTF-8' }, origen: 'shell -lc', ms: 7, shell: '/bin/zsh' }; };
 
-function montar({ env = {}, config = configFalsa(), topePuerto = 500, ...resto } = {}) {
-  const f = electronFalso(resto);
+// Monta un arranque: `lock` y `fallosURL` son del Electron falso; lo demás va a `arrancar`.
+function montar({ env = {}, config = configFalsa(), topePuerto = 500, lock, fallosURL, ...paraArrancar } = {}) {
+  const f = electronFalso({ lock, fallosURL });
   const registro = registroFalso();
   const entorno = entornoFalso(f);
-  const estado = arrancar({ electron: f.electron, config, env: { PATH: '/usr/bin', ...env }, entorno, registro, topePuerto, execPath: '/apps/Cuaderno', existe: () => true, ...resto });
+  const estado = arrancar({ electron: f.electron, config, env: { PATH: '/usr/bin', ...env }, entorno, registro, topePuerto, execPath: '/apps/Cuaderno', existe: () => true, ...paraArrancar });
   return { ...f, registro, estado, get vistas() { return f.vistas; } };
 }
+// Un arranque ya con la app cargada en el puerto 7331.
+async function arrancado(opciones) { const m = montar(opciones); await tic(); m.hijos[0].escucha(7331, 't0k'); assert.equal(await m.estado.listo, true); return m; }
+const sinCarpeta = env => { const { CUADERNO_CARPETA, ...resto } = env; return resto; };
 
 test('arranca en orden: userData de pruebas, instancia única, ventana con el fondo del tema y «Arrancando…» ANTES del entorno, hijo con el entorno resuelto, CUADERNO_NODE y el último cuaderno; loadURL con la URL de entrada al llegar { puerto, token }', async () => {
   const recientes = [{ ruta: '/cuadernos/viejo', nombre: 'Viejo', abierto: '2026-01-01' }, { ruta: '/cuadernos/ultimo', nombre: 'Último', abierto: '2026-10-10' }];
@@ -78,7 +84,7 @@ test('arranca en orden: userData de pruebas, instancia única, ventana con el fo
   h.escucha(7331, 'f00d');
   assert.equal(await m.estado.listo, true);
   assert.deepEqual(v.cargas[1], { url: 'http://localhost:7331/?t=f00d' });
-  assert.deepEqual(m.estado.entorno, { origen: 'shell -lc', ms: 7, shell: '/bin/zsh', error: undefined, PATH: '/shell/bin:/usr/bin' });
+  assert.deepEqual({ ...m.estado.entorno, env: undefined }, { origen: 'shell -lc', ms: 7, shell: '/bin/zsh', error: undefined, PATH: '/shell/bin:/usr/bin', env: undefined });
   assert.equal(m.estado.puerto, 7331);
   assert.deepEqual(m.pasos, ['ventana', 'loadFile', `fork ${h.pid}`, 'loadURL http://localhost:7331/?t=f00d']);
   assert.ok(m.registro.lineas.some(l => l === '[app] entorno de la shell: shell -lc, 7 ms'), m.registro.lineas.join('\n'));
@@ -96,15 +102,13 @@ test('sin recientes, el hijo arranca sin CUADERNO_CARPETA (pantalla de cuadernos
   assert.ok(m.registro.lineas.includes('[app] servidor en el puerto 40000; sin cuaderno: pantalla de cuadernos'));
 });
 
-test('si el hijo muere después de arrancar, se relanza una vez con el mismo entorno y la ventana se recarga en la URL nueva (el puerto puede cambiar)', async () => {
-  const m = montar();
-  await tic();
-  m.hijos[0].escucha(7331, 't0k');
-  await m.estado.listo;
+test('si el hijo muere después de arrancar, se relanza una vez con el mismo entorno (PATH, CUADERNO_NODE) y la ventana se recarga en la URL nueva (el puerto puede cambiar)', async () => {
+  const m = await arrancado({ config: configFalsa({ recientes: [{ ruta: '/cuadernos/a', abierto: '2026-01-01' }] }) });
   m.hijos[0].muere(1);
   await tic();
   assert.equal(m.hijos.length, 2, 'relanzado');
-  assert.deepEqual(m.hijos[1].opciones.env, m.hijos[0].opciones.env);
+  assert.deepEqual(sinCarpeta(m.hijos[1].opciones.env), sinCarpeta(m.hijos[0].opciones.env));
+  assert.equal(m.hijos[1].opciones.env.CUADERNO_CARPETA, '/cuadernos/a', 'sin cambiar de cuaderno, el mismo');
   assert.equal(m.estado.hijo, m.hijos[1]);
   m.hijos[1].escucha(45000, 't0k');
   await tic(); await tic();
@@ -112,16 +116,42 @@ test('si el hijo muere después de arrancar, se relanza una vez con el mismo ent
   assert.equal(m.estado.puerto, 45000);
   assert.deepEqual(m.salidas, [], 'la app sigue');
   assert.ok(m.registro.lineas.includes('[app] el servidor ha salido con código 1'));
-  assert.ok(m.registro.lineas.includes('[app] se relanza el servidor con el mismo entorno'));
+  assert.ok(m.registro.lineas.includes('[app] se relanza el servidor con el mismo entorno y el cuaderno /cuadernos/a'));
   assert.ok(m.registro.lineas.includes('[app] servidor relanzado en el puerto 45000: se recarga la ventana'));
+});
+
+test('si la persona cambió de cuaderno antes de la caída, el relanzado abre el que estaba abierto (el reciente más nuevo), no el del arranque', async () => {
+  let recientes = [{ ruta: '/cuadernos/a', abierto: '2026-01-01' }];
+  const m = await arrancado({ config: configFalsa({ recientes: () => recientes }) });
+  assert.equal(m.hijos[0].opciones.env.CUADERNO_CARPETA, '/cuadernos/a');
+  recientes = [{ ruta: '/cuadernos/b', abierto: '2026-10-10' }, ...recientes];   // abrir «b» en Cuadernos lo registró como reciente
+  m.hijos[0].muere(1); await tic();
+  assert.equal(m.hijos[1].opciones.env.CUADERNO_CARPETA, '/cuadernos/b');
+  assert.deepEqual(sinCarpeta(m.hijos[1].opciones.env), sinCarpeta(m.hijos[0].opciones.env), 'lo demás, igual');
+  assert.ok(m.registro.lineas.includes('[app] se relanza el servidor con el mismo entorno y el cuaderno /cuadernos/b'));
+  // Y si ya no queda ningún reciente válido (más de un minuto después), sin carpeta: pantalla de cuadernos, no la vieja.
+  m.hijos[1].escucha(7332); await tic(); await tic();
+  recientes = [];
+  m.hijos[1].muere(1); await tic();
+  assert.equal(m.hijos.length, 2, 'dentro de la tregua: no se relanza');
+  assert.deepEqual(m.salidas, [1]);
+});
+
+test('la salida tardía del hijo viejo tras un relanzado no cuenta como caída ni dispara otro relanzado', async () => {
+  const m = await arrancado();
+  m.hijos[0].muere(1); await tic();
+  assert.equal(m.hijos.length, 2);
+  m.hijos[1].escucha(7332); await tic(); await tic();
+  m.hijos[0].emit('exit', 137);   // el proceso viejo aún dice algo (Electron puede emitir exit tras kill)
+  await tic(); await tic();
+  assert.equal(m.hijos.length, 2, 'sin tercer hijo');
+  assert.deepEqual(m.salidas, []); assert.equal(m.dialogos.length, 0);
+  assert.equal(m.estado.muertes.length, 1);
 });
 
 test('si vuelve a morir en menos de un minuto: diálogo y salir con 1; pasado el minuto, se vuelve a relanzar', async () => {
   let reloj = 1_000_000;
-  const m = montar({ ahora: () => reloj });
-  await tic();
-  m.hijos[0].escucha(7331);
-  await m.estado.listo;
+  const m = await arrancado({ ahora: () => reloj });
   m.hijos[0].muere(139); await tic();
   m.hijos[1].escucha(7332); await tic(); await tic();
   reloj += 61_000;   // más de un minuto después: la tregua ha pasado
@@ -129,24 +159,20 @@ test('si vuelve a morir en menos de un minuto: diálogo y salir con 1; pasado el
   assert.equal(m.hijos.length, 3, 'tercera vida: la muerte anterior ya es vieja');
   assert.deepEqual(m.salidas, []);
   m.hijos[2].escucha(7333); await tic(); await tic();
-  reciente: {
-    reloj += 10_000;
-    m.hijos[2].muere(139); await tic();
-    assert.equal(m.hijos.length, 3, 'no se relanza');
-    assert.deepEqual(m.salidas, [1]);
-    assert.equal(m.dialogos.length, 1);
-    assert.equal(m.dialogos[0].message, 'El servidor del cuaderno ha fallado');
-    assert.match(m.dialogos[0].detail, /se ha caído dos veces en menos de un minuto \(código 139\)/);
-    assert.match(m.dialogos[0].detail, /El registro está en \/config\/registro\.log/);
-    assert.ok(m.registro.lineas.some(l => l.startsWith('[app] FALLO: El servidor se ha caído dos veces')));
-  }
+  // Una muerte reciente de verdad: diez segundos después de la anterior.
+  reloj += 10_000;
+  m.hijos[2].muere(139); await tic();
+  assert.equal(m.hijos.length, 3, 'no se relanza');
+  assert.deepEqual(m.salidas, [1]);
+  assert.equal(m.dialogos.length, 1);
+  assert.equal(m.dialogos[0].message, 'El servidor del cuaderno ha fallado');
+  assert.match(m.dialogos[0].detail, /se ha caído dos veces en menos de un minuto \(código 139\)/);
+  assert.match(m.dialogos[0].detail, /El registro está en \/config\/registro\.log/);
+  assert.ok(m.registro.lineas.some(l => l.startsWith('[app] FALLO: El servidor se ha caído dos veces')));
 });
 
 test('no relanza si el hijo sale durante el cierre: before-quit marca cerrando (lo vio el spike: app.quit() mata al hijo con 0)', async () => {
-  const m = montar();
-  await tic();
-  m.hijos[0].escucha(7331);
-  await m.estado.listo;
+  const m = await arrancado();
   m.electron.app.emitir('before-quit');
   assert.equal(m.estado.cerrando, true);
   assert.ok(m.hijos[0].muerto, 'al salir, el padre mata al hijo');
@@ -158,16 +184,37 @@ test('no relanza si el hijo sale durante el cierre: before-quit marca cerrando (
 });
 
 test('cerrar la última ventana: mata al hijo, sale, y la salida del hijo no cuenta como caída', async () => {
-  const m = montar();
-  await tic();
-  m.hijos[0].escucha(7331);
-  await m.estado.listo;
+  const m = await arrancado();
   m.electron.app.emitir('window-all-closed');
   assert.deepEqual(m.pasos.slice(-2), [`kill ${m.hijos[0].pid}`, 'quit']);
   await tic(); await tic();
   assert.equal(m.hijos.length, 1);
   assert.deepEqual(m.salidas, ['quit']);
   assert.ok(m.registro.lineas.includes('[app] el servidor ha salido con código null'));
+});
+
+test('cerrar la ventana durante «Arrancando…» (antes del puerto) no es un fallo: ni diálogo ni salida con 1, solo quit', async () => {
+  const m = montar();
+  await tic();
+  assert.equal(m.hijos.length, 1);
+  m.electron.app.emitir('window-all-closed');   // el hijo muere antes de decir su puerto
+  assert.equal(await m.estado.listo, false);
+  assert.equal(m.dialogos.length, 0);
+  assert.deepEqual(m.salidas, ['quit']);
+  assert.ok(m.registro.lineas.some(l => /^\[app\] durante el cierre: el servidor ha salido con código null antes de escuchar/.test(l)), m.registro.lineas.join('\n'));
+  assert.ok(!m.registro.lineas.some(l => /FALLO/.test(l)));
+});
+
+test('cerrar con un relanzado en vuelo (el hijo nuevo aún sin puerto) tampoco es un fallo', async () => {
+  const m = await arrancado();
+  m.hijos[0].muere(1); await tic();
+  assert.equal(m.hijos.length, 2);
+  m.electron.app.emitir('before-quit');   // mata al hijo relanzado antes de que escuche
+  await tic(); await tic();
+  assert.equal(m.dialogos.length, 0);
+  assert.deepEqual(m.salidas, []);
+  assert.equal(m.hijos.length, 2);
+  assert.ok(m.registro.lineas.some(l => /^\[app\] durante el cierre: El servidor no ha vuelto a arrancar/.test(l)));
 });
 
 test('si el hijo sale antes de decir el puerto: registro, diálogo con el motivo y salir con 1', async () => {
@@ -198,6 +245,41 @@ test('si da error antes del puerto, lo mismo; y si vence el tope (inyectable) ta
   // Un puerto que llegase tarde ya no cambia nada.
   lento.hijos[0].emit('message', { puerto: 1, token: 'x' }); await esperar(10);
   assert.equal(lento.ventanas[0].cargas.length, 1);
+});
+
+test('loadURL que falla: se reintenta una vez; si vuelve a fallar, fallo con el mensaje SIN el token (ni en el registro ni en el diálogo)', async () => {
+  const error = () => Object.assign(new Error("ERR_CONNECTION_REFUSED (-102) loading 'http://localhost:7331/?t=f00d'"), { code: 'ERR_CONNECTION_REFUSED', errno: -102 });
+  const unaVez = montar({ fallosURL: [error()] });
+  await tic(); unaVez.hijos[0].escucha(7331, 'f00d');
+  assert.equal(await unaVez.estado.listo, true);
+  assert.equal(unaVez.pasos.filter(p => p.startsWith('loadURL')).length, 2, 'un reintento');
+  assert.deepEqual(unaVez.ventanas[0].cargas.at(-1), { url: 'http://localhost:7331/?t=f00d' });
+  assert.ok(unaVez.registro.lineas.includes("[app] la ventana no ha cargado (ERR_CONNECTION_REFUSED (-102) loading 'http://localhost:7331/?t=…'): se reintenta"));
+  const dosVeces = montar({ fallosURL: [error(), error()] });
+  await tic(); dosVeces.hijos[0].escucha(7331, 'f00d');
+  assert.equal(await dosVeces.estado.listo, false);
+  assert.deepEqual(dosVeces.salidas, [1]);
+  assert.match(dosVeces.dialogos[0].detail, /^La ventana no ha podido cargar la app: ERR_CONNECTION_REFUSED \(-102\) loading 'http:\/\/localhost:7331\/\?t=…'/);
+  for (const texto of [...dosVeces.registro.lineas, dosVeces.dialogos[0].detail]) assert.ok(!texto.includes('f00d'), `el token se ha filtrado: ${texto}`);
+  assert.ok(dosVeces.hijos[0].muerto);
+});
+
+test('ERR_ABORTED en loadURL (otra carga la pisó: una recarga, un enlace) no es fallo: se anota y la app sigue; también tras un relanzado', async () => {
+  const abortado = () => Object.assign(new Error("ERR_ABORTED (-3) loading 'http://localhost:7331/?t=f00d'"), { code: 'ERR_ABORTED', errno: -3 });
+  const m = montar({ fallosURL: [abortado(), abortado()] });
+  await tic(); m.hijos[0].escucha(7331, 'f00d');
+  assert.equal(await m.estado.listo, true);
+  assert.equal(m.dialogos.length, 0); assert.deepEqual(m.salidas, []);
+  assert.ok(m.registro.lineas.some(l => l.startsWith('[app] carga de la ventana interrumpida por otra (no es fallo): ERR_ABORTED (-3) loading') && l.includes('?t=…') && !l.includes('f00d')));
+  m.hijos[0].muere(1); await tic();
+  m.hijos[1].escucha(7332, 'f00d'); await tic(); await tic(); await tic();
+  assert.equal(m.dialogos.length, 0); assert.deepEqual(m.salidas, []);
+  assert.equal(m.registro.lineas.filter(l => /interrumpida por otra/.test(l)).length, 2);
+});
+
+test('sinToken limpia cualquier ?t=<hex> de un texto y deja lo demás', () => {
+  assert.equal(sinToken("loading 'http://localhost:7331/?t=0123456789abcdef' y otra ?t=ff"), "loading 'http://localhost:7331/?t=…' y otra ?t=…");
+  assert.equal(sinToken('sin nada'), 'sin nada');
 });
 
 test('CUADERNO_SIN_DIALOGO: el diálogo se sustituye por una línea en el registro (para las pruebas sin nadie que lo cierre); un diálogo que falla tampoco para la salida', async () => {
