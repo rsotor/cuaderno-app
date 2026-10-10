@@ -19,3 +19,6 @@ Thumbs.db
 *.tmp
 *~
 .cobertura-pantalla/
+
+# Árboles de trabajo de los agentes de Claude Code (copias temporales del repo)
+.claude/worktrees/
