@@ -58,7 +58,8 @@ Comprobar, en este orden:
    **Guardar sigue funcionando** (el fallo 1 de §11 era justo este). Luego «Descartar» cierra.
 7. **Cerrar y volver a abrir:** la ventana vuelve al mismo tamaño y sitio; en Actividad no queda ningún proceso
    `Cuaderno` ni `electron`.
-8. **Elegir carpeta…** abre el diálogo del sistema; arrastrar una carpeta al icono del Dock la abre.
+8. **Elegir carpeta…** abre el diálogo del sistema; arrastrar una carpeta al icono del Dock la abre
+   (solo en la app empaquetada: con `npm run app` el icono es el de Electron y no admite el arrastre).
 
 ## 3. Guardar con un kit de verdad (10 min)
 

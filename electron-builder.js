@@ -65,6 +65,18 @@ module.exports = {
     icon: 'electron/icono/icono.png',   // electron-builder genera el .icns (npm run icono rehace el PNG desde el SVG)
     target: [{ target: 'dmg', arch: ['arm64', 'x64'] }],   // uno por arquitectura; sin universal (dobla el tamaño sin ganar nada)
     darkModeSupport: true,
+    // Arrastrar una carpeta al icono del Dock (prueba local, 2026-10-10): macOS solo la acepta, y manda `open-file`
+    // (electron/carpeta.js), si el Info.plist declara que la app admite carpetas. Sin esto el icono rechaza el arrastre.
+    // `Alternate` para NO ser la app por defecto que abre las carpetas en el Finder. Solo vale en el .app empaquetado:
+    // en desarrollo (`npm run app`) corre el Electron.app de node_modules, cuyo Info.plist es el de Electron.
+    extendInfo: {
+      CFBundleDocumentTypes: [{
+        CFBundleTypeName: 'Carpeta de notas',
+        CFBundleTypeRole: 'Viewer',
+        LSItemContentTypes: ['public.folder'],
+        LSHandlerRank: 'Alternate',
+      }],
+    },
   },
   dmg: { writeUpdateInfo: false },
   win: {

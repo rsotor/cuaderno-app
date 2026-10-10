@@ -42,6 +42,14 @@ test('Mac: firma ad hoc (identity "-") sin hardened runtime ni notarización; un
   assert.equal(config.mac.icon, 'electron/icono/icono.png');
 });
 
+test('Mac: el Info.plist declara que admite carpetas (public.folder, rango Alternate), para abrirlas arrastrándolas al Dock sin ser la app por defecto', () => {
+  const tipos = config.mac.extendInfo.CFBundleDocumentTypes;
+  const carpeta = tipos.find(t => t.LSItemContentTypes.includes('public.folder'));
+  assert.ok(carpeta, 'falta el tipo de documento public.folder');
+  assert.equal(carpeta.LSHandlerRank, 'Alternate');
+  assert.equal(carpeta.CFBundleTypeRole, 'Viewer');
+});
+
 test('Windows: NSIS x64 instalado por usuario, con sus pasos, sin pedir administrador ni dónde', () => {
   assert.deepEqual(config.win.target, [{ target: 'nsis', arch: ['x64'] }]);
   assert.equal(config.nsis.oneClick, false);
