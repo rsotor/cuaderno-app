@@ -310,6 +310,29 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
 - **Tests:** recorrido Electron que fuerza el diálogo con una ruta fija (en pruebas, `CUADERNO_DIALOGO_PRUEBA=<ruta>`
   y no abre diálogo); test de `arrancar` con `argv` que lleva carpeta; fila nueva en la tabla de casos.
 - **Estimación:** medio día. **Depende de:** T1.
+- **Hecha (2026-10-10, en un árbol aparte sobre `c22e0d4`, pendiente de integrar con T2).** Lo que difiere de lo escrito arriba,
+  y por qué: (1) todo lo de T4 va en un módulo nuevo, `electron/carpeta.js` (`crearAbridor`: el canal IPC, `open-file`, la
+  carpeta de `argv` y `second-instance`; `carpetaDeArgv`, `remitenteValido` y `abrirEnServidor` puros), y `app.js` solo lo
+  engancha en cuatro líneas (el preload en `webPreferences`, `tomar()` en el entorno del hijo y `despachar()` al llegar el
+  puerto), para no chocar con T2. (2) La carpeta que llega **con el servidor ya en marcha** (open-file o segunda instancia
+  con la app abierta) la abre **el padre** con `POST /api/abrir` al hijo, con la cookie del código (conoce puerto y token) y
+  sin `Origin` (navegación propia para el servidor), y después vuelve a cargar la URL de entrada: así no hace falta un canal
+  IPC más en el preload ni que la ventana esté cargada, y el servidor no cambia; el WebSocket de cambios no valía solo,
+  porque la pantalla lo ignora cuando no hay cuaderno abierto (Cuadernos). Si llega **antes** del puerto (argv, u open-file
+  durante «Arrancando…»), va al hijo en `CUADERNO_CARPETA` en lugar del último reciente; la que llega entre el fork y el
+  puerto se despacha al escuchar. Un relanzado tras una caída ya no lleva la carpeta de argv: vuelve al último reciente,
+  que es el que estaba abierto. (3) `carpetaDeArgv` salta el ejecutable, la ruta de la propia app cuando no está
+  empaquetada (`electron .`: el primer argumento que no es un flag; Playwright quita sus `--inspect=0` antes de que lleguen
+  a `process.argv`, comprobado) y los flags; las relativas se resuelven contra el directorio de trabajo (la segunda
+  instancia trae el suyo). (4) `open-file` con algo que no es una carpeta (un fichero) se ignora y se anota. (5) El preload
+  pasa `version` desde `additionalArguments` (`--cuaderno-version=<package.json>`): en el sandbox no se puede leer el
+  `package.json`; `tests/electron-carpeta.test.js` vigila que el único `require` sea `electron`. (6) El remitente del IPC se
+  valida con `event.senderFrame.url` que empiece por `http://localhost:<puerto>/`; lo demás se rechaza y queda en el registro.
+  (7) En `public/app.js`, con `window.cuadernoApp`: botón «Elegir carpeta…» junto a la casilla (que se queda), resumen de
+  Cuadernos, el 403 («cierra y vuelve a abrir la app») y el `#aviso-reinicio` (se reescribe el texto al cargar, sin tocar
+  `index.html`); sin él, nada cambia. (8) El recorrido `tests/electron/carpeta.test.js` (fila 26 del ejemplo) cubre además
+  la **segunda instancia real** (lanza el binario de Electron con otra carpeta y la primera la abre), que arriba no estaba
+  como test. Textos del 403 del servidor y `will-prevent-unload`: siguen en T2.
 
 ### T5 · Menú en castellano y atajos de app
 - **Qué:** `electron/menu.js` (tabla → plantilla), con roles estándar en Edición (sin ellos, en Mac no hay copiar y
