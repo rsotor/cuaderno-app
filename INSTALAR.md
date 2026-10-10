@@ -33,6 +33,35 @@ Los `.dmg` van por arquitectura: `arm64` para los Mac con chip Apple, `x64` para
 3. Hace falta **Windows 10 versión 1809 o más reciente** (o Windows 11): la terminal de la app usa ConPTY, que
    no existe antes.
 
+## Actualizar sin instalador: `npm run instalar`
+
+La app no se actualiza sola. En un ordenador con el repo clonado, `npm run instalar` deja instalada la última versión
+de `main`: la construye allí mismo (en Mac sin `.dmg`, en Windows con el instalador NSIS), cierra Cuaderno sin
+forzarla, la sustituye y la abre. Si Cuaderno no se cierra (por ejemplo, pregunta si descartas lo escrito), para
+sin instalar nada. `npm run instalar -- --simular` enseña los pasos sin ejecutar ninguno.
+
+**Preparación de una vez en el Windows del padre** (la hace quien le ayude, no hace falta repetirla):
+
+1. Instala **Node 24 o más reciente** (nodejs.org, instalador para Windows) y **git** (git-scm.com).
+2. Crea en GitHub un **token de acceso personal de grano fino** (Ajustes → Developer settings → Fine-grained tokens)
+   con acceso **solo a este repositorio** y el permiso **Contents: solo lectura**. El repo es privado y sin token
+   `git pull` no entra. El token no se guarda en ningún fichero del repo ni se pega en un chat.
+3. Clona el repo con el Administrador de credenciales de Windows (viene con git): al pedir usuario y contraseña, el
+   usuario es el de GitHub y la contraseña es el token; git lo guarda en el Administrador de credenciales y no vuelve a
+   preguntar.
+   ```
+   git clone <el repo> && cd cuaderno-app
+   ```
+4. Instala las dependencias y el binario de Electron (una vez; `npm run instalar` lo repite solo si cambian):
+   ```
+   npm ci
+   node node_modules/electron/install.js
+   ```
+5. Primera instalación: `npm run instalar`. SmartScreen puede avisar la primera vez (arriba, en Windows).
+
+Desde ahí, cada actualización es `npm run instalar` en esa carpeta, con la app cerrada o abierta sin cambios sin
+guardar. Se instala por usuario, sin administrador, en `%LOCALAPPDATA%\Programs\Cuaderno`.
+
 ## Dónde mira cuando algo falla
 
 - **Ayuda → Mostrar registro** abre `registro.log`, en la carpeta de configuración de la app (la misma que usa
