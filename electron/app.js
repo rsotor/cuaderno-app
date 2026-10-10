@@ -11,8 +11,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { entornoDeLaShell } = require('./entorno');
 const registroPorDefecto = require('./registro');
+const ventanaApp = require('./ventana');   // lo del navegador que en la app cambia: enlaces fuera, cerrar con cambios, permisos, tema
 
-const FONDO = { claro: '#ffffff', oscuro: '#1e1e1e', auto: '#ffffff' };   // el fondo hasta que carga la pantalla; T2 lo afina con nativeTheme
+const { FONDO } = ventanaApp;   // el fondo hasta que carga la pantalla, según el tema (con auto, el del sistema)
 const TOPE_PUERTO = 15_000;   // ms que se espera el puerto del hijo
 const TREGUA = 60_000;        // ms: dos muertes del hijo en menos de esto y la app se rinde
 const PANTALLA = { width: 1280, height: 800, title: 'Cuaderno', webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, partition: 'cuaderno' } };   // sin preload hasta T4
@@ -21,8 +22,9 @@ const sinToken = texto => String(texto).replace(/\?t=[0-9a-f]+/g, '?t=…');
 
 // Devuelve el estado (ventana, hijo, puerto, entorno, muertes, cerrando) y `listo`, la promesa del arranque (true si
 // la ventana cargó la app). Variables de prueba: CUADERNO_USERDATA (dónde va el lock de instancia única) y
-// CUADERNO_SIN_DIALOGO (el diálogo de error se anota y se da por cerrado).
-function arrancar({ electron, config, env = process.env, entorno = entornoDeLaShell, registro = registroPorDefecto, topePuerto = TOPE_PUERTO, tregua = TREGUA, ahora = Date.now, execPath = process.execPath, existe = r => fs.statSync(r).isDirectory() }) {
+// CUADERNO_SIN_DIALOGO (el diálogo de error se anota y se da por cerrado; en ventana.js, además, su valor fija la respuesta
+// a «¿Descartar lo escrito?»). `vigilar`: el fs.watch de config.json (inyectable en los tests).
+function arrancar({ electron, config, env = process.env, entorno = entornoDeLaShell, registro = registroPorDefecto, topePuerto = TOPE_PUERTO, tregua = TREGUA, ahora = Date.now, execPath = process.execPath, existe = r => fs.statSync(r).isDirectory(), vigilar = undefined }) {
   const { app, BrowserWindow, utilityProcess, dialog } = electron;
   const anotar = linea => registro.escribir(`[app] ${sinToken(linea)}`);
   const estado = { ventana: null, hijo: null, puerto: null, token: null, entorno: null, muertes: [], cerrando: false, listo: null };
@@ -102,9 +104,10 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
   };
 
   estado.listo = app.whenReady().then(async () => {
-    const tema = config.leer().tema;
-    const ventana = new BrowserWindow({ ...PANTALLA, backgroundColor: FONDO[tema] || FONDO.auto });
+    const { color } = ventanaApp.aplicarTema({ nativeTheme: electron.nativeTheme, config });   // themeSource según config.tema antes del primer píxel: sin flash blanco en oscuro
+    const ventana = new BrowserWindow({ ...PANTALLA, backgroundColor: color });
     estado.ventana = ventana;
+    ventanaApp.preparar({ ventana, electron, config, env, particion: PANTALLA.webPreferences.partition, puerto: () => estado.puerto, anotar, vigilar });
     await ventana.loadFile(path.join(__dirname, 'arrancando.html'));
     const r = await entorno({ env });   // asíncrono: el proceso principal sigue atendiendo eventos mientras la shell contesta (hasta 10 s)
     estado.entorno = { origen: r.origen, ms: r.ms, shell: r.shell, error: r.error, PATH: r.env.PATH, env: r.env };

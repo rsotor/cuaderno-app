@@ -4,21 +4,31 @@
 // cierre (sin relanzar, también a medio arrancar) y los fallos con diálogo y salida, sin que el token se filtre.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
 const { arrancar, sinToken, FONDO } = require('../electron/app');
 
+const carpetaConfig = fs.mkdtempSync(path.join(os.tmpdir(), 'cuaderno-app-config-'));   // la que «vigila» el fs.watch falso
+test.after(() => fs.rmSync(carpetaConfig, { recursive: true, force: true }));
+
 const tic = () => new Promise(r => setImmediate(r));
 const esperar = ms => new Promise(r => setTimeout(r, ms));
 
-// Un Electron de mentira: lo que app.js usa de app, BrowserWindow, utilityProcess y dialog, anotando cada paso en `pasos`.
-// `fallosURL`: errores con los que loadURL rechaza, en orden, antes de empezar a cargar bien.
-function electronFalso({ lock = true, fallosURL = [] } = {}) {
-  const pasos = [], ventanas = [], hijos = [], dialogos = [], salidas = [];
+// Un Electron de mentira: lo que app.js usa de app, BrowserWindow, utilityProcess y dialog (y lo que ventana.js usa de
+// webContents, session, shell y nativeTheme: aquí solo se comprueba que se enganchan; su conducta, en electron-ventana.test.js),
+// anotando cada paso en `pasos`. `fallosURL`: errores con los que loadURL rechaza, en orden, antes de empezar a cargar bien.
+function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false } = {}) {
+  const pasos = [], ventanas = [], hijos = [], dialogos = [], salidas = [], abiertos = [];
   const eventos = new EventEmitter();
   let pid = 100;
   class BrowserWindow {
-    constructor(opciones) { this.opciones = opciones; this.cargas = []; this.minimizada = false; this.enfocada = 0; ventanas.push(this); pasos.push('ventana'); }
+    constructor(opciones) {
+      this.opciones = opciones; this.cargas = []; this.minimizada = false; this.enfocada = 0; this.fondos = []; ventanas.push(this); pasos.push('ventana');
+      this.webContents = Object.assign(new EventEmitter(), { manejadorVentanas: null, setWindowOpenHandler(f) { this.manejadorVentanas = f; } });
+    }
+    setBackgroundColor(c) { this.fondos.push(c); }
     async loadFile(f) { this.cargas.push({ fichero: f }); pasos.push('loadFile'); }
     async loadURL(u) { pasos.push(`loadURL ${u}`); if (fallosURL.length) throw fallosURL.shift(); this.cargas.push({ url: u }); }
     isMinimized() { return this.minimizada; }
@@ -41,21 +51,28 @@ function electronFalso({ lock = true, fallosURL = [] } = {}) {
     quit() { pasos.push('quit'); salidas.push('quit'); eventos.emit('before-quit'); }, exit(c) { pasos.push(`exit ${c}`); salidas.push(c); },
   };
   const dialog = { showMessageBoxSync(o) { dialogos.push(o); pasos.push('diálogo'); return 0; } };
-  return { electron: { app, BrowserWindow, utilityProcess, dialog }, pasos, ventanas, hijos, dialogos, salidas };
+  const nativeTheme = { themeSource: 'system', shouldUseDarkColors: sistemaOscuro };
+  const sesiones = {};
+  const session = { fromPartition(p) { sesiones[p] = sesiones[p] || { manejadorPermisos: null, setPermissionRequestHandler(f) { this.manejadorPermisos = f; } }; return sesiones[p]; } };
+  const shell = { async openExternal(u) { abiertos.push(u); } };
+  return { electron: { app, BrowserWindow, utilityProcess, dialog, nativeTheme, session, shell }, pasos, ventanas, hijos, dialogos, salidas, sesiones, abiertos };
 }
 // Una configuración de mentira; `recientes` puede ser una función para que cambie entre el arranque y una caída.
-const configFalsa = ({ tema = 'auto', recientes = [] } = {}) => ({ leer: () => ({ tema, recientes: typeof recientes === 'function' ? recientes() : recientes }), cuadernoAlArrancar: require('../config').cuadernoAlArrancar });
+const configFalsa = ({ tema = 'auto', recientes = [] } = {}) => ({ leer: () => ({ tema, recientes: typeof recientes === 'function' ? recientes() : recientes }), cuadernoAlArrancar: require('../config').cuadernoAlArrancar, carpeta: () => carpetaConfig });
+// Un fs.watch de mentira: anota qué carpeta se vigila y deja disparar el cambio a mano.
+const vigilanteFalso = () => { const v = { carpetas: [], avisar: null, cerrado: 0 }; v.vigilar = (dir, f) => { v.carpetas.push(dir); v.avisar = f; return { close() { v.cerrado++; } }; }; return v; };
 const registroFalso = () => { const lineas = []; return { lineas, escribir: l => lineas.push(l), ruta: () => '/config/registro.log' }; };
 // Un entorno de la shell de mentira: anota cuántas ventanas había al llamarlo y devuelve un PATH propio.
 const entornoFalso = (f, { PATH = '/shell/bin:/usr/bin' } = {}) => ({ env }) => { f.vistas = f.ventanas.length; return { env: { ...env, PATH, LANG: 'es_ES.UTF-8' }, origen: 'shell -lc', ms: 7, shell: '/bin/zsh' }; };
 
 // Monta un arranque: `lock` y `fallosURL` son del Electron falso; lo demás va a `arrancar`.
-function montar({ env = {}, config = configFalsa(), topePuerto = 500, lock, fallosURL, ...paraArrancar } = {}) {
-  const f = electronFalso({ lock, fallosURL });
+function montar({ env = {}, config = configFalsa(), topePuerto = 500, lock, fallosURL, sistemaOscuro, ...paraArrancar } = {}) {
+  const f = electronFalso({ lock, fallosURL, sistemaOscuro });
   const registro = registroFalso();
   const entorno = entornoFalso(f);
-  const estado = arrancar({ electron: f.electron, config, env: { PATH: '/usr/bin', ...env }, entorno, registro, topePuerto, execPath: '/apps/Cuaderno', existe: () => true, ...paraArrancar });
-  return { ...f, registro, estado, get vistas() { return f.vistas; } };
+  const vigilante = vigilanteFalso();
+  const estado = arrancar({ electron: f.electron, config, env: { PATH: '/usr/bin', ...env }, entorno, registro, topePuerto, execPath: '/apps/Cuaderno', existe: () => true, vigilar: vigilante.vigilar, ...paraArrancar });
+  return { ...f, registro, estado, vigilante, get vistas() { return f.vistas; } };
 }
 // Un arranque ya con la app cargada en el puerto 7331.
 async function arrancado(opciones) { const m = montar(opciones); await tic(); m.hijos[0].escucha(7331, 't0k'); assert.equal(await m.estado.listo, true); return m; }
@@ -92,14 +109,42 @@ test('arranca en orden: userData de pruebas, instancia única, ventana con el fo
   assert.ok(m.registro.lineas.includes(`[app] servidor lanzado (pid ${h.pid})`));
 });
 
-test('sin recientes, el hijo arranca sin CUADERNO_CARPETA (pantalla de cuadernos); con tema claro o auto, fondo blanco', async () => {
+test('sin recientes, el hijo arranca sin CUADERNO_CARPETA (pantalla de cuadernos); con tema claro, o auto sobre un sistema claro, fondo blanco', async () => {
   const m = montar({ config: configFalsa({ tema: 'claro' }) });
   await tic();
   assert.equal('CUADERNO_CARPETA' in m.hijos[0].opciones.env, false);
   assert.equal(m.ventanas[0].opciones.backgroundColor, '#ffffff');
+  assert.equal(m.electron.nativeTheme.themeSource, 'light');
   m.hijos[0].escucha(40000);
   await m.estado.listo;
   assert.ok(m.registro.lineas.includes('[app] servidor en el puerto 40000; sin cuaderno: pantalla de cuadernos'));
+  const auto = montar({ config: configFalsa({ tema: 'auto' }) });
+  await tic();
+  assert.equal(auto.ventanas[0].opciones.backgroundColor, '#ffffff'); assert.equal(auto.electron.nativeTheme.themeSource, 'system');
+  auto.electron.app.emitir('before-quit');
+});
+
+test('tema: oscuro fijo → themeSource dark y fondo oscuro; auto sobre un sistema oscuro → fondo oscuro (nunca blanco); la ventana lleva los tratos de ventana.js (enlaces, cierre, permisos de la partición, vigilante de config.json que se cierra al salir)', async () => {
+  const m = await arrancado({ config: configFalsa({ tema: 'oscuro' }) });
+  assert.equal(m.electron.nativeTheme.themeSource, 'dark');
+  assert.equal(m.ventanas[0].opciones.backgroundColor, FONDO.oscuro);
+  const wc = m.ventanas[0].webContents;
+  assert.equal(typeof wc.manejadorVentanas, 'function', 'setWindowOpenHandler');
+  for (const e of ['will-navigate', 'will-prevent-unload', 'did-create-window']) assert.equal(wc.listenerCount(e), 1, e);
+  assert.equal(typeof m.sesiones.cuaderno.manejadorPermisos, 'function', 'setPermissionRequestHandler en la sesión de la partición de la ventana');
+  assert.deepEqual(m.vigilante.carpetas, [carpetaConfig], 'vigila la carpeta de configuración');
+  // Un enlace de la pantalla a otra web va al navegador del sistema y la ventana no navega; el puerto propio es el de ahora.
+  const navegacion = { impedida: 0, preventDefault() { this.impedida++; } };
+  wc.emit('will-navigate', navegacion, 'https://example.com/x');
+  assert.equal(navegacion.impedida, 1); await tic(); assert.deepEqual(m.abiertos, ['https://example.com/x']);
+  wc.emit('will-navigate', navegacion, 'http://localhost:7331/#/n/inicio.md');
+  assert.equal(navegacion.impedida, 1, 'lo propio navega');
+  m.electron.app.emitir('before-quit');
+  assert.equal(m.vigilante.cerrado, 1);
+  const oscuroPorSistema = montar({ config: configFalsa({ tema: 'auto' }), sistemaOscuro: true });
+  await tic();
+  assert.equal(oscuroPorSistema.ventanas[0].opciones.backgroundColor, FONDO.oscuro); assert.equal(oscuroPorSistema.electron.nativeTheme.themeSource, 'system');
+  oscuroPorSistema.electron.app.emitir('before-quit');
 });
 
 test('si el hijo muere después de arrancar, se relanza una vez con el mismo entorno (PATH, CUADERNO_NODE) y la ventana se recarga en la URL nueva (el puerto puede cambiar)', async () => {
