@@ -1,8 +1,11 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { leerExamen, marcar, validable } = require('../formulario');
-const { NOTAS } = require('./ayuda');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { leerExamen, marcar, validable, corregir } = require('../formulario');
+const { NOTAS, otroNode, herramientasChivatas } = require('./ayuda');
 
 const cuerpo = NOTAS['examenes/01-examen.md'].split('\n').slice(8).join('\n');   // sin frontmatter (8 líneas)
 
@@ -36,4 +39,27 @@ test('el histórico queda fuera del formulario', () => {
 test('sin kit no se puede corregir, y se dice por qué (el curso sin motor lo prueba guardar.test.js)', () => {
   const v = validable('/x', { tipo: 'carpeta' }, 'e.md', {});
   assert.equal(v.ok, false); assert.match(v.motivo, /Sin kit no hay quien corrija/);
+});
+
+// Con qué Node corre examen.js (plan de Electron, T3): por defecto, el de este proceso; la app de escritorio inyecta
+// ejecutarNode = { cmd, env }. El examen.js falso chiva lo que recibe.
+test('con kit: corregir y la revisión lanzan examen.js con el Node de este proceso; con ejecutarNode, con ese Node y su entorno', () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'cuaderno-examen-'));
+  const leerLanzado = herramientasChivatas(d, ['examen.js']);
+  const KIT = { tipo: 'kit' };
+  try {
+    const r = corregir(d, 'estudio/examenes/01-examen.md');
+    assert.equal(r.codigo, 0, r.salida);
+    const l = JSON.parse(r.salida);
+    assert.deepEqual(l.args, ['--corregir', 'estudio/examenes/01-examen.md']); assert.equal(l.execPath, process.execPath); assert.equal(l.RUN_AS_NODE, undefined);
+    const ejecutarNode = { cmd: otroNode(), env: { ELECTRON_RUN_AS_NODE: '1' } };
+    const c = JSON.parse(corregir(d, 'e.md', { ejecutarNode }).salida);
+    assert.deepEqual(c.args, ['--corregir', 'e.md']);
+    assert.equal(path.basename(c.execPath), path.basename(ejecutarNode.cmd)); assert.notEqual(c.execPath, process.execPath);
+    assert.equal(c.RUN_AS_NODE, '1'); assert.equal(c.PATH, process.env.PATH);   // su entorno sumado al de este proceso, no en su lugar
+    // La revisión (examen de módulo sin intentos) pasa por la misma herramienta con el mismo Node; la falsa sale con 0: «revisada».
+    assert.deepEqual(validable(d, KIT, 'e.md', { tipo_examen: 'modulo', intentos: 0 }, { ejecutarNode }), { ok: true, motivo: null });
+    const v = leerLanzado();
+    assert.deepEqual(v.args, ['--revision', 'e.md']); assert.equal(path.basename(v.execPath), path.basename(ejecutarNode.cmd)); assert.equal(v.RUN_AS_NODE, '1');
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });

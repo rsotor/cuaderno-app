@@ -45,4 +45,29 @@ function crearCuaderno({ crlf = false, kit = false, ignorar = '', obsidianignore
   return { raiz, base, leer: rel => fs.readFileSync(path.join(base, rel), 'utf8'), borrar: () => fs.rmSync(raiz, { recursive: true, force: true }) };
 }
 
-module.exports = { crearCuaderno, NOTAS, EJEMPLOS };
+// Un «otro Node» para probar ejecutarNode (plan de Electron, T3): una copia de process.execPath con otro nombre, así una
+// herramienta falsa del kit puede decir con qué binario la han lanzado (process.execPath) y distinguirlo del de este
+// proceso. Una copia por proceso de test; se borra al salir.
+let nodeCopiado = null;
+function otroNode() {
+  if (nodeCopiado) return nodeCopiado;
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'cuaderno-node-'));
+  nodeCopiado = path.join(d, `node-del-kit${path.extname(process.execPath)}`);
+  fs.copyFileSync(process.execPath, nodeCopiado);
+  process.on('exit', () => fs.rmSync(d, { recursive: true, force: true }));
+  return nodeCopiado;
+}
+
+// Herramientas del kit falsas que chivan con qué las han lanzado: { execPath, args, PATH, GIT_TERMINAL_PROMPT, LC_ALL,
+// RUN_AS_NODE } en su salida y en .kit/herramientas/lanzado.json (para cuando la salida no llega al test: la revisión del
+// examen, las rutas). Devuelve la función que lee ese fichero.
+const CHIVATA = `const j = JSON.stringify({ execPath: process.execPath, args: process.argv.slice(2), PATH: process.env.PATH, GIT_TERMINAL_PROMPT: process.env.GIT_TERMINAL_PROMPT, LC_ALL: process.env.LC_ALL, RUN_AS_NODE: process.env.ELECTRON_RUN_AS_NODE });
+require('fs').writeFileSync(require('path').join(__dirname, 'lanzado.json'), j); process.stdout.write(j);`;
+function herramientasChivatas(raiz, nombres) {
+  const dir = path.join(raiz, '.kit', 'herramientas');
+  fs.mkdirSync(dir, { recursive: true });
+  for (const n of nombres) fs.writeFileSync(path.join(dir, n), CHIVATA);
+  return () => JSON.parse(fs.readFileSync(path.join(dir, 'lanzado.json'), 'utf8'));
+}
+
+module.exports = { crearCuaderno, NOTAS, EJEMPLOS, otroNode, herramientasChivatas };
