@@ -636,12 +636,19 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
 3. **La marca de la web**: etiqueta sola con línea en el README (recomendado), Release con zip, o carpeta
    `legado/` con un LEEME (§7).
 4. **Dónde se construye el `.dmg` de su Mac**: en CI (descarga con cuarentena: «Abrir de todos modos») o en su
-   ordenador con `npm run empaquetar` (sin cuarentena). Para el Windows de su padre, CI.
+   ordenador con `npm run empaquetar` (sin cuarentena). Para el Windows de su padre, CI. **Decidido (Roberto,
+   2026-10-10, tras §5 bis):** el `.dmg` de su Mac se construye en su Mac (`npm run empaquetar:instaladores`: menos de
+   un minuto, abre sin Gatekeeper, sin cuota); la CI, solo para el `.exe` del padre.
 5. **¿Hacer público el repo antes del empaquetado en CI?** Público: la CI de Mac y Windows no gasta cuota y
    «Buscar versión nueva» es posible sin token. Privado: unos 100 min de cuota por build completo y sin aviso de
-   versión nueva.
+   versión nueva. **Decidido (Roberto, 2026-10-10): privado de momento.** Con el `.dmg` hecho en su Mac (§8.4), la CI
+   solo hace falta para el `.exe` del padre, una vez; hacerlo público pide antes lo del Inbox del plan vivo (guía
+   `repo-publico`, consulta sobre el chat).
 6. **Arranque al iniciar sesión**: fuera (recomendado: sin firma falla en silencio en Mac) o a mano para el
-   padre (carpeta Inicio de Windows).
+   padre (carpeta Inicio de Windows). **Decidido (Roberto, 2026-10-10): fuera de la app, y apuntado.** Sin firma de
+   Apple, `app.setLoginItemSettings` falla en silencio en Mac. Si se quiere, a mano y sin tocar la app: en Mac, Ajustes
+   del sistema → General → Ítems de inicio → «+» → Cuaderno; en Windows, un acceso directo a Cuaderno en la carpeta
+   Inicio (`Win+R` → `shell:startup`). Se retoma si la app llega a tener firma.
 7. **Qué Windows tiene su padre** (conpty necesita Windows 10 1809 o más).
 8. **⌘S con el editor de la nota abierto** (salió en la prueba en su Mac, §5 bis). **Decidido (Roberto, 2026-10-10):
    la opción A**: con el editor abierto, ⌘S escribe la nota (lo mismo que Aplicar / ⌘Enter); sin editor, sigue siendo el
