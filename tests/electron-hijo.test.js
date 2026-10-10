@@ -1,6 +1,6 @@
 'use strict';
 // El servidor dentro del utilityProcess (electron/hijo.js) con un parentPort falso: manda { puerto, token } solo al
-// escuchar; con el puerto ocupado, escucha en otro; abre el cuaderno del padre; cierra cuando se lo piden.
+// escuchar; con el puerto ocupado, escucha en otro; abre el cuaderno del padre.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -80,16 +80,13 @@ test('el Node del kit que recibe crearServidor es el de CUADERNO_NODE con ELECTR
   assert.equal(recibido[0].pty, pty);
 });
 
-test('la orden «cerrar» del padre cierra el servidor y sale con 0; otro error al escuchar sale con 1', async () => {
+test('otro error al escuchar (no EADDRINUSE) se anota y sale con 1; el hijo no atiende órdenes del padre (lo para con kill)', async () => {
   const parentPort = padreFalso(), registro = registroFalso(), salidas = [];
   const server = arrancarHijo({ crearServidor, config, parentPort, registro, env: {}, puerto: 0, salir: c => salidas.push(c) });
   await parentPort.primerMensaje();
-  parentPort.emit('message', { data: { orden: 'otra' } });
-  assert.deepEqual(salidas, []);
-  parentPort.emit('message', { data: { orden: 'cerrar' } });
-  assert.deepEqual(salidas, [0]);
-  assert.equal(server.listening, false);
+  assert.equal(parentPort.listenerCount('message'), 0, 'sin oyentes de mensajes del padre');
   server.emit('error', Object.assign(new Error('permiso denegado'), { code: 'EACCES' }));
-  assert.deepEqual(salidas, [0, 1]);
+  assert.deepEqual(salidas, [1]);
   assert.ok(registro.lineas.includes('[hijo] error del servidor: permiso denegado'));
+  await cerrar(server);
 });
