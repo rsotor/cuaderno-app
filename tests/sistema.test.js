@@ -47,3 +47,17 @@ test('aPapelera: si el fichero sigue ahí después de la orden, falla con lo que
   assert.equal(visto, abs); assert.ok(!fs.existsSync(abs));
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('repararAyudantePty: el spawn-helper de node-pty sin permiso de ejecución se repara; con permiso, «bien»; sin ayudante o en Windows, «no-hay»', { skip: process.platform === 'win32' && 'en Windows no hay chmod' }, () => {
+  const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'pty-'));
+  const ayudante = path.join(raiz, 'node_modules', 'node-pty', 'prebuilds', 'darwin-arm64', 'spawn-helper');
+  assert.equal(sistema.repararAyudantePty({ raiz, plataforma: 'darwin', arquitectura: 'arm64' }), 'no-hay');
+  fs.mkdirSync(path.dirname(ayudante), { recursive: true });
+  fs.writeFileSync(ayudante, '#!/bin/sh\n', { mode: 0o644 });
+  assert.equal(sistema.repararAyudantePty({ raiz, plataforma: 'darwin', arquitectura: 'arm64' }), 'reparado');
+  assert.doesNotThrow(() => fs.accessSync(ayudante, fs.constants.X_OK));
+  assert.equal(sistema.repararAyudantePty({ raiz, plataforma: 'darwin', arquitectura: 'arm64' }), 'bien');
+  assert.equal(sistema.repararAyudantePty({ raiz, plataforma: 'win32', arquitectura: 'x64' }), 'no-hay');
+  assert.equal(sistema.repararAyudantePty({ raiz, plataforma: 'linux', arquitectura: 'x64' }), 'no-hay', 'Linux compila: sin prebuild');
+  fs.rmSync(raiz, { recursive: true, force: true });
+});
