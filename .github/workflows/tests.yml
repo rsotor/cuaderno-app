@@ -1,7 +1,14 @@
 # Tests del repo en GitHub Actions.
-#   push (solo main)    → Linux: npm test + recorridos de navegador. En una rama, la lanza su pull request (no dos veces el mismo commit).
-#   pull_request        → Linux, macOS y Windows: lo mismo en los tres (el run de Windows compila node-pty con Node 24).
-#   workflow_dispatch   → los tres sistemas, a mano, desde la pestaña Actions.
+#   push (solo main)    → Linux: npm test + recorridos de navegador + recorridos de Electron (xvfb-run). En una rama, la
+#                         lanza su pull request (no dos veces el mismo commit).
+#   pull_request        → Linux, macOS y Windows: lo mismo en los tres (el run de Windows compila node-pty con Node 24),
+#                         salvo los recorridos de Electron, que en Mac y Windows solo corren a mano (coste: R5 del plan).
+#   workflow_dispatch   → los tres sistemas, a mano, desde la pestaña Actions, con los recorridos de Electron en los tres.
+# Los recorridos de Electron (`tests/electron/`, Playwright `_electron`, experimental) van en un paso propio con su tiempo
+# máximo: si fallan por su cuenta se pueden pasar a manual sin tocar el resto (R9). El binario de Electron (~100 MB) no lo
+# baja `npm ci` (Electron 44 no tiene postinstall): lo baja `node node_modules/electron/install.js` en un paso explícito,
+# con la caché de descargas de @electron/get guardada entre runs (actions/cache). Empaquetar (.dmg y .exe) es otro
+# workflow, empaquetar.yml: a mano o con una etiqueta v*.
 # Solo se lanza cuando cambia algo que afecta a los tests: código, pantalla, la app de escritorio (electron/ y su
 # empaquetado), tests, dependencias o este fichero (el filtro `*.js` no cruza directorios: electron/** va aparte).
 # Un commit que solo toca docs/, capturas o Markdown no gasta nada.
@@ -91,3 +98,35 @@ jobs:
       - name: Cobertura de la pantalla (informe)
         if: runner.os == 'Linux'
         run: node pruebas/cobertura-pantalla.js .cobertura-pantalla
+
+      # ── Recorridos de Electron ─────────────────────────────────────────────────────────────────────────────────────
+      # En Linux siempre; en Mac y Windows solo a mano (workflow_dispatch): el run de Mac cuenta ×10 en repo privado y el
+      # recorrido es el mismo código en los tres sistemas. La misma condición en los cuatro pasos.
+      - name: Versión de Electron (para la clave de la caché)
+        id: electron
+        if: runner.os == 'Linux' || github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: echo "version=$(node -p "require('./node_modules/electron/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Caché del binario de Electron
+        if: runner.os == 'Linux' || github.event_name == 'workflow_dispatch'
+        uses: actions/cache@v4
+        with:
+          # La caché de descargas de @electron/get, que es la misma para install.js y para electron-builder: cada sistema
+          # usa la suya (el resto no existe en ese runner y actions/cache lo ignora). Un zip por versión y arquitectura.
+          path: |
+            ~/.cache/electron
+            ~/Library/Caches/electron
+            ~/AppData/Local/electron/Cache
+          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ steps.electron.outputs.version }}
+
+      - name: Binario de Electron
+        # Con la caché presente no descarga nada: solo extrae el zip en node_modules/electron/dist (~2 s).
+        if: runner.os == 'Linux' || github.event_name == 'workflow_dispatch'
+        run: node node_modules/electron/install.js
+
+      - name: Recorridos de Electron
+        # Sin pantalla en Linux: xvfb-run. Los tests fijan TMPDIR corto, configuración y userData temporales.
+        if: runner.os == 'Linux' || github.event_name == 'workflow_dispatch'
+        timeout-minutes: 10
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a npm run test:electron' || 'npm run test:electron' }}
