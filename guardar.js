@@ -17,9 +17,13 @@ function ejecutar(cwd, cmd, args, timeout = 120_000, extra = {}) {
 const git = (raiz, args) => ejecutar(raiz, 'git', args, 60_000);
 const esRepo = raiz => git(raiz, ['rev-parse', '--is-inside-work-tree']).salida === 'true';
 const tieneRemoto = raiz => git(raiz, ['rev-parse', '--abbrev-ref', '@{upstream}']).codigo === 0;
-// Con qué Node se lanza una herramienta del kit: por defecto el de este proceso; la app de escritorio inyecta
-// ejecutarNode = { cmd, env } (el binario de Electron con ELECTRON_RUN_AS_NODE=1).
-const herramienta = (raiz, nombre, args, ejecutarNode = null) => ejecutar(raiz, ejecutarNode ? ejecutarNode.cmd : process.execPath, [path.join('.kit', 'herramientas', nombre), ...args], 120_000, ejecutarNode ? ejecutarNode.env : {});
+// Con qué Node se lanza una herramienta del kit: por defecto, el de este proceso (process.execPath). La app de
+// escritorio inyecta ejecutarNode = { cmd, env }, porque dentro de Electron process.execPath es el binario de Electron
+// (lanzaría una ventana, no el script) y con ELECTRON_RUN_AS_NODE=1 en el entorno se comporta como node.
+const herramienta = (raiz, nombre, args, ejecutarNode = null) => {
+  const { cmd = process.execPath, env = {} } = ejecutarNode || {};
+  return ejecutar(raiz, cmd, [path.join('.kit', 'herramientas', nombre), ...args], 120_000, env);
+};
 
 // Lo que ha cambiado desde el último guardado, como lo ve git, con nombres de nota (sin ruta ni .md).
 function cambios(raiz) {

@@ -45,9 +45,11 @@ function marcar(texto, respuestas) {
   return lineas.join(eol);
 }
 
-// ejecutarNode = { cmd, env }: con qué Node se lanza examen.js (la app de escritorio inyecta el de Electron); por defecto, el de este proceso.
+// Con qué Node se lanza examen.js: por defecto, el de este proceso. La app de escritorio inyecta ejecutarNode = { cmd, env }
+// (como en guardar.js): en Electron process.execPath es el binario de Electron, y con ELECTRON_RUN_AS_NODE=1 hace de node.
 const herramienta = (raiz, args, ejecutarNode = null) => {
-  const r = spawnSync(ejecutarNode ? ejecutarNode.cmd : process.execPath, [path.join('.kit', 'herramientas', 'examen.js'), ...args], { cwd: raiz, encoding: 'utf8', timeout: 120_000, env: { ...process.env, ...(ejecutarNode ? ejecutarNode.env : {}) } });
+  const { cmd = process.execPath, env = {} } = ejecutarNode || {};
+  const r = spawnSync(cmd, [path.join('.kit', 'herramientas', 'examen.js'), ...args], { cwd: raiz, encoding: 'utf8', timeout: 120_000, env: { ...process.env, ...env } });
   return { codigo: r.status ?? 1, salida: `${r.stdout || ''}${r.stderr || ''}`.trim() };
 };
 // ¿Se puede validar este examen con el kit? Solo con motor y, si es de módulo o final, con la revisión resuelta.
