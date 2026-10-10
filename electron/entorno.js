@@ -5,11 +5,13 @@
 // prompt o los avisos de nvm, y `env -0` separa por \0, que no aparece en ningún valor; fish también exporta PATH con
 // `:` así). Primero `-lc`; `-ilc` solo si con `-lc` no llega nada (hay quien pone el PATH en el .bashrc). Tope de
 // 10 s; si la shell falla o tarda, quedan las rutas de respaldo, que se añaden siempre. Todo puro e inyectable: la
-// shell es `env.SHELL` (en los tests, un script) y `ejecutar` es spawnSync salvo que se inyecte otro.
+// shell es `env.SHELL` (en los tests, un script) y `ejecutar` lanza con spawn (asíncrono: el proceso principal sigue
+// atendiendo eventos mientras espera; con spawnSync, en el Mac el menú no respondía esos segundos) salvo que se inyecte otro.
+// Aquí viven también las funciones puras de la ventana (plan §2): esquemaPermitido (qué enlaces van fuera) y temaNativo.
 const os = require('node:os');
 const path = require('node:path');
 const fs = require('node:fs');
-const { spawnSync } = require('node:child_process');
+const { spawn } = require('node:child_process');
 
 const MARCADOR = '__CUADERNO__';
 const IMPORTAR = /^(PATH|LANG|LC_[A-Z_]+|SSH_AUTH_SOCK|GIT_[A-Z_]+)$/;   // lo que se toma de la shell; lo demás, no
@@ -37,22 +39,37 @@ function parsear(salida) {
   return vars;
 }
 
+const MAX_SALIDA = 8 * 1024 * 1024;   // bytes de stdout que se aceptan de la shell: más es que algo va mal
+
+// Lanza la shell y resuelve con { stdout, status, error? } (el contrato de spawnSync, que es lo que había): error con
+// code ETIMEDOUT si pasa el tope (se mata la shell y se sueltan sus tuberías: un `sleep` nieto no la retiene), ENOENT
+// si no existe. Nunca rechaza.
 function ejecutarShell(shell, args, { timeout, env }) {
-  const r = spawnSync(shell, args, { encoding: 'utf8', timeout, env, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 8 * 1024 * 1024 });
-  return { stdout: r.stdout || '', status: r.status, error: r.error };
+  return new Promise(resolver => {
+    let stdout = '', hijo, acabado = false, temporizador;
+    const acabar = r => { if (acabado) return; acabado = true; clearTimeout(temporizador); resolver(r); };
+    const soltar = () => { for (const t of [hijo.stdout, hijo.stderr]) { try { t.destroy(); } catch { /* ya cerrada */ } } };
+    try { hijo = spawn(shell, args, { env, stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { return acabar({ stdout: '', status: null, error: e }); }
+    temporizador = setTimeout(() => { try { hijo.kill('SIGKILL'); } catch { /* ya muerta */ } soltar(); acabar({ stdout, status: null, error: Object.assign(new Error(`${shell}: no ha contestado en ${timeout} ms`), { code: 'ETIMEDOUT' }) }); }, timeout);
+    hijo.stdout.setEncoding('utf8');
+    hijo.stdout.on('data', d => { stdout += d; if (stdout.length > MAX_SALIDA) { try { hijo.kill('SIGKILL'); } catch { /* ya muerta */ } soltar(); acabar({ stdout: '', status: null, error: Object.assign(new Error(`${shell}: demasiada salida`), { code: 'ENOBUFS' }) }); } });
+    hijo.stderr.resume();   // el ruido de la shell se descarta, pero hay que leerlo para que no se atasque
+    hijo.on('error', e => acabar({ stdout, status: null, error: e }));
+    hijo.on('close', status => acabar({ stdout, status }));
+  });
 }
 
-// Devuelve { env, origen, ms, shell, error? }: `env` es el de partida con PATH, LANG, LC_*, SSH_AUTH_SOCK y GIT_*
+// Devuelve (promesa) { env, origen, ms, shell, error? }: `env` es el de partida con PATH, LANG, LC_*, SSH_AUTH_SOCK y GIT_*
 // de la shell de login y las rutas de respaldo añadidas al PATH. origen: 'shell -lc' | 'shell -ilc' | 'respaldo'
 // (la shell no contestó: `error` dice por qué) | 'sistema' (Windows: no se ejecuta nada ni se añade nada).
-function entornoDeLaShell({ env = process.env, plataforma = process.platform, ejecutar = ejecutarShell, tope = TOPE, home = os.homedir(), shell = env.SHELL || '/bin/sh' } = {}) {
+async function entornoDeLaShell({ env = process.env, plataforma = process.platform, ejecutar = ejecutarShell, tope = TOPE, home = os.homedir(), shell = env.SHELL || '/bin/sh' } = {}) {
   const t0 = Date.now();
   const resultado = { env: { ...env }, origen: 'sistema', ms: 0, shell: null };
   if (plataforma === 'win32') return resultado;
   resultado.origen = 'respaldo';
   resultado.shell = shell;
   for (const flags of ['-lc', '-ilc']) {
-    const r = ejecutar(shell, [flags, ORDEN], { timeout: tope, env: { ...env } });   // copia: spawnSync escribe en el env que recibe (NODE_V8_COVERAGE)
+    const r = await ejecutar(shell, [flags, ORDEN], { timeout: tope, env: { ...env } });   // copia: lo que se lanza no debe escribir en el env de partida (NODE_V8_COVERAGE)
     if (r.error) { resultado.error = `${shell} ${flags}: ${r.error.code === 'ETIMEDOUT' ? `no ha contestado en ${tope / 1000} s` : r.error.message}`; break; }
     const vars = parsear(r.stdout);
     if (vars && vars.PATH) {
@@ -76,4 +93,16 @@ function nodeDelKit(env = process.env) {
   return { cmd: env.CUADERNO_NODE || process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' } };
 }
 
-module.exports = { entornoDeLaShell, nodeDelKit, parsear, respaldo, MARCADOR, IMPORTAR, TOPE };
+// Qué enlaces de una nota pueden ir al navegador del sistema (shell.openExternal): solo web y correo. Un `file:`,
+// `smb:`, `vnc:` o `javascript:` no se pasa (lista de seguridad de Electron); la ventana lo anota y no hace nada.
+const ESQUEMAS = ['http:', 'https:', 'mailto:'];
+function esquemaPermitido(url) {
+  try { return ESQUEMAS.includes(new URL(String(url)).protocol); } catch { return false; }
+}
+
+// El tema de config.json en palabras de nativeTheme.themeSource: auto → system, claro → light, oscuro → dark; cualquier
+// otra cosa (un config.json viejo o roto) → system, que es lo que hace config.leer con un tema que no conoce.
+const TEMAS_NATIVOS = { auto: 'system', claro: 'light', oscuro: 'dark' };
+function temaNativo(tema) { return TEMAS_NATIVOS[tema] || 'system'; }
+
+module.exports = { entornoDeLaShell, ejecutarShell, nodeDelKit, esquemaPermitido, temaNativo, parsear, respaldo, MARCADOR, IMPORTAR, TOPE, ESQUEMAS };

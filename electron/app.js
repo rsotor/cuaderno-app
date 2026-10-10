@@ -106,7 +106,7 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
     const ventana = new BrowserWindow({ ...PANTALLA, backgroundColor: FONDO[tema] || FONDO.auto });
     estado.ventana = ventana;
     await ventana.loadFile(path.join(__dirname, 'arrancando.html'));
-    const r = entorno({ env });
+    const r = await entorno({ env });   // asíncrono: el proceso principal sigue atendiendo eventos mientras la shell contesta (hasta 10 s)
     estado.entorno = { origen: r.origen, ms: r.ms, shell: r.shell, error: r.error, PATH: r.env.PATH, env: r.env };
     anotar(`entorno de la shell: ${r.origen}, ${r.ms} ms${r.error ? ` (${r.error})` : ''}`);
     const { env: entornoHijo, carpeta, origen } = entornoDelHijo();
