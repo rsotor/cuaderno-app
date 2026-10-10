@@ -153,8 +153,10 @@ $('#arbol').addEventListener('keydown', e => {
   if (e.key === 'ArrowDown' && todos[i + 1]) todos[i + 1].focus();
   else if (e.key === 'ArrowUp') (todos[i - 1] || $('#buscador')).focus();
 });
+// Ctrl K (y Buscar… en el menú de la app de escritorio): el buscador, desplegando la barra lateral si estaba plegada.
+function enfocarBuscador() { if (lateralPlegado() && window.innerWidth > 760) plegarLateral(false, { enfocar: false }); const b = $('#buscador'); b.focus(); b.select(); return b; }
 document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); if (lateralPlegado() && window.innerWidth > 760) plegarLateral(false, { enfocar: false }); $('#buscador').focus(); $('#buscador').select(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); enfocarBuscador(); }
   if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); alternarTerminal(); }
 });
 
@@ -989,13 +991,27 @@ $('#ajustes form').addEventListener('change', async () => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ajustes').hidden) cerrarAjustes(); });
 
 // ---------- acciones del menú de la app de escritorio (electron/menu.js → preload → aquí; en la web no hay menú y nada cambia)
-// Cada acción hace lo que ya hace su botón: Guardar es el botón Guardar (del repositorio, /api/guardar), Ajustes el de
-// Ajustes y Abrir carpeta… el diálogo del sistema (elegirCarpeta). Con un diálogo abierto la acción se ignora: ⌘S sobre el
-// propio modal de Guardar no apila otro. Un atajo nuevo (plan de Electron, §8.1) es una fila en ATAJOS de menu.js y una aquí.
+// Cada acción hace lo que ya hace su botón o su tecla: Guardar es el botón Guardar (del repositorio, /api/guardar), Ajustes
+// el de Ajustes, Abrir carpeta… el diálogo del sistema (elegirCarpeta), Abrir nota… y Buscar… lo de Ctrl K (el buscador) y Nueva tarea el
+// camino de siempre: la casilla «Nueva tarea» si está la pantalla de Tareas, y si no el buscador con «+» delante (Enter la
+// añade). Con un diálogo abierto la acción se ignora: ⌘S sobre el propio modal de Guardar no apila otro. Un atajo nuevo
+// (plan de Electron, §8.1) es una fila en ATAJOS de menu.js y una aquí.
 const ACCIONES_APP = {
   guardar: () => { const b = $('#btn-guardar'); if (!cuaderno()) return avisar('No hay ningún cuaderno abierto: nada que guardar.'); if (b.disabled) return avisar(b.title); b.click(); },
   ajustes: abrirAjustes,
   'abrir-carpeta': elegirCarpeta,
+  // Abrir nota… y Buscar… hoy son lo mismo (el buscador busca por nombre de nota y de carpeta y por el texto; Enter abre);
+  // son dos acciones porque divergirán (menu.js lo explica).
+  buscar: () => { if (cuaderno()) enfocarBuscador(); },
+  'abrir-nota': () => { if (cuaderno()) enfocarBuscador(); },
+  'nueva-tarea': () => {
+    if (!cuaderno()) return;
+    const campo = $('#tarea-nueva');
+    if (campo && !$('#panel').hidden) return campo.focus();
+    const b = enfocarBuscador();
+    if (comandoTarea(b.value) == null) { b.value = '+ '; b.dispatchEvent(new Event('input', { bubbles: true })); }
+    b.setSelectionRange(b.value.length, b.value.length);
+  },
 };
 if (enApp()) window.cuadernoApp.alAccion(nombre => { if (dialogoAbierto()) return; const fn = ACCIONES_APP[nombre]; if (fn) fn(); });
 

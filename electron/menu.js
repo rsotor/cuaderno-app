@@ -3,8 +3,8 @@
 // → la plantilla de Menu.buildFromTemplate, con etiquetas, aceleradores y acciones por plataforma; `instalarMenu` la
 // engancha a Electron y la reconstruye cuando cambian los recientes. Los elementos propios no hacen nada por su cuenta:
 // mandan un nombre a la pantalla (`webContents.send('accion', nombre)`), que lo atiende con cuadernoApp.alAccion(cb) y
-// hace lo que ya sabe hacer (Guardar es el botón Guardar; Ajustes, el botón de Ajustes; Abrir carpeta…, el diálogo del
-// sistema de T4). Los roles estándar son de Electron (sin los de Edición, en Mac no hay copiar y pegar). Lo de Ayuda es
+// hace lo que ya sabe hacer (Guardar es el botón Guardar; Ajustes, el botón de Ajustes; Abrir nota… y Buscar…, el
+// buscador; Nueva tarea, su casilla; Abrir carpeta…, el diálogo del sistema de T4). Los roles estándar son de Electron (sin los de Edición, en Mac no hay copiar y pegar). Lo de Ayuda es
 // del proceso principal: el plan vivo en GitHub (shell.openExternal, el repo público), el registro (shell.openPath), el
 // Diagnóstico (versiones, puerto, PATH resuelto y su origen, si node-pty cargó, carpeta de configuración; nunca el token)
 // y Acerca de. Los atajos que decida Roberto (plan §8.1) se añaden a ATAJOS.
@@ -16,12 +16,24 @@ const CANAL = 'accion';   // el canal que escucha el preload (cuadernoApp.alAcci
 const NOMBRE = 'Cuaderno';
 
 // Los atajos propios: etiqueta, acelerador (CmdOrCtrl: ⌘ en Mac, Ctrl en Windows y Linux) y el nombre que recibe la
-// pantalla. Para añadir uno (§8.1): una fila aquí y su caso en el oyente de public/app.js.
+// pantalla. Para añadir uno: una fila aquí y su caso en ACCIONES_APP de public/app.js. Son los que decidió Roberto (plan
+// §8.1, 2026-10-10: «los típicos: buscar, abrir, la T para la tarea; la K con dudas», y «el de abrir que me abra la carpeta
+// o nota dentro del cuaderno porque no tenemos un importar»):
+//   · Abrir nota… (⌘O) y Buscar… (⌘F) hoy hacen lo mismo en la pantalla (enfocar el buscador, que busca por nombre de nota
+//     y de carpeta y por el texto; Enter abre). Son dos acciones con nombre distinto a propósito: divergirán (abrir por
+//     nombre irá a la paleta de acciones rápidas; buscar seguirá siendo buscar texto).
+//   · Abrir carpeta… (⇧⌘O) es cambiar de cuaderno con el diálogo del sistema: lo que Roberto ve como un «importar».
+//   · **CmdOrCtrl+K queda RESERVADA y sin acción**: será la paleta de «acciones rápidas», un bloque posterior del plan vivo
+//     (hoy, en la web, Ctrl K enfoca el buscador desde la propia pantalla; el menú no la toca). Tampoco hay CmdOrCtrl+P.
 const ATAJOS = [
-  { id: 'abrir-carpeta', label: 'Abrir carpeta…', accelerator: 'CmdOrCtrl+O', accion: 'abrir-carpeta' },
+  { id: 'abrir-nota', label: 'Abrir nota…', accelerator: 'CmdOrCtrl+O', accion: 'abrir-nota' },
+  { id: 'buscar', label: 'Buscar…', accelerator: 'CmdOrCtrl+F', accion: 'buscar' },
+  { id: 'nueva-tarea', label: 'Nueva tarea', accelerator: 'CmdOrCtrl+T', accion: 'nueva-tarea' },
   { id: 'guardar', label: 'Guardar', accelerator: 'CmdOrCtrl+S', accion: 'guardar' },
+  { id: 'abrir-carpeta', label: 'Abrir carpeta…', accelerator: 'CmdOrCtrl+Shift+O', accion: 'abrir-carpeta' },
   { id: 'ajustes', label: 'Ajustes…', accelerator: 'CmdOrCtrl+,', accion: 'ajustes' },
 ];
+const RESERVADOS = ['CmdOrCtrl+K'];   // sin asignar a propósito (acciones rápidas); el test vigila que ningún atajo lo use
 const atajo = id => ATAJOS.find(a => a.id === id);
 const sep = { type: 'separator' };
 
@@ -46,10 +58,12 @@ function plantillaMenu({ plataforma = process.platform, recientes = [], version 
   const cuaderno = {
     id: 'cuaderno', label: NOMBRE,
     submenu: [
-      propio('abrir-carpeta'),
-      { id: 'recientes', label: 'Cuadernos recientes', submenu: submenuRecientes(recientes, a.abrirCarpeta) },
+      propio('abrir-nota'), propio('buscar'), propio('nueva-tarea'),
       sep,
       propio('guardar'),
+      sep,
+      propio('abrir-carpeta'),
+      { id: 'recientes', label: 'Cuadernos recientes', submenu: submenuRecientes(recientes, a.abrirCarpeta) },
       // En Mac, Ajustes y Salir van en el menú de la app, como manda la plataforma; en los demás, aquí.
       ...(mac ? [] : [sep, propio('ajustes'), sep, salir]),
     ],
@@ -94,6 +108,8 @@ function elemento(plantilla, id) {
 function textoDiagnostico({ version = '', versiones = process.versions, estado = {}, carpetaConfig = '', rutaRegistro = '', plataforma = process.platform, arquitectura = process.arch, execPath = process.execPath } = {}) {
   const e = estado.entorno || {};
   const pty = estado.pty === true ? 'sí' : estado.pty === false ? 'no (la app arranca sin terminal)' : 'sin saber aún';
+  // «shell -lc (/bin/zsh, 7 ms)», «respaldo (/bin/bash, 10002 ms) — no ha contestado», «sistema» (Windows: sin shell que leer).
+  const detalleShell = e.shell ? ` (${e.shell}${e.ms !== undefined ? `, ${e.ms} ms` : ''})` : '';
   return [
     `${NOMBRE} ${version || '(sin versión)'}`,
     `Electron ${versiones.electron || '(fuera de Electron)'} · Node ${versiones.node || '?'} · Chromium ${versiones.chrome || '?'}`,
@@ -101,7 +117,7 @@ function textoDiagnostico({ version = '', versiones = process.versions, estado =
     `Ejecutable: ${execPath}`,
     `Puerto del servidor: ${estado.puerto || '(el servidor aún no escucha)'}`,
     `node-pty cargado: ${pty}`,
-    `Entorno de la shell: ${e.origen || 'sin resolver'}${e.shell ? ` (${e.shell}` : ''}${e.ms !== undefined && e.shell ? `, ${e.ms} ms)` : e.shell ? ')' : ''}${e.error ? ` — ${e.error}` : ''}`,
+    `Entorno de la shell: ${e.origen || 'sin resolver'}${detalleShell}${e.error ? ` — ${e.error}` : ''}`,
     `PATH: ${e.PATH || '(sin resolver)'}`,
     `Carpeta de configuración: ${carpetaConfig}`,
     `Registro: ${rutaRegistro}`,
@@ -150,15 +166,16 @@ function instalarMenu({ electron, estado, config, registro, env = process.env, a
   let actuales = null;
   const menu = { acciones, plantilla: null };
   // Construye e instala el menú con los recientes de ahora. Devuelve true si se ha reconstruido (los recientes cambiaron
-  // o es la primera vez); si no, no toca nada (config.json cambia también por el tema o los ajustes).
+  // o es la primera vez); si no, no toca nada (config.json cambia también por el tema o los ajustes). Si instalarlo falla,
+  // se anota y se vuelve a intentar al siguiente cambio (no se da por puesto).
   menu.reconstruir = () => {
-    const recientes = config.leer().recientes;
+    const leidos = config.leer().recientes, recientes = Array.isArray(leidos) ? leidos : [];
     const rutas = rutasDe(recientes);
     if (rutas === actuales) return false;
     const primera = actuales === null;
-    actuales = rutas;
     menu.plantilla = plantillaMenu({ plataforma, recientes, version, acciones });
     try { Menu.setApplicationMenu(Menu.buildFromTemplate(menu.plantilla)); } catch (e) { anotar(`no se ha podido instalar el menú: ${e.message}`); return false; }
+    actuales = rutas;
     if (!primera) anotar(`menú reconstruido: ${recientes.length} reciente${recientes.length === 1 ? '' : 's'}`);
     return true;
   };
@@ -166,4 +183,4 @@ function instalarMenu({ electron, estado, config, registro, env = process.env, a
   return menu;
 }
 
-module.exports = { plantillaMenu, instalarMenu, textoDiagnostico, submenuRecientes, elemento, ATAJOS, CANAL, REPO, URL_PLAN_VIVO, NOMBRE };
+module.exports = { plantillaMenu, instalarMenu, textoDiagnostico, submenuRecientes, elemento, ATAJOS, RESERVADOS, CANAL, REPO, URL_PLAN_VIVO, NOMBRE };

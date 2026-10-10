@@ -18,17 +18,18 @@ test.after(() => fs.rmSync(carpetaConfig, { recursive: true, force: true }));
 const tic = () => new Promise(r => setImmediate(r));
 const esperar = ms => new Promise(r => setTimeout(r, ms));
 
-// Un Electron de mentira: lo que app.js usa de app, BrowserWindow, utilityProcess, dialog e ipcMain (y lo que ventana.js usa de
-// webContents, session, shell y nativeTheme: aquí solo se comprueba que se enganchan; su conducta, en electron-ventana.test.js),
-// anotando cada paso en `pasos`. `fallosURL`: errores con los que loadURL rechaza, en orden, antes de empezar a cargar bien.
+// Un Electron de mentira: lo que app.js usa de app, BrowserWindow, utilityProcess, dialog, ipcMain y Menu (y lo que ventana.js
+// usa de webContents, session, shell y nativeTheme: aquí solo se comprueba que se enganchan; su conducta, en
+// electron-ventana.test.js; lo que menu.js usa de Menu, dialog.showMessageBox, shell y clipboard), anotando cada paso en
+// `pasos`. `fallosURL`: errores con los que loadURL rechaza, en orden, antes de empezar a cargar bien.
 function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false } = {}) {
-  const pasos = [], ventanas = [], hijos = [], dialogos = [], salidas = [], abiertos = [], canales = {};
+  const pasos = [], ventanas = [], hijos = [], dialogos = [], salidas = [], abiertos = [], canales = {}, menus = [], rutasAbiertas = [], portapapeles = [];
   const eventos = new EventEmitter();
   let pid = 100;
   class BrowserWindow {
     constructor(opciones) {
       this.opciones = opciones; this.cargas = []; this.minimizada = false; this.enfocada = 0; this.fondos = []; ventanas.push(this); pasos.push('ventana');
-      this.webContents = Object.assign(new EventEmitter(), { manejadorVentanas: null, setWindowOpenHandler(f) { this.manejadorVentanas = f; } });
+      this.webContents = Object.assign(new EventEmitter(), { manejadorVentanas: null, mensajes: [], setWindowOpenHandler(f) { this.manejadorVentanas = f; }, send(canal, ...args) { this.mensajes.push([canal, ...args]); } });
     }
     setBackgroundColor(c) { this.fondos.push(c); }
     async loadFile(f) { this.cargas.push({ fichero: f }); pasos.push('loadFile'); }
@@ -42,7 +43,7 @@ function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false } = 
   const utilityProcess = { fork(ruta, args, opciones) {
     const h = new EventEmitter();
     Object.assign(h, { ruta, args, opciones, pid: ++pid, muerto: false, kill() { if (h.muerto) return false; h.muerto = true; pasos.push(`kill ${h.pid}`); setImmediate(() => h.emit('exit', null)); return true; },
-      escucha(puerto, token = 'abc123') { setImmediate(() => { h.emit('spawn'); h.emit('message', { puerto, token }); }); },
+      escucha(puerto, token = 'abc123', pty = undefined) { setImmediate(() => { h.emit('spawn'); h.emit('message', pty === undefined ? { puerto, token } : { puerto, token, pty }); }); },
       muere(codigo) { h.muerto = true; h.emit('exit', codigo); } });
     hijos.push(h); pasos.push(`fork ${h.pid}`);
     return h;
@@ -52,13 +53,18 @@ function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false } = 
     whenReady() { return Promise.resolve(); }, on(e, f) { eventos.on(e, f); }, emitir(e, ...a) { eventos.emit(e, ...a); },
     quit() { pasos.push('quit'); salidas.push('quit'); eventos.emit('before-quit'); }, exit(c) { pasos.push(`exit ${c}`); salidas.push(c); },
   };
-  const dialog = { showMessageBoxSync(o) { dialogos.push(o); pasos.push('diálogo'); return 0; } };
+  // showMessageBox (el del Diagnóstico y Acerca de) contesta con el último botón (Cerrar), salvo que el test fije `respuesta`.
+  const dialog = { respuesta: null, showMessageBoxSync(o) { dialogos.push(o); pasos.push('diálogo'); return 0; }, async showMessageBox(v, o) { dialogos.push({ ...o, ventana: v }); pasos.push('diálogo'); return { response: dialog.respuesta === null ? o.buttons.length - 1 : dialog.respuesta }; } };
   const nativeTheme = { themeSource: 'system', shouldUseDarkColors: sistemaOscuro };
   const sesiones = {};
   const session = { fromPartition(p) { sesiones[p] = sesiones[p] || { manejadorPermisos: null, setPermissionRequestHandler(f) { this.manejadorPermisos = f; } }; return sesiones[p]; } };
-  const shell = { async openExternal(u) { abiertos.push(u); } };
+  const shell = { async openExternal(u) { abiertos.push(u); }, async openPath(r) { rutasAbiertas.push(r); return ''; } };
   const ipcMain = { handle(canal, f) { canales[canal] = f; } };
-  return { electron: { app, BrowserWindow, utilityProcess, dialog, nativeTheme, session, shell, ipcMain }, pasos, ventanas, hijos, dialogos, salidas, sesiones, abiertos, canales };
+  // Menu: buildFromTemplate devuelve la plantilla tal cual (con `getMenuItemById` como el de verdad) y setApplicationMenu la anota.
+  const buscar = (items, id) => { for (const e of items) { if (e.id === id) return e; if (Array.isArray(e.submenu)) { const h = buscar(e.submenu, id); if (h) return h; } } return null; };
+  const Menu = { buildFromTemplate(plantilla) { return { items: plantilla, getMenuItemById: id => buscar(plantilla, id) }; }, setApplicationMenu(m) { menus.push(m); pasos.push('menú'); } };
+  const clipboard = { writeText(t) { portapapeles.push(t); } };
+  return { electron: { app, BrowserWindow, utilityProcess, dialog, nativeTheme, session, shell, ipcMain, Menu, clipboard }, pasos, ventanas, hijos, dialogos, salidas, sesiones, abiertos, canales, menus, rutasAbiertas, portapapeles };
 }
 // Una configuración de mentira; `recientes` puede ser una función para que cambie entre el arranque y una caída.
 const configFalsa = ({ tema = 'auto', recientes = [] } = {}) => ({ leer: () => ({ tema, recientes: typeof recientes === 'function' ? recientes() : recientes }), cuadernoAlArrancar: require('../config').cuadernoAlArrancar, carpeta: () => carpetaConfig });
@@ -78,7 +84,7 @@ function montar({ env = {}, config = configFalsa(), topePuerto = 500, lock, fall
   const peticiones = [];
   const peticion = async (o, cuerpo) => { peticiones.push({ ...o, cuerpo }); return { status: 200, cuerpo: '{}' }; };
   const estado = arrancar({ electron: f.electron, config, env: { PATH: '/usr/bin', ...env }, entorno, registro, topePuerto, execPath: '/apps/Cuaderno', existe: () => true, vigilar: vigilante.vigilar, argv: ['/apps/electron', '.'], peticion, ...paraArrancar });
-  return { ...f, registro, estado, vigilante, peticiones, get vistas() { return f.vistas; } };
+  return { ...f, registro, estado, vigilante, peticiones, get vistas() { return f.vistas; }, get menu() { return f.menus.at(-1); } };   // el menú instalado ahora (los getters no sobreviven al spread)
 }
 // Un arranque ya con la app cargada en el puerto 7331.
 async function arrancado(opciones) { const m = montar(opciones); await tic(); m.hijos[0].escucha(7331, 't0k'); assert.equal(await m.estado.listo, true); return m; }
@@ -109,7 +115,7 @@ test('arranca en orden: userData de pruebas, instancia única, ventana con el fo
   assert.deepEqual(v.cargas[1], { url: 'http://localhost:7331/?t=f00d' });
   assert.deepEqual({ ...m.estado.entorno, env: undefined }, { origen: 'shell -lc', ms: 7, shell: '/bin/zsh', error: undefined, PATH: '/shell/bin:/usr/bin', env: undefined });
   assert.equal(m.estado.puerto, 7331);
-  assert.deepEqual(m.pasos, ['ventana', 'loadFile', `fork ${h.pid}`, 'loadURL http://localhost:7331/?t=f00d']);
+  assert.deepEqual(m.pasos, ['ventana', 'menú', 'loadFile', `fork ${h.pid}`, 'loadURL http://localhost:7331/?t=f00d'], 'el menú se instala con la ventana, antes del primer píxel');
   assert.ok(m.registro.lineas.some(l => l === '[app] entorno de la shell: shell -lc, 7 ms'), m.registro.lineas.join('\n'));
   assert.ok(m.registro.lineas.includes('[app] servidor en el puerto 7331; el último cuaderno: /cuadernos/ultimo'));
   assert.ok(m.registro.lineas.includes(`[app] servidor lanzado (pid ${h.pid})`));
@@ -433,4 +439,160 @@ test('el canal IPC elegir-carpeta queda registrado y, desde nuestra pantalla, co
   assert.equal(typeof m.canales['elegir-carpeta'], 'function');
   assert.equal(await m.canales['elegir-carpeta']({ senderFrame: { url: 'http://localhost:7331/' } }), '/cuadernos/elegida');
   await assert.rejects(m.canales['elegir-carpeta']({ senderFrame: { url: 'http://localhost:7332/' } }), /remitente no permitido/);
+});
+
+// ---------- T5: el menú (electron/menu.js enganchado por app.js; lo puro, en electron-menu.test.js)
+const { URL_PLAN_VIVO } = require('../electron/menu');
+const etiquetasDe = items => items.filter(e => e.type !== 'separator').map(e => e.label);
+
+test('el menú se instala con la ventana, en castellano y con los recientes de config.json; se reconstruye cuando config.json cambia de recientes (el mismo vigilante que el tema) y no cuando solo cambia el tema', async () => {
+  let recientes = [{ ruta: '/cuadernos/ultimo', nombre: 'Último', abierto: '2026-10-10' }];
+  const m = await arrancado({ config: configFalsa({ recientes: () => recientes }) });
+  assert.equal(m.menus.length, 1, 'instalado una vez al arrancar');
+  assert.deepEqual(etiquetasDe(m.menu.items), ['Cuaderno', 'Edición', 'Ver', 'Ventana', 'Ayuda'], 'en Linux (donde corre el test) no hay menú de la app');
+  assert.deepEqual(m.menu.getMenuItemById('recientes').submenu.map(e => e.label), ['Último']);
+  assert.equal(m.menu.getMenuItemById('guardar').accelerator, 'CmdOrCtrl+S');
+  // Abrir otro cuaderno lo registra como reciente y el hijo reescribe config.json: el vigilante avisa y el menú se rehace.
+  recientes = [{ ruta: '/cuadernos/otro', nombre: 'Otro', abierto: '2026-10-11' }, ...recientes];
+  m.vigilante.avisar('change', 'config.json');
+  assert.equal(m.menus.length, 2);
+  assert.deepEqual(m.menu.getMenuItemById('recientes').submenu.map(e => e.label), ['Otro', 'Último']);
+  assert.ok(m.registro.lineas.includes('[app] menú reconstruido: 2 recientes'));
+  m.vigilante.avisar('change', 'config.json');   // la misma lista (un cambio de tema o de ajustes): el menú no se toca
+  assert.equal(m.menus.length, 2);
+  m.vigilante.avisar('change', 'token');   // otro fichero de la carpeta: nada
+  assert.equal(m.menus.length, 2);
+  recientes = [];
+  m.vigilante.avisar('rename', null);
+  assert.equal(m.menus.length, 3);
+  assert.deepEqual(m.menu.getMenuItemById('recientes').submenu.map(e => [e.label, e.enabled]), [['Sin recientes', false]]);
+  assert.ok(m.registro.lineas.includes('[app] menú reconstruido: 0 recientes'));
+  m.electron.app.emitir('before-quit');
+});
+
+test('si instalar el menú falla, se anota y se vuelve a intentar al siguiente cambio de config.json; un fallo en alCambiar no rompe el vigilante del tema', async () => {
+  const m = montar();
+  const bueno = m.electron.Menu.setApplicationMenu;
+  m.electron.Menu.setApplicationMenu = () => { throw new Error('sin menú nativo'); };
+  await tic(); m.hijos[0].escucha(7331); await m.estado.listo;
+  assert.equal(m.menus.length, 0);
+  assert.ok(m.registro.lineas.includes('[app] no se ha podido instalar el menú: sin menú nativo'));
+  m.electron.Menu.setApplicationMenu = bueno;
+  m.vigilante.avisar('change', 'config.json');
+  assert.equal(m.menus.length, 1, 'con los mismos recientes, pero el anterior no llegó a instalarse');
+  m.estado.menu.reconstruir = () => { throw new Error('roto'); };
+  m.vigilante.avisar('change', 'config.json');
+  assert.ok(m.registro.lineas.includes('[app] al cambiar config.json: roto'));
+  m.electron.app.emitir('before-quit');
+});
+
+test('Abrir nota…, Buscar…, Nueva tarea, Guardar, Abrir carpeta… y Ajustes… mandan su nombre a la pantalla por el canal «accion» (y quedan en el registro); sin ventana se ignoran y se anota', async () => {
+  const m = await arrancado();
+  const wc = m.ventanas[0].webContents;
+  for (const id of ['abrir-nota', 'buscar', 'nueva-tarea', 'guardar', 'abrir-carpeta', 'ajustes']) m.menu.getMenuItemById(id).click();
+  assert.deepEqual(wc.mensajes, [['accion', 'abrir-nota'], ['accion', 'buscar'], ['accion', 'nueva-tarea'], ['accion', 'guardar'], ['accion', 'abrir-carpeta'], ['accion', 'ajustes']]);
+  assert.ok(m.registro.lineas.includes('[app] menú: guardar'));
+  m.estado.ventana = null;
+  m.menu.getMenuItemById('guardar').click();
+  assert.equal(wc.mensajes.length, 6);
+  assert.ok(m.registro.lineas.includes('[app] acción del menú sin ventana, se ignora: guardar'));
+  m.electron.app.emitir('before-quit');
+});
+
+test('un cuaderno de «Cuadernos recientes» se abre en el servidor (POST /api/abrir, como open-file) y la ventana se recarga', async () => {
+  const m = await arrancado({ config: configFalsa({ recientes: [{ ruta: '/cuadernos/a', abierto: '2026-10-10' }, { ruta: '/cuadernos/viejo', nombre: 'Viejo', abierto: '2026-01-01' }] }) });
+  const e = m.menu.getMenuItemById('reciente:/cuadernos/viejo');
+  assert.equal(e.label, 'Viejo'); assert.equal(e.toolTip, '/cuadernos/viejo');
+  e.click();
+  await tic(); await tic(); await tic();
+  assert.equal(m.peticiones.length, 1);
+  assert.equal(m.peticiones[0].path, '/api/abrir'); assert.deepEqual(JSON.parse(m.peticiones[0].cuerpo), { ruta: '/cuadernos/viejo' });
+  assert.deepEqual(m.ventanas[0].cargas.at(-1), { url: 'http://localhost:7331/?t=t0k' });
+  assert.ok(m.registro.lineas.includes('[app] menú: cuaderno reciente /cuadernos/viejo'));
+  assert.ok(m.registro.lineas.includes('[app] carpeta por menú: /cuadernos/viejo'));
+  m.electron.app.emitir('before-quit');
+});
+
+test('Ayuda → Diagnóstico: un diálogo con versión de la app, Electron/Node/Chromium, sistema, puerto, si node-pty cargó (lo dice el hijo), PATH resuelto y su origen, carpeta de configuración y registro; nunca el token; «Copiar» lo lleva al portapapeles; y queda en el registro', async () => {
+  const m = montar({ env: { CUADERNO_USERDATA: '/tmp/ud' } });
+  await tic(); m.hijos[0].escucha(7331, 'f00d', true); assert.equal(await m.estado.listo, true);
+  assert.equal(m.estado.pty, true, 'el hijo dijo que node-pty cargó');
+  m.menu.getMenuItemById('diagnostico').click();
+  await tic(); await tic();
+  assert.equal(m.dialogos.length, 1);
+  const d = m.dialogos[0];
+  assert.equal(d.title, 'Diagnóstico'); assert.deepEqual(d.buttons, ['Copiar', 'Cerrar']); assert.equal(d.ventana, m.ventanas[0]);
+  const lineas = d.detail.split('\n');
+  assert.equal(lineas[0], `Cuaderno ${require('../package.json').version}`);
+  assert.match(lineas[1], /^Electron \(fuera de Electron\) · Node \d+\.\d+\.\d+ · Chromium \?$/, 'en el test no hay Electron; en la app, sus tres versiones');
+  assert.equal(lineas[2], `Sistema: ${process.platform} ${process.arch}`);
+  assert.equal(lineas[3], 'Ejecutable: /apps/Cuaderno');
+  assert.ok(lineas.includes('Puerto del servidor: 7331'));
+  assert.ok(lineas.includes('node-pty cargado: sí'));
+  assert.ok(lineas.includes('Entorno de la shell: shell -lc (/bin/zsh, 7 ms)'));
+  assert.ok(lineas.includes('PATH: /shell/bin:/usr/bin'));
+  assert.ok(lineas.includes(`Carpeta de configuración: ${carpetaConfig}`));
+  assert.ok(lineas.includes('Registro: /config/registro.log'));
+  assert.ok(!d.detail.includes('f00d'), 'el token en el diagnóstico');
+  assert.deepEqual(m.portapapeles, [], 'Cerrar no copia');
+  const anotado = m.registro.lineas.find(l => l.startsWith('[app] diagnóstico:\n'));
+  assert.ok(anotado, 'el diagnóstico queda en el registro'); assert.ok(anotado.includes('Puerto del servidor: 7331') && !anotado.includes('f00d'));
+  m.electron.dialog.respuesta = 0;   // Copiar
+  m.menu.getMenuItemById('diagnostico').click();
+  await tic(); await tic();
+  assert.deepEqual(m.portapapeles, [d.detail]);
+  m.electron.app.emitir('before-quit');
+});
+
+test('Diagnóstico sin servidor aún y sin saber de node-pty lo dice; con CUADERNO_SIN_DIALOGO se anota en vez de enseñarse; un diálogo que falla se anota y no rompe nada', async () => {
+  const m = montar({ env: { CUADERNO_SIN_DIALOGO: '1' } });
+  await tic();   // la ventana y el menú ya están; el hijo aún no ha dicho su puerto
+  m.menu.getMenuItemById('diagnostico').click();
+  await tic(); await tic();
+  assert.equal(m.dialogos.length, 0);
+  assert.ok(m.registro.lineas.includes('[app] diálogo saltado (CUADERNO_SIN_DIALOGO): Diagnóstico'));
+  const anotado = m.registro.lineas.find(l => l.startsWith('[app] diagnóstico:\n'));
+  assert.ok(anotado.includes('Puerto del servidor: (el servidor aún no escucha)') && anotado.includes('node-pty cargado: sin saber aún'), anotado);
+  m.hijos[0].escucha(7331, 't0k', false); await m.estado.listo;
+  assert.equal(m.estado.pty, false);
+  m.electron.app.emitir('before-quit');
+  const roto = await arrancado();
+  roto.electron.dialog.showMessageBox = async () => { throw new Error('sin pantalla'); };
+  roto.menu.getMenuItemById('diagnostico').click();
+  await tic(); await tic();
+  assert.ok(roto.registro.lineas.includes('[app] no se ha podido enseñar «Diagnóstico»: sin pantalla'));
+  assert.deepEqual(roto.portapapeles, []);
+  roto.electron.app.emitir('before-quit');
+});
+
+test('Ayuda → Plan vivo abre la URL del repo público en el navegador del sistema (sin token); Mostrar registro abre el fichero del registro; Acerca de enseña versión y repo; con CUADERNO_SIN_NAVEGADOR se anotan en vez de abrirse', async () => {
+  const m = await arrancado();
+  m.menu.getMenuItemById('plan-vivo').click(); await tic();
+  assert.deepEqual(m.abiertos, [URL_PLAN_VIVO]);
+  assert.match(URL_PLAN_VIVO, /^https:\/\/github\.com\/[^?#]+\/docs\/planes\/plan-vivo\.md$/);
+  m.menu.getMenuItemById('mostrar-registro').click(); await tic();
+  assert.deepEqual(m.rutasAbiertas, ['/config/registro.log']);
+  m.menu.getMenuItemById('acerca-de').click(); await tic(); await tic();
+  assert.equal(m.dialogos.length, 1);
+  assert.equal(m.dialogos[0].title, 'Acerca de Cuaderno'); assert.equal(m.dialogos[0].message, 'Cuaderno');
+  assert.match(m.dialogos[0].detail, new RegExp(`^Versión ${require('../package.json').version.replace(/\\./g, '\\.')}\\n`));
+  assert.ok(m.dialogos[0].detail.includes('https://github.com/'));
+  for (const texto of [...m.abiertos, ...m.rutasAbiertas, m.dialogos[0].detail]) assert.ok(!texto.includes('t0k'));
+  // openPath devuelve un texto de error (así avisa Electron) o rechaza: las dos cosas quedan anotadas.
+  m.electron.shell.openPath = async () => 'No existe';
+  m.menu.getMenuItemById('mostrar-registro').click(); await tic();
+  assert.ok(m.registro.lineas.includes('[app] no se ha podido abrir el registro /config/registro.log: No existe'));
+  m.electron.shell.openPath = async () => { throw new Error('sin escritorio'); };
+  m.menu.getMenuItemById('mostrar-registro').click(); await tic();
+  assert.ok(m.registro.lineas.includes('[app] no se ha podido abrir el registro /config/registro.log: sin escritorio'));
+  m.electron.shell.openExternal = async () => { throw new Error('sin navegador'); };
+  m.menu.getMenuItemById('plan-vivo').click(); await tic();
+  assert.ok(m.registro.lineas.includes('[app] no se ha podido abrir el plan vivo: sin navegador'));
+  m.electron.app.emitir('before-quit');
+  const sin = await arrancado({ env: { CUADERNO_SIN_NAVEGADOR: '1' } });
+  sin.menu.getMenuItemById('plan-vivo').click(); sin.menu.getMenuItemById('mostrar-registro').click(); await tic();
+  assert.deepEqual(sin.abiertos, []); assert.deepEqual(sin.rutasAbiertas, []);
+  assert.ok(sin.registro.lineas.includes(`[app] navegador no abierto (CUADERNO_SIN_NAVEGADOR): ${URL_PLAN_VIVO}`));
+  assert.ok(sin.registro.lineas.includes('[app] registro no abierto (CUADERNO_SIN_NAVEGADOR): /config/registro.log'));
+  sin.electron.app.emitir('before-quit');
 });

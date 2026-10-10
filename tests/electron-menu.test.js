@@ -4,7 +4,7 @@
 // el token. Lo que engancha a Electron (instalarMenu) se prueba con el Electron falso en electron-app.test.js.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { plantillaMenu, textoDiagnostico, submenuRecientes, elemento, ATAJOS, CANAL, REPO, URL_PLAN_VIVO } = require('../electron/menu');
+const { plantillaMenu, textoDiagnostico, submenuRecientes, elemento, ATAJOS, RESERVADOS, CANAL, REPO, URL_PLAN_VIVO } = require('../electron/menu');
 
 // Recorre la plantilla y devuelve todos sus elementos (menús, submenús y hojas), en orden.
 const todos = (plantilla, acc = []) => { for (const e of plantilla) { acc.push(e); if (Array.isArray(e.submenu)) todos(e.submenu, acc); } return acc; };
@@ -17,7 +17,7 @@ test('en Windows y Linux: Cuaderno, Edición, Ver, Ventana y Ayuda, en castellan
   for (const plataforma of ['win32', 'linux']) {
     const p = plantillaMenu({ plataforma, recientes, version: '0.1.0' });
     assert.deepEqual(etiquetas(p), ['Cuaderno', 'Edición', 'Ver', 'Ventana', 'Ayuda'], plataforma);
-    assert.deepEqual(etiquetas(p[0].submenu).filter(Boolean), ['Abrir carpeta…', 'Cuadernos recientes', 'Guardar', 'Ajustes…', 'Salir']);
+    assert.deepEqual(etiquetas(p[0].submenu).filter(Boolean), ['Abrir nota…', 'Buscar…', 'Nueva tarea', 'Guardar', 'Abrir carpeta…', 'Cuadernos recientes', 'Ajustes…', 'Salir']);
     assert.equal(elemento(p, 'salir').role, 'quit');
     assert.deepEqual(etiquetas(elemento(p, 'ayuda').submenu).filter(Boolean), ['Plan vivo (en GitHub)', 'Mostrar registro', 'Diagnóstico', 'Acerca de Cuaderno']);
     assert.equal(elemento(p, 'ayuda').role, 'help');
@@ -30,14 +30,18 @@ test('en Mac: el primero es el menú de la app (Acerca de, Ajustes, Servicios, o
   assert.deepEqual(etiquetas(p), ['Cuaderno', 'Cuaderno', 'Edición', 'Ver', 'Ventana', 'Ayuda']);
   assert.deepEqual(etiquetas(p[0].submenu).filter(Boolean), ['Acerca de Cuaderno', 'Ajustes…', 'Servicios', 'Ocultar Cuaderno', 'Ocultar otros', 'Mostrar todo', 'Salir de Cuaderno']);
   assert.deepEqual(roles([p[0]]), ['services', 'hide', 'hideOthers', 'unhide', 'quit']);
-  assert.deepEqual(etiquetas(p[1].submenu).filter(Boolean), ['Abrir carpeta…', 'Cuadernos recientes', 'Guardar']);
+  assert.deepEqual(etiquetas(p[1].submenu).filter(Boolean), ['Abrir nota…', 'Buscar…', 'Nueva tarea', 'Guardar', 'Abrir carpeta…', 'Cuadernos recientes']);
   assert.deepEqual(etiquetas(elemento(p, 'ayuda').submenu).filter(Boolean), ['Plan vivo (en GitHub)', 'Mostrar registro', 'Diagnóstico'], 'Acerca de va en el menú de la app');
   assert.equal(todos(p).filter(e => e.id === 'ajustes').length, 1, 'Ajustes una sola vez');
   assert.equal(todos(p).filter(e => e.id === 'salir').length, 1, 'Salir una sola vez');
 });
 
-test('los aceleradores de salida: ⌘O / Ctrl+O abrir carpeta, ⌘S / Ctrl+S guardar, ⌘, / Ctrl+, ajustes (CmdOrCtrl: Electron pone la tecla de cada plataforma); la tabla ATAJOS es la fuente', () => {
-  assert.deepEqual(ATAJOS.map(a => [a.id, a.accelerator, a.accion]), [['abrir-carpeta', 'CmdOrCtrl+O', 'abrir-carpeta'], ['guardar', 'CmdOrCtrl+S', 'guardar'], ['ajustes', 'CmdOrCtrl+,', 'ajustes']]);
+test('los aceleradores (Roberto, §8.1): ⌘O abrir nota, ⌘F buscar, ⌘T nueva tarea, ⌘S guardar, ⇧⌘O abrir carpeta (cambiar de cuaderno), ⌘, ajustes (CmdOrCtrl: Electron pone la tecla de cada plataforma); la tabla ATAJOS es la fuente y ⌘K queda reservada', () => {
+  assert.deepEqual(ATAJOS.map(a => [a.id, a.accelerator, a.accion]), [['abrir-nota', 'CmdOrCtrl+O', 'abrir-nota'], ['buscar', 'CmdOrCtrl+F', 'buscar'], ['nueva-tarea', 'CmdOrCtrl+T', 'nueva-tarea'], ['guardar', 'CmdOrCtrl+S', 'guardar'], ['abrir-carpeta', 'CmdOrCtrl+Shift+O', 'abrir-carpeta'], ['ajustes', 'CmdOrCtrl+,', 'ajustes']]);
+  // ⌘K / Ctrl+K es de las acciones rápidas (un bloque posterior): ningún elemento del menú la lleva, en ninguna plataforma.
+  assert.deepEqual(RESERVADOS, ['CmdOrCtrl+K']);
+  for (const plataforma of ['darwin', 'win32', 'linux']) for (const e of todos(plantillaMenu({ plataforma, recientes }))) assert.ok(!e.accelerator || !RESERVADOS.includes(e.accelerator), `${e.label} usa ${e.accelerator}`);
+  assert.ok(!ATAJOS.some(a => /\+P$/.test(a.accelerator)), 'sin «abrir página»: una nota se abre con el buscador');
   for (const plataforma of ['darwin', 'win32', 'linux']) {
     const p = plantillaMenu({ plataforma });
     for (const a of ATAJOS) { const e = elemento(p, a.id); assert.ok(e, `${a.id} en ${plataforma}`); assert.equal(e.accelerator, a.accelerator); assert.equal(e.label, a.label); }
@@ -45,16 +49,16 @@ test('los aceleradores de salida: ⌘O / Ctrl+O abrir carpeta, ⌘S / Ctrl+S gua
   // Ningún acelerador propio se repite ni pisa uno de los roles (Recargar, zoom, pantalla completa los pone Electron).
   const ac = ATAJOS.map(a => a.accelerator);
   assert.equal(new Set(ac).size, ac.length);
-  assert.ok(!ac.some(a => /CmdOrCtrl\+(R|0|Plus|-|Z|X|C|V|A)$/.test(a)));
+  assert.ok(!ac.some(a => /CmdOrCtrl\+(R|0|Plus|-|Z|X|C|V|A|Q|W|M|H)$/.test(a)));
 });
 
 test('cada acción propia manda su nombre por `accion`, los recientes abren su carpeta y los de Ayuda llaman a lo suyo', () => {
   const a = anotador();
   const p = plantillaMenu({ plataforma: 'linux', recientes, acciones: a.acciones });
-  for (const id of ['abrir-carpeta', 'guardar', 'ajustes']) elemento(p, id).click();
+  for (const id of ['abrir-nota', 'buscar', 'nueva-tarea', 'guardar', 'abrir-carpeta', 'ajustes']) elemento(p, id).click();
   elemento(p, 'reciente:/cuadernos/historia').click();
   for (const id of ['plan-vivo', 'mostrar-registro', 'diagnostico', 'acerca-de']) elemento(p, id).click();
-  assert.deepEqual(a.lineas, ['accion abrir-carpeta', 'accion guardar', 'accion ajustes', 'abrir /cuadernos/historia', 'plan', 'registro', 'diagnostico', 'acerca']);
+  assert.deepEqual(a.lineas, ['accion abrir-nota', 'accion buscar', 'accion nueva-tarea', 'accion guardar', 'accion abrir-carpeta', 'accion ajustes', 'abrir /cuadernos/historia', 'plan', 'registro', 'diagnostico', 'acerca']);
   assert.equal(CANAL, 'accion', 'el canal que escucha el preload');
   // Sin acciones (pintar el menú sin app detrás), pulsar no falla.
   const sola = plantillaMenu({ plataforma: 'darwin', recientes });

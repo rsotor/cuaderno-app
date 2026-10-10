@@ -115,7 +115,7 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
     const ventana = new BrowserWindow({ ...PANTALLA, backgroundColor: color });
     estado.ventana = ventana;
     // El menú, antes del primer píxel; sus recientes se reconstruyen cuando cambia config.json (el mismo vigilante que el tema).
-    estado.menu = instalarMenu({ electron, estado, config, registro, env, anotar, version: VERSION, abrirCarpeta: ruta => carpetas.llegada(ruta, 'menú') });
+    estado.menu = instalarMenu({ electron, estado, config, registro, env, anotar, version: VERSION, execPath, abrirCarpeta: ruta => carpetas.llegada(ruta, 'menú') });
     ventanaApp.preparar({ ventana, electron, config, env, particion: PANTALLA.webPreferences.partition, puerto: () => estado.puerto, anotar, vigilar, alCambiar: () => estado.menu.reconstruir() });
     await ventana.loadFile(path.join(__dirname, 'arrancando.html'));
     const r = await entorno({ env });   // asíncrono: el proceso principal sigue atendiendo eventos mientras la shell contesta (hasta 10 s)

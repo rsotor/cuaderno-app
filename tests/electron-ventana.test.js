@@ -245,3 +245,32 @@ test('preparar: de una vez, los tratos de la ventana, los permisos de la partici
   f.eventosApp.emit('before-quit');
   assert.equal(cerrado, 1);
 });
+
+test('vigilarTema con alCambiar (el menú rehace sus recientes): se llama en cada cambio de config.json, también sin cambio de tema, no por otro fichero; si falla, se anota y el tema se sigue aplicando', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'cuaderno-ventana-')), carpeta = path.join(base, 'config');
+  const tema = { valor: 'claro', carpeta }, f = electronFalso(), r = registroFalso();
+  let avisar = null, llamadas = 0;
+  const vigilar = (dir, fn) => { avisar = fn; return { on() {}, close() {} }; };
+  const vig = ventana.vigilarTema({ nativeTheme: f.electron.nativeTheme, config: configFalsa(tema), anotar: r.anotar, vigilar, alCambiar: () => { llamadas++; if (llamadas === 3) throw new Error('menú roto'); } });
+  avisar('change', 'token'); assert.equal(llamadas, 0, 'otro fichero: nada');
+  avisar('change', 'config.json'); assert.equal(llamadas, 1);
+  avisar('change', 'config.json'); assert.equal(llamadas, 2, 'sin cambio de tema también: los recientes pueden haber cambiado');
+  assert.deepEqual(r.lineas, []);
+  tema.valor = 'oscuro';
+  avisar('change', 'config.json');
+  assert.equal(llamadas, 3);
+  assert.equal(f.electron.nativeTheme.themeSource, 'dark', 'el tema se aplicó antes del fallo');
+  assert.deepEqual(r.lineas, ['tema cambiado en config.json: oscuro → themeSource dark', 'al cambiar config.json: menú roto']);
+  vig.cerrar();
+  fs.rmSync(base, { recursive: true, force: true });
+});
+
+test('preparar pasa alCambiar al vigilante', () => {
+  const f = electronFalso(), r = registroFalso(), v = ventanaFalsa();
+  let avisar = null, llamadas = 0;
+  const vigilar = (dir, fn) => { avisar = fn; return { on() {}, close() {} }; };
+  ventana.preparar({ ventana: v, electron: f.electron, config: configFalsa({ valor: 'claro', carpeta: os.tmpdir() }), env: {}, particion: 'cuaderno', puerto: () => 7331, anotar: r.anotar, vigilar, alCambiar: () => llamadas++ });
+  avisar('change', 'config.json');
+  assert.equal(llamadas, 1);
+  f.eventosApp.emit('before-quit');
+});
