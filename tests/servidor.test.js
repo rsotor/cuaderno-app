@@ -323,6 +323,48 @@ test('una sola dirección: http://localhost:<puerto>/, la misma cada vez; 127.0.
   } finally { await s.cerrar(); }
 });
 
+test('en la app (enApp) el 403 sin cookie no manda a la terminal: dice que se cierre y se vuelva a abrir la app; en la web, lo de siempre', async () => {
+  const c = crearCuaderno({ kit: false });
+  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, c.base), kit: detectar(c.raiz), token: 'ab'.repeat(16), enApp: true });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  try {
+    const sin = await fetch(server.url());
+    assert.equal(sin.status, 403);
+    const texto = await sin.text();
+    assert.match(texto, /Esta ventana aún no ha entrado en la app\. Cierra y vuelve a abrir la app/);
+    assert.doesNotMatch(texto, /terminal|server\.js/);
+  } finally { await new Promise(r => server.close(r)); c.borrar(); }
+});
+
+// Una pty de mentira que anota con qué se lanza la shell; el WebSocket /pty con la cookie y el Origin propios la abre.
+function ptyFalsa() {
+  const lanzadas = [];
+  return { lanzadas, spawn(cmd, args, o) { lanzadas.push({ cmd, args, cwd: o.cwd }); return { onData() {}, onExit() {}, write() {}, resize() {}, kill() {} }; } };
+}
+async function terminalCon({ shellLogin, plataforma }) {
+  const WebSocket = require('ws');
+  const c = crearCuaderno({ kit: false }), pty = ptyFalsa();
+  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, c.base), kit: detectar(c.raiz), token: 'ab'.repeat(16), pty, plataforma, shellLogin });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const puerto = server.address().port;
+  try {
+    await new Promise((ok, mal) => { const ws = new WebSocket(`ws://127.0.0.1:${puerto}/pty`, { headers: { cookie: `cuaderno=${server.token}`, origin: `http://127.0.0.1:${puerto}` } }); ws.on('open', () => { setTimeout(() => { ws.close(); ok(); }, 50); }); ws.on('error', mal); });
+    return { lanzadas: pty.lanzadas, raiz: c.raiz };
+  } finally { await new Promise(r => server.close(r)); c.borrar(); }
+}
+
+test('shellLogin (la app): en Mac y Linux la terminal lanza la shell con -l, en la raíz del cuaderno; sin shellLogin (la web) sin argumentos; en Windows nunca cambia nada', async () => {
+  const shell = process.env.SHELL || 'bash';
+  const app = await terminalCon({ shellLogin: true, plataforma: 'darwin' });
+  assert.deepEqual(app.lanzadas, [{ cmd: shell, args: ['-l'], cwd: app.raiz }]);
+  const linux = await terminalCon({ shellLogin: true, plataforma: 'linux' });
+  assert.deepEqual(linux.lanzadas[0].args, ['-l']);
+  const web = await terminalCon({ shellLogin: false, plataforma: 'darwin' });
+  assert.deepEqual(web.lanzadas, [{ cmd: shell, args: [], cwd: web.raiz }]);
+  const windows = await terminalCon({ shellLogin: true, plataforma: 'win32' });
+  assert.deepEqual(windows.lanzadas[0], { cmd: 'powershell.exe', args: [], cwd: windows.raiz });
+});
+
 test('la cookie dura un año: con el código fijo, recargar tras reiniciar el servidor o el navegador sigue valiendo', async () => {
   const s = await arrancar();
   try {

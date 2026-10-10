@@ -51,7 +51,10 @@ function estadoGit(raiz) {
   } catch { return null; }
 }
 
-function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null, ejecutar = null, ejecutarNode = null, plataforma = process.platform, fuentes = [__dirname, PUBLICO] }) {
+// Lo que la app de escritorio pide distinto (electron/hijo.js lo pasa; la web, nada): `shellLogin`, la terminal lanza la
+// shell como shell de login (`-l`, en Mac y Linux: la misma terminal que la del sistema; en Windows no cambia nada), y
+// `enApp`, el texto del 403 sin cookie no manda a la terminal (en la app no hay terminal desde la que arrancar).
+function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null, ejecutar = null, ejecutarNode = null, plataforma = process.platform, fuentes = [__dirname, PUBLICO], shellLogin = false, enApp = false }) {
   const estado = { cuaderno, kit };
   // Con qué Node corren las herramientas del kit y el corrector (null: el de este proceso, como en la web). La app de
   // escritorio inyecta el binario de Electron con ELECTRON_RUN_AS_NODE=1 (guardar.js y formulario.js lo explican).
@@ -144,7 +147,8 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
       }
       if (!autorizado(req, token)) {
         res.writeHead(403, { 'content-type': 'text/html; charset=utf-8' });
-        return res.end('<!doctype html><meta charset="utf-8"><title>Cuaderno</title><p style="font:16px system-ui;margin:40px;max-width:36em">Este navegador aún no ha entrado en la app. Arráncala desde la terminal (<code>node server.js</code>): abre esta pestaña ya dentro, y desde entonces basta con esta dirección.</p>');
+        const como = enApp ? 'Cierra y vuelve a abrir la app: la ventana entra ya dentro.' : 'Arráncala desde la terminal (<code>node server.js</code>): abre esta pestaña ya dentro, y desde entonces basta con esta dirección.';
+        return res.end(`<!doctype html><meta charset="utf-8"><title>Cuaderno</title><p style="font:16px system-ui;margin:40px;max-width:36em">${enApp ? 'Esta ventana' : 'Este navegador'} aún no ha entrado en la app. ${como}</p>`);
       }
       if (!origenPropio(req, puerto)) { res.writeHead(403); return res.end('origen no permitido'); }
 
@@ -248,7 +252,8 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
     if (!estado.cuaderno) { ws.send('\r\n[no hay ningún cuaderno abierto]\r\n'); return ws.close(); }
     const url = new URL(req.url, 'http://x');
     const profesor = url.searchParams.get('profesor') === '1';
-    const shell = process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash');
+    const shell = plataforma === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash');
+    const argsShell = shellLogin && plataforma !== 'win32' ? ['-l'] : [];   // shell de login solo en la app (plan §2, fila Terminal)
     const comando = comandoProfesor();
     const opciones = { name: 'xterm-256color', cols: 100, rows: 28, cwd: estado.cuaderno.raiz, env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } };
     let term;
@@ -257,7 +262,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
         if (!comando) { ws.send('\r\n[este cuaderno no tiene profesor configurado]\r\n'); return ws.close(); }
         const [cmd, ...args] = comando.split(/\s+/);
         term = pty.spawn(cmd, args, opciones);
-      } else term = pty.spawn(shell, [], opciones);
+      } else term = pty.spawn(shell, argsShell, opciones);
     } catch (e) {
       ws.send(`\r\n[no se ha podido abrir ${profesor ? comando : shell}: ${e.message}]\r\n`); return ws.close();
     }

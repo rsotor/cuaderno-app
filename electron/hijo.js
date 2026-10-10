@@ -14,7 +14,7 @@ function arrancarHijo({ crearServidor, config, parentPort, registro, pty = null,
   const anotar = linea => registro.escribir(`[hijo] ${linea}`);
   const ejecutarNode = nodeDelKit(env);
   anotar(`node ${process.versions.node}${process.versions.electron ? ` (electron ${process.versions.electron})` : ''}, pid ${process.pid}; el kit corre con ${ejecutarNode.cmd}`);
-  const server = crearServidor({ pty, token: config.token(), ejecutarNode });   // siempre el token de config: CUADERNO_TOKEN (server.js) no vale en la app, a propósito
+  const server = crearServidor({ pty, token: config.token(), ejecutarNode, shellLogin: true, enApp: true });   // siempre el token de config: CUADERNO_TOKEN (server.js) no vale en la app, a propósito; la terminal, shell de login; el 403 sin «desde la terminal»
   if (env.CUADERNO_CARPETA) {
     try { server.abrir(env.CUADERNO_CARPETA); anotar(`cuaderno abierto: ${env.CUADERNO_CARPETA}`); } catch (e) { anotar(`no se puede abrir ${env.CUADERNO_CARPETA}: ${e.message}`); }   // queda la pantalla de cuadernos
   }

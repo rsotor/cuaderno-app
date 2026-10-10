@@ -78,6 +78,17 @@ test('el Node del kit que recibe crearServidor es el de CUADERNO_NODE con ELECTR
   assert.deepEqual(m, { puerto: 4321, token: config.token() });
   assert.deepEqual(recibido[0].ejecutarNode, { cmd: '/apps/Cuaderno', env: { ELECTRON_RUN_AS_NODE: '1' } });
   assert.equal(recibido[0].pty, pty);
+  assert.equal(recibido[0].shellLogin, true, 'la terminal de la app lanza la shell de login');
+  assert.equal(recibido[0].enApp, true, 'el 403 no manda a la terminal');
+});
+
+test('en la app nadie abre el navegador: ningún módulo de electron/ carga server.js ni llama a sistema.abrirUrl (el hijo usa crearServidor directamente)', () => {
+  const dir = path.join(__dirname, '..', 'electron');
+  for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.js'))) {
+    const texto = fs.readFileSync(path.join(dir, f), 'utf8');
+    assert.doesNotMatch(texto, /require\(['"][./]*\/server['"]\)|require\(['"]\.\.\/server['"]\)/, `${f} carga server.js`);
+    assert.doesNotMatch(texto, /abrirUrl/, `${f} llama a sistema.abrirUrl`);
+  }
 });
 
 test('otro error al escuchar (no EADDRINUSE) se anota y sale con 1; el hijo no atiende órdenes del padre (lo para con kill)', async () => {
