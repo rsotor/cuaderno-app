@@ -105,12 +105,13 @@ function prepararVentana({ ventana, electron, env, puerto, anotar, abrirFuera = 
 }
 
 // Todo lo de la ventana principal de una vez: tratos de la ventana, permisos de la sesión y vigilancia del tema (y de lo
-// demás de config.json, con `alCambiar`). Devuelve el vigilante (se cierra solo al salir).
+// demás de config.json, con `alCambiar`). Devuelve el vigilante (se cierra solo al salir, en `will-quit`: un quit cancelado
+// por «Seguir editando» no debe dejar la app sin vigilante).
 function preparar({ ventana, electron, config, env, particion, puerto, anotar, vigilar, alCambiar = null }) {
   prepararVentana({ ventana, electron, env, puerto, anotar });
   permisos({ session: electron.session.fromPartition(particion), anotar });
   const vigilante = vigilarTema({ nativeTheme: electron.nativeTheme, config, ventana, anotar, alCambiar, ...(vigilar ? { vigilar } : {}) });
-  electron.app.on('before-quit', vigilante.cerrar);
+  electron.app.on('will-quit', vigilante.cerrar);
   return vigilante;
 }
 

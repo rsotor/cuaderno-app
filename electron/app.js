@@ -5,8 +5,10 @@
 // en un utilityProcess con ese entorno, CUADERNO_NODE (el Node del kit) y el cuaderno que toca → esperar
 // { puerto, token } compitiendo con exit/error y un tope de 15 s → la ventana entra por la URL de entrada (la cookie
 // se fija igual que en la web). Si el hijo muere después, se relanza una vez y se recarga; si vuelve a morir en menos
-// de un minuto, diálogo y salir. Cerrar la ventana mata al hijo (que cierra vigilante y pty) y sale; `before-quit`
-// marca `cerrando` para que esa salida del hijo no cuente como caída (lo vio el spike).
+// de un minuto, diálogo y salir. Cerrar la ventana mata al hijo (que cierra vigilante y pty) y sale; `will-quit`
+// marca `cerrando` para que esa salida del hijo no cuente como caída (lo vio el spike). Es `will-quit` y no
+// `before-quit` porque un quit se puede cancelar después de `before-quit` (el editor sucio y «Seguir editando» en
+// will-prevent-unload): si se matara al hijo ahí, la app seguiría viva con el servidor muerto y nadie lo relanzaría.
 const fs = require('node:fs');
 const path = require('node:path');
 const { entornoDeLaShell } = require('./entorno');
@@ -131,8 +133,9 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
     } catch (e) { fallo(e.message); return false; }
   });
 
-  // Salir (Cuaderno → Salir, app.quit() desde Playwright) o cerrar la ventana: el hijo se mata y su salida no es caída.
-  app.on('before-quit', () => { estado.cerrando = true; matarHijo(); });
+  // Salir (Cuaderno → Salir, ⌘Q, app.quit() desde Playwright) o cerrar la ventana: el hijo se mata y su salida no es caída.
+  // En `will-quit`, no en `before-quit`: ahí ya no hay vuelta atrás (un «Seguir editando» cancela el quit entre los dos).
+  app.on('will-quit', () => { estado.cerrando = true; matarHijo(); });
   app.on('window-all-closed', () => { estado.cerrando = true; matarHijo(); app.quit(); });
   return estado;
 }

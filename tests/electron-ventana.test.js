@@ -233,7 +233,7 @@ test('vigilarTema con el fs.watch de verdad: escribir config.json con otro tema 
   } finally { vig.cerrar(); fs.rmSync(base, { recursive: true, force: true }); }
 });
 
-test('preparar: de una vez, los tratos de la ventana, los permisos de la partición y el vigilante del tema, que se cierra en before-quit', () => {
+test('preparar: de una vez, los tratos de la ventana, los permisos de la partición y el vigilante del tema, que se cierra en will-quit (no en before-quit: un quit cancelado lo dejaría sin vigilante)', () => {
   const f = electronFalso(), r = registroFalso(), v = ventanaFalsa();
   let cerrado = 0;
   const vigilar = () => ({ on() {}, close() { cerrado++; } });
@@ -243,6 +243,8 @@ test('preparar: de una vez, los tratos de la ventana, los permisos de la partici
   assert.equal(typeof f.sesiones.cuaderno.manejador, 'function');
   assert.equal(typeof vig.cerrar, 'function');
   f.eventosApp.emit('before-quit');
+  assert.equal(cerrado, 0, 'before-quit aún se puede cancelar');
+  f.eventosApp.emit('will-quit');
   assert.equal(cerrado, 1);
 });
 
