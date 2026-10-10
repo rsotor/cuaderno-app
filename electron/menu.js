@@ -6,7 +6,7 @@
 // hace lo que ya sabe hacer (Guardar es el botón Guardar; Ajustes, el botón de Ajustes; Abrir nota… y Buscar…, el
 // buscador; Nueva tarea, su casilla; Abrir carpeta…, el diálogo del sistema de T4). Los roles estándar son de Electron (sin los de Edición, en Mac no hay copiar y pegar). Lo de Ayuda es
 // del proceso principal: el README y el plan vivo en GitHub (shell.openExternal, el repo público), el registro (shell.openPath), el
-// Diagnóstico (versiones, puerto, PATH resuelto y su origen, si node-pty cargó, carpeta de configuración; nunca el token)
+// Diagnóstico (si node-pty cargó, el entorno de la shell, PATH, puerto, carpeta de configuración, versiones; nunca el token)
 // y Acerca de. Los atajos que decida Roberto (plan §8.1) se añaden a ATAJOS.
 const path = require('node:path');
 
@@ -127,24 +127,28 @@ function elemento(plantilla, id) {
   return null;
 }
 
-// El texto de Ayuda → Diagnóstico, con lo que hace falta para entender un «git: not found» o una terminal muda a distancia.
-// Nunca lleva el token. `estado` es el de app.js (puerto, entorno, pty); `versiones`, process.versions.
-function textoDiagnostico({ version = '', versiones = process.versions, estado = {}, carpetaConfig = '', rutaRegistro = '', plataforma = process.platform, arquitectura = process.arch, execPath = process.execPath } = {}) {
+// El texto de Ayuda → Diagnóstico, con lo que hace falta para entender un «git: not found» o una terminal muda a distancia,
+// por utilidad (crítica 2026-10-10, 7): primero si node-pty cargó y el entorno de la shell (lo que falla de verdad), después
+// el PATH, el puerto y las carpetas, y las versiones al final. Nunca lleva el token. `estado` es el de app.js (puerto,
+// entorno, pty); `versiones`, process.versions. Con `resumido`, el PATH va en una línea («7 rutas, empieza por …»): es lo
+// que cabe en el diálogo; el texto que se copia y el del registro llevan el PATH entero.
+function textoDiagnostico({ version = '', versiones = process.versions, estado = {}, carpetaConfig = '', rutaRegistro = '', plataforma = process.platform, arquitectura = process.arch, execPath = process.execPath, resumido = false } = {}) {
   const e = estado.entorno || {};
   const pty = estado.pty === true ? 'sí' : estado.pty === false ? 'no (la app arranca sin terminal)' : 'sin saber aún';
   // «shell -lc (/bin/zsh, 7 ms)», «respaldo (/bin/bash, 10002 ms) — no ha contestado», «sistema» (Windows: sin shell que leer).
   const detalleShell = e.shell ? ` (${e.shell}${e.ms !== undefined ? `, ${e.ms} ms` : ''})` : '';
+  const rutas = e.PATH ? String(e.PATH).split(plataforma === 'win32' ? ';' : ':').filter(Boolean) : [];
+  const path = !e.PATH ? '(sin resolver)' : resumido ? `${rutas.length} ruta${rutas.length === 1 ? '' : 's'}, empieza por ${rutas[0]}` : e.PATH;
   return [
-    `${NOMBRE} ${version || '(sin versión)'}`,
-    `Electron ${versiones.electron || '(fuera de Electron)'} · Node ${versiones.node || '?'} · Chromium ${versiones.chrome || '?'}`,
-    `Sistema: ${plataforma} ${arquitectura}`,
-    `Ejecutable: ${execPath}`,
-    `Puerto del servidor: ${estado.puerto || '(el servidor aún no escucha)'}`,
     `node-pty cargado: ${pty}`,
     `Entorno de la shell: ${e.origen || 'sin resolver'}${detalleShell}${e.error ? ` — ${e.error}` : ''}`,
-    `PATH: ${e.PATH || '(sin resolver)'}`,
+    `PATH: ${path}`,
+    `Puerto del servidor: ${estado.puerto || '(el servidor aún no escucha)'}`,
     `Carpeta de configuración: ${carpetaConfig}`,
     `Registro: ${rutaRegistro}`,
+    `Sistema: ${plataforma} ${arquitectura}`,
+    `Ejecutable: ${execPath}`,
+    `${NOMBRE} ${version || '(sin versión)'} · Electron ${versiones.electron || '(fuera de Electron)'} · Node ${versiones.node || '?'} · Chromium ${versiones.chrome || '?'}`,
   ].join('\n');
 }
 
@@ -192,9 +196,10 @@ function instalarMenu({ electron, estado, config, registro, env = process.env, a
       return Promise.resolve(shell.openPath(f)).then(error => { if (error) anotar(`no se ha podido abrir el registro ${f}: ${error}`); }, e => anotar(`no se ha podido abrir el registro ${f}: ${e.message}`));
     },
     diagnostico: async () => {
-      const texto = textoDiagnostico({ version, versiones, estado, carpetaConfig: config.carpeta(), rutaRegistro: registro.ruta(), plataforma, execPath });
+      const datos = { version, versiones, estado, carpetaConfig: config.carpeta(), rutaRegistro: registro.ruta(), plataforma, execPath };
+      const texto = textoDiagnostico(datos);   // entero: al registro y al portapapeles
       anotar(`diagnóstico:\n${texto}`);
-      const r = await dialogo('Diagnóstico', `Diagnóstico de ${NOMBRE}`, texto, ['Copiar', 'Cerrar']);
+      const r = await dialogo('Diagnóstico', `Diagnóstico de ${NOMBRE}`, textoDiagnostico({ ...datos, resumido: true }), ['Copiar y cerrar', 'Cerrar']);
       if (r && r.response === 0 && clipboard) { try { clipboard.writeText(texto); } catch (e) { anotar(`no se ha podido copiar el diagnóstico: ${e.message}`); } }
     },
     acercaDe: () => dialogo(`Acerca de ${NOMBRE}`, NOMBRE, `Versión ${version || '(sin versión)'}\nUn cuaderno de estudio: la ventana sobre tus notas Markdown.\n${REPO}`),

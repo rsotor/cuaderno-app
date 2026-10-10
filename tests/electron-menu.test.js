@@ -101,32 +101,39 @@ test('Edición trae los roles estándar (sin ellos en Mac no hay copiar y pegar)
   }
 });
 
-test('el texto del Diagnóstico lleva versión, Electron, Node, Chromium, puerto, PATH y su origen, node-pty, carpeta de configuración y registro; nunca el token', () => {
+test('el texto del Diagnóstico, por utilidad: node-pty, el entorno de la shell y su origen, PATH, puerto, carpeta de configuración, registro, sistema, ejecutable y las versiones al final; nunca el token; resumido, el PATH en una línea', () => {
   const estado = { puerto: 7331, token: 'f00d', pty: true, entorno: { origen: 'shell -lc', ms: 7, shell: '/bin/zsh', PATH: '/opt/homebrew/bin:/usr/bin' } };
-  const t = textoDiagnostico({ version: '0.1.0', versiones: { electron: '44.7.0', node: '24.1.0', chrome: '140.0.0.0' }, estado, carpetaConfig: '/config/cuaderno', rutaRegistro: '/config/cuaderno/registro.log', plataforma: 'darwin', arquitectura: 'arm64', execPath: '/Applications/Cuaderno.app/Contents/MacOS/Cuaderno' });
+  const datos = { version: '0.1.0', versiones: { electron: '44.7.0', node: '24.1.0', chrome: '140.0.0.0' }, estado, carpetaConfig: '/config/cuaderno', rutaRegistro: '/config/cuaderno/registro.log', plataforma: 'darwin', arquitectura: 'arm64', execPath: '/Applications/Cuaderno.app/Contents/MacOS/Cuaderno' };
+  const t = textoDiagnostico(datos);
   assert.deepEqual(t.split('\n'), [
-    'Cuaderno 0.1.0',
-    'Electron 44.7.0 · Node 24.1.0 · Chromium 140.0.0.0',
-    'Sistema: darwin arm64',
-    'Ejecutable: /Applications/Cuaderno.app/Contents/MacOS/Cuaderno',
-    'Puerto del servidor: 7331',
     'node-pty cargado: sí',
     'Entorno de la shell: shell -lc (/bin/zsh, 7 ms)',
     'PATH: /opt/homebrew/bin:/usr/bin',
+    'Puerto del servidor: 7331',
     'Carpeta de configuración: /config/cuaderno',
     'Registro: /config/cuaderno/registro.log',
+    'Sistema: darwin arm64',
+    'Ejecutable: /Applications/Cuaderno.app/Contents/MacOS/Cuaderno',
+    'Cuaderno 0.1.0 · Electron 44.7.0 · Node 24.1.0 · Chromium 140.0.0.0',
   ]);
   assert.ok(!t.includes('f00d'));
+  // Resumido (lo que cabe en el diálogo): solo cambia la línea del PATH.
+  const r = textoDiagnostico({ ...datos, resumido: true }).split('\n');
+  assert.equal(r[2], 'PATH: 2 rutas, empieza por /opt/homebrew/bin');
+  assert.deepEqual([...r.slice(0, 2), ...r.slice(3)], [...t.split('\n').slice(0, 2), ...t.split('\n').slice(3)]);
+  assert.equal(textoDiagnostico({ ...datos, estado: { ...estado, entorno: { ...estado.entorno, PATH: '/usr/bin' } }, resumido: true }).split('\n')[2], 'PATH: 1 ruta, empieza por /usr/bin');
+  assert.equal(textoDiagnostico({ versiones: {}, estado: { entorno: { PATH: 'C:\\Windows;C:\\Cuaderno' } }, plataforma: 'win32', resumido: true }).split('\n')[2], 'PATH: 2 rutas, empieza por C:\\Windows', 'en Windows el PATH se separa con ;');
   // Sin servidor aún, sin pty, con el respaldo porque la shell no contestó; y en Windows no hay shell que leer.
   const antes = textoDiagnostico({ versiones: {}, estado: { puerto: null, pty: null, entorno: { origen: 'respaldo', ms: 10_002, shell: '/bin/bash', error: '/bin/bash -lc: no ha contestado en 10 s', PATH: '/usr/bin' } }, plataforma: 'linux', arquitectura: 'x64', execPath: '/apps/cuaderno' });
-  assert.match(antes, /^Cuaderno \(sin versión\)\nElectron \(fuera de Electron\) · Node \? · Chromium \?\n/);
+  assert.match(antes, /\nCuaderno \(sin versión\) · Electron \(fuera de Electron\) · Node \? · Chromium \?$/);
   assert.match(antes, /Puerto del servidor: \(el servidor aún no escucha\)/);
-  assert.match(antes, /node-pty cargado: sin saber aún/);
+  assert.match(antes, /^node-pty cargado: sin saber aún\n/);
   assert.match(antes, /Entorno de la shell: respaldo \(\/bin\/bash, 10002 ms\) — \/bin\/bash -lc: no ha contestado en 10 s/);
   const sinPty = textoDiagnostico({ versiones: {}, estado: { pty: false, entorno: { origen: 'sistema', ms: 0, shell: null, PATH: 'C:\\Windows' } }, plataforma: 'win32', arquitectura: 'x64', execPath: 'C:\\Cuaderno.exe' });
   assert.match(sinPty, /node-pty cargado: no \(la app arranca sin terminal\)/);
   assert.match(sinPty, /Entorno de la shell: sistema\nPATH: C:\\Windows/);
   assert.match(textoDiagnostico({ versiones: {} }), /Entorno de la shell: sin resolver\nPATH: \(sin resolver\)/);
+  assert.match(textoDiagnostico({ versiones: {}, resumido: true }), /\nPATH: \(sin resolver\)\n/);
 });
 
 test('Ayuda abre páginas del repo público, sin token ni nada más en la URL: el README (cómo se usa), su sección Teclado (atajos) y el plan vivo', () => {

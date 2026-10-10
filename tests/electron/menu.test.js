@@ -172,7 +172,8 @@ test('el menú de la app de escritorio: Ayuda → Diagnóstico queda en el regis
   await pulsar('diagnostico');
   await hasta(() => /diálogo saltado \(CUADERNO_SIN_DIALOGO\): Diagnóstico/.test(registro()), 'el Diagnóstico no ha llegado al registro');
   const r = registro();
-  assert.match(r, /\[app\] diagnóstico:\nCuaderno \d+\.\d+\.\d+\nElectron \d+\.\d+\.\d+ · Node \d+\.\d+\.\d+ · Chromium \d+\./);
+  assert.match(r, /\[app\] diagnóstico:\nnode-pty cargado: /);
+  assert.match(r, /\nCuaderno \d+\.\d+\.\d+ · Electron \d+\.\d+\.\d+ · Node \d+\.\d+\.\d+ · Chromium \d+\./);
   assert.match(r, new RegExp(`Puerto del servidor: ${puerto}\\n`));
   assert.match(r, /node-pty cargado: (sí|no \(la app arranca sin terminal\))\n/);
   assert.match(r, /Entorno de la shell: (shell -i?lc|respaldo|sistema)/);

@@ -589,7 +589,7 @@ test('un cuaderno de «Cuadernos recientes» se abre en el servidor (POST /api/a
   m.electron.app.emitir('will-quit');
 });
 
-test('Ayuda → Diagnóstico: un diálogo con versión de la app, Electron/Node/Chromium, sistema, puerto, si node-pty cargó (lo dice el hijo), PATH resuelto y su origen, carpeta de configuración y registro; nunca el token; «Copiar» lo lleva al portapapeles; y queda en el registro', async () => {
+test('Ayuda → Diagnóstico: un diálogo («Copiar y cerrar» / «Cerrar») con node-pty (lo dice el hijo), el entorno de la shell y su origen, el PATH resumido, puerto, carpeta de configuración, registro, sistema, ejecutable y las versiones; nunca el token; «Copiar y cerrar» lleva al portapapeles el texto entero (PATH completo), que es también el del registro', async () => {
   const m = montar({ env: { CUADERNO_USERDATA: '/tmp/ud' } });
   await tic(); m.hijos[0].escucha(7331, 'f00d', true); assert.equal(await m.estado.listo, true);
   assert.equal(m.estado.pty, true, 'el hijo dijo que node-pty cargó');
@@ -597,26 +597,24 @@ test('Ayuda → Diagnóstico: un diálogo con versión de la app, Electron/Node/
   await tic(); await tic();
   assert.equal(m.dialogos.length, 1);
   const d = m.dialogos[0];
-  assert.equal(d.title, 'Diagnóstico'); assert.deepEqual(d.buttons, ['Copiar', 'Cerrar']); assert.equal(d.ventana, m.ventanas[0]);
+  assert.equal(d.title, 'Diagnóstico'); assert.deepEqual(d.buttons, ['Copiar y cerrar', 'Cerrar']); assert.equal(d.ventana, m.ventanas[0]);
   const lineas = d.detail.split('\n');
-  assert.equal(lineas[0], `Cuaderno ${require('../package.json').version}`);
-  assert.match(lineas[1], /^Electron \(fuera de Electron\) · Node \d+\.\d+\.\d+ · Chromium \?$/, 'en el test no hay Electron; en la app, sus tres versiones');
-  assert.equal(lineas[2], `Sistema: ${process.platform} ${process.arch}`);
-  assert.equal(lineas[3], 'Ejecutable: /apps/Cuaderno');
-  assert.ok(lineas.includes('Puerto del servidor: 7331'));
-  assert.ok(lineas.includes('node-pty cargado: sí'));
-  assert.ok(lineas.includes('Entorno de la shell: shell -lc (/bin/zsh, 7 ms)'));
-  assert.ok(lineas.includes('PATH: /shell/bin:/usr/bin'));
-  assert.ok(lineas.includes(`Carpeta de configuración: ${carpetaConfig}`));
-  assert.ok(lineas.includes('Registro: /config/registro.log'));
+  assert.deepEqual(lineas.slice(0, 6), ['node-pty cargado: sí', 'Entorno de la shell: shell -lc (/bin/zsh, 7 ms)', 'PATH: 2 rutas, empieza por /shell/bin', 'Puerto del servidor: 7331', `Carpeta de configuración: ${carpetaConfig}`, 'Registro: /config/registro.log']);
+  assert.equal(lineas[6], `Sistema: ${process.platform} ${process.arch}`);
+  assert.equal(lineas[7], 'Ejecutable: /apps/Cuaderno');
+  assert.match(lineas[8], new RegExp(`^Cuaderno ${require('../package.json').version.replace(/\\./g, '\\.')} · Electron \\(fuera de Electron\\) · Node \\d+\\.\\d+\\.\\d+ · Chromium \\?$`), 'en el test no hay Electron; en la app, sus tres versiones');
+  assert.equal(lineas.length, 9);
   assert.ok(!d.detail.includes('f00d'), 'el token en el diagnóstico');
   assert.deepEqual(m.portapapeles, [], 'Cerrar no copia');
   const anotado = m.registro.lineas.find(l => l.startsWith('[app] diagnóstico:\n'));
   assert.ok(anotado, 'el diagnóstico queda en el registro'); assert.ok(anotado.includes('Puerto del servidor: 7331') && !anotado.includes('f00d'));
-  m.electron.dialog.respuesta = 0;   // Copiar
+  assert.ok(anotado.includes('\nPATH: /shell/bin:/usr/bin\n'), 'en el registro, el PATH entero');
+  m.electron.dialog.respuesta = 0;   // Copiar y cerrar
   m.menu.getMenuItemById('diagnostico').click();
   await tic(); await tic();
-  assert.deepEqual(m.portapapeles, [d.detail]);
+  assert.equal(m.portapapeles.length, 1);
+  assert.equal(`[app] diagnóstico:\n${m.portapapeles[0]}`, anotado, 'lo copiado es el texto entero, el mismo del registro');
+  assert.equal(m.portapapeles[0].split('\n')[2], 'PATH: /shell/bin:/usr/bin');
   m.electron.app.emitir('will-quit');
 });
 
