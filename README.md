@@ -22,6 +22,10 @@ sistema; arrastrar una carpeta al icono también vale). El menú va en castellan
 la terminal ha cargado. Los instaladores (`.dmg` y `.exe`, sin firma: el sistema avisa la primera vez) y cómo instalarlos:
 [`INSTALAR.md`](INSTALAR.md). El plan y lo decidido: `docs/planes/electron.md`.
 
+**Actualizar la app instalada:** `npm run instalar`, desde el checkout en `main` y sin cambios. Trae `main`, construye la
+app para tu máquina, cierra Cuaderno sin forzarla (si no se deja, para y no instala nada), la sustituye (en Mac, la
+anterior va a la Papelera) y la vuelve a abrir. Mac y Windows; `-- --simular` enseña los pasos sin ejecutar ninguno.
+
 **La web,** la misma pantalla en tu navegador:
 
 ```
