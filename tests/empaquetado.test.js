@@ -59,10 +59,11 @@ test('files acotado: fuera tests, docs, ejemplos, pruebas, cuadernos-prueba, la 
   for (const p of files.filter(p => !p.startsWith('!'))) assert.ok(/^(electron\/\*\*|public\/\*\*|package\.json|[a-z-]+\.js)$/.test(p), `patrón demasiado ancho: ${p}`);
 });
 
-// Los require('./x') y require('../x') de un fichero, resueltos a rutas relativas a la raíz (con su .js).
+// Los require('./x') y require('../x') de un fichero, resueltos a rutas relativas a la raíz (con su .js) y con '/' en
+// cualquier sistema (en Windows path.relative da '\\', y los patrones de `files` van con '/').
 function requiresLocales(fichero) {
   const texto = fs.readFileSync(path.join(RAIZ, fichero), 'utf8');
-  return [...texto.matchAll(/require\('(\.\.?\/[^']+)'\)/g)].map(m => path.relative(RAIZ, path.resolve(path.dirname(path.join(RAIZ, fichero)), m[1]))).map(r => (fs.existsSync(path.join(RAIZ, r)) && !fs.statSync(path.join(RAIZ, r)).isDirectory() ? r : `${r}.js`));
+  return [...texto.matchAll(/require\('(\.\.?\/[^']+)'\)/g)].map(m => path.relative(RAIZ, path.resolve(path.dirname(path.join(RAIZ, fichero)), m[1])).split(path.sep).join('/')).map(r => (fs.existsSync(path.join(RAIZ, r)) && !fs.statSync(path.join(RAIZ, r)).isDirectory() ? r : `${r}.js`));
 }
 
 test('cada módulo que el proceso principal y el hijo requieren (recursivamente) está en files; y ningún módulo listado sobra', () => {
