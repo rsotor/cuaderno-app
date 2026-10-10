@@ -50,7 +50,7 @@ function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false, emp
   } };
   const app = {
     rutas: {}, isPackaged: empaquetada, setPath(k, v) { this.rutas[k] = v; }, requestSingleInstanceLock() { return lock; },
-    whenReady() { return Promise.resolve(); }, on(e, f) { eventos.on(e, f); }, emitir(e, ...a) { eventos.emit(e, ...a); },
+    whenReady() { return Promise.resolve(); }, on(e, f) { eventos.on(e, f); }, emitir(e, ...a) { eventos.emit(e, ...a); }, oyentes: e => eventos.listenerCount(e),
     // quit(): before-quit y, como nadie lo cancela en el falso, will-quit (en Electron, un «Seguir editando» corta entre los dos).
     quit() { pasos.push('quit'); salidas.push('quit'); eventos.emit('before-quit'); eventos.emit('will-quit'); }, exit(c) { pasos.push(`exit ${c}`); salidas.push(c); },
   };
@@ -401,7 +401,7 @@ test('app empaquetada (isPackaged): las variables de prueba se ignoran y queda a
   dev.electron.app.emitir('will-quit');
 });
 
-test('segunda instancia: sin el lock, sale sin crear nada; con el lock, second-instance trae la ventana al frente (y la restaura si está minimizada)', async () => {
+test('segunda instancia: sin el lock, sale sin crear nada; con el lock, second-instance trae la ventana al frente (y la restaura si está minimizada): lo hace el abridor de carpeta.js, el único oyente', async () => {
   const segunda = montar({ lock: false });
   assert.equal(await segunda.estado.listo, false);
   assert.deepEqual(segunda.pasos, ['quit']);
@@ -415,6 +415,7 @@ test('segunda instancia: sin el lock, sale sin crear nada; con el lock, second-i
   primera.ventanas[0].minimizada = true;
   primera.electron.app.emitir('second-instance');
   assert.deepEqual(primera.pasos.slice(-3), ['focus', 'restore', 'focus']);
+  assert.equal(primera.electron.app.oyentes('second-instance'), 1, 'un solo oyente de second-instance (carpeta.js)');
   primera.hijos[0].escucha(7331); await primera.estado.listo;
 });
 

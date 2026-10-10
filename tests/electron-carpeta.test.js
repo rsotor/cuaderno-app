@@ -166,17 +166,26 @@ test('open-file con algo que no es una carpeta (un fichero, una ruta que no exis
   assert.deepEqual(m.pasos, []);
 });
 
-test('second-instance: con carpeta en los argumentos de la segunda (relativa a su directorio) la abre en el servidor; sin carpeta, no hace nada', async () => {
+test('second-instance: siempre trae la ventana al frente (restaurándola si está minimizada); con carpeta en los argumentos de la segunda (relativa a su directorio) la abre en el servidor; sin carpeta, solo el foco', async () => {
   const m = montar({ puerto: 7331 });
+  m.ventana.minimizada = true;
   m.eventos.emit('second-instance', {}, ['/apps/electron', '.', 'c'], '/cuadernos');
   await tic(); await tic();
   assert.equal(m.peticiones.length, 1);
   assert.deepEqual(JSON.parse(m.peticiones[0].cuerpo), { ruta: '/cuadernos/c' });
   assert.ok(m.lineas.includes('carpeta por segunda instancia: /cuadernos/c'));
+  assert.deepEqual(m.pasos, ['restore', 'focus', 'recargar'], 'al frente antes de abrir');
   m.eventos.emit('second-instance', {}, ['/apps/electron', '.'], '/cuadernos');
   m.eventos.emit('second-instance', {}, ['/apps/electron', '.', '--allow-file-access-from-files'], undefined);   // sin directorio: el nuestro
+  m.eventos.emit('second-instance');   // sin argumentos (como lo emite el test de app.js): solo el foco
   await tic(); await tic();
   assert.equal(m.peticiones.length, 1);
+  assert.deepEqual(m.pasos.slice(3), ['focus', 'focus', 'focus'], 'sin carpeta, solo el foco');
+  // Sin ventana aún (antes de ready), nada que enfocar y nada se rompe.
+  const sinVentana = montar({ puerto: null });
+  sinVentana.estado.ventana = null;
+  sinVentana.eventos.emit('second-instance', {}, ['/apps/electron', '.'], '/');
+  assert.deepEqual(sinVentana.pasos, []);
   // Empaquetada, la segunda no lleva «.»: su primer argumento ya es la carpeta.
   const emp = montar({ puerto: 7331, empaquetada: true });
   m.eventos.removeAllListeners();

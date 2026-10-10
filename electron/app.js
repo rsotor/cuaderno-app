@@ -46,8 +46,8 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
   // userData solo para lo de Electron (el lock de instancia única va ahí); tiene que fijarse antes de `ready`.
   if (env.CUADERNO_USERDATA) app.setPath('userData', env.CUADERNO_USERDATA);
   if (!app.requestSingleInstanceLock()) { anotar('ya hay otra instancia abierta: esta sale y aquella pasa al frente'); app.quit(); estado.listo = Promise.resolve(false); return estado; }
-  app.on('second-instance', () => { const v = estado.ventana; if (!v) return; if (v.isMinimized()) v.restore(); v.focus(); });
-  // Abrir carpeta por diálogo, argumentos, open-file y segunda instancia (carpeta.js); open-file se registra aquí, antes de ready.
+  // Abrir carpeta por diálogo, argumentos, open-file y segunda instancia (carpeta.js, único dueño de `second-instance`: trae la
+  // ventana al frente y abre la carpeta que traiga); open-file se registra aquí, antes de ready.
   const carpetas = crearAbridor({ electron, estado, anotar, existe, env, argv, cwd, peticion, recargar: () => (estado.ventana ? cargarVentana(estado.ventana) : false) });
 
   const urlEntrada = () => `http://localhost:${estado.puerto}/?t=${estado.token}`;

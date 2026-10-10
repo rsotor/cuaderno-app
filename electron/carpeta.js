@@ -93,8 +93,11 @@ function crearAbridor({ electron, estado, anotar, existe, recargar, env = proces
     alFrente();
     abridor.llegada(ruta, 'open-file');
   });
-  // La segunda instancia (`Cuaderno otra-carpeta` con la app abierta) le pasa sus argumentos a esta, que ya la trae al frente.
+  // La segunda instancia (`Cuaderno otra-carpeta`, o un doble clic en el icono, con la app abierta) sale sola; esta trae su
+  // ventana al frente (y la restaura si estaba minimizada) y abre la carpeta que traigan sus argumentos, si trae alguna.
+  // Es el único oyente de `second-instance` de la app (app.js no pone otro).
   app.on('second-instance', (evento, argvSegunda, directorio) => {
+    alFrente();
     const c = carpetaDeArgv(argvSegunda, { empaquetada, existe, cwd: directorio || cwd });
     if (c) abridor.llegada(c, 'segunda instancia');
   });
