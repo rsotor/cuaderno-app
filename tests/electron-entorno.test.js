@@ -95,6 +95,16 @@ test('`ejecutar` inyectable: se llama con -lc y la orden con env -0 entre marcad
   assert.equal(llamadas[1].sh, '/bin/sh'); assert.equal(llamadas[2].a[0], '-ilc'); assert.equal(r2.origen, 'respaldo');
 });
 
+test('la shell contesta con marcadores pero su entorno no trae PATH: el error lo dice así (no «sin marcadores»), y se pasa a -ilc', () => {
+  const llamadas = [];
+  const ejecutar = (sh, args) => { llamadas.push(args[0]); return { stdout: `${MARCADOR}LANG=C\0${MARCADOR}`, status: 0 }; };
+  const r = entornoDeLaShell({ env: { PATH: '/bin', SHELL: '/bin/zsh' }, home, plataforma: 'darwin', ejecutar });
+  assert.deepEqual(llamadas, ['-lc', '-ilc']);
+  assert.equal(r.origen, 'respaldo');
+  assert.equal(r.error, '/bin/zsh -ilc: la shell contestó pero su entorno no trae PATH (código 0)');
+  assert.equal(r.env.LANG, undefined, 'sin PATH no se importa nada: la respuesta no es de fiar');
+});
+
 test('Windows: no se ejecuta nada ni se añade nada; origen «sistema»', () => {
   const ejecutar = () => { throw new Error('no debía ejecutarse'); };
   const r = entornoDeLaShell({ env: { PATH: 'C:\\Windows', SHELL: 'x' }, home, plataforma: 'win32', ejecutar });

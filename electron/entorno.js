@@ -61,7 +61,7 @@ function entornoDeLaShell({ env = process.env, plataforma = process.platform, ej
       delete resultado.error;
       break;
     }
-    resultado.error = `${shell} ${flags}: sin marcadores en la salida (código ${r.status})`;
+    resultado.error = vars ? `${shell} ${flags}: la shell contestó pero su entorno no trae PATH (código ${r.status})` : `${shell} ${flags}: sin marcadores en la salida (código ${r.status})`;
   }
   const partes = (resultado.env.PATH || '').split(path.delimiter).filter(Boolean);
   for (const d of respaldo(home)) if (!partes.includes(d)) partes.push(d);
