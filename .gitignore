@@ -22,3 +22,8 @@ Thumbs.db
 
 # Árboles de trabajo de los agentes de Claude Code (copias temporales del repo)
 .claude/worktrees/
+
+# La app empaquetada (npm run empaquetar) y los iconos que electron-builder derive del PNG
+dist-app/
+electron/icono/*.icns
+electron/icono/*.ico
