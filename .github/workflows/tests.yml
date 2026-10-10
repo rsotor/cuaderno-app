@@ -125,6 +125,17 @@ jobs:
         if: runner.os == 'Linux' || github.event_name == 'workflow_dispatch'
         run: node node_modules/electron/install.js
 
+      - name: Sandbox de Chromium en Linux
+        # Ubuntu 24 restringe los espacios de nombres sin privilegios (AppArmor) y Chromium cae al ayudante SUID, que
+        # aborta si no es de root con 4755 («The SUID sandbox helper binary was found, but is not configured
+        # correctly»): los 15 recorridos fallaban al lanzar (primer run real, 2026-10-10; en el contenedor de desarrollo
+        # se corría como root, con --no-sandbox). Se configura el ayudante en vez de quitar el sandbox: los recorridos
+        # corren con el mismo sandbox que la app.
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
       - name: Recorridos de Electron
         # Sin pantalla en Linux: xvfb-run. Los tests fijan TMPDIR corto, configuración y userData temporales.
         if: runner.os == 'Linux' || github.event_name == 'workflow_dispatch'
