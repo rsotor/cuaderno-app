@@ -24,9 +24,16 @@ navegador puede hablar con tu cuaderno. Para probar sin un cuaderno propio, `eje
 todo lo que la app sabe hacer (`ejemplos/cuaderno-ejemplo.md` dice qué hay en cada nota); cópialo antes de escribir
 en él. Necesita Node 24 o más reciente.
 
+**La app de escritorio** (en desarrollo; plan en `docs/planes/electron.md`): `npm run app` abre el mismo cuaderno en
+una ventana propia, con el servidor dentro. Electron 44 no descarga su binario al instalar: la primera vez,
+`node node_modules/electron/install.js` (unos 100 MB). Lo que falle queda en `registro.log`, en la carpeta de
+configuración.
+
 `npm test` lanza los tests. `npm run test:navegador` lanza los recorridos de navegador (Playwright con Chromium headless;
 en un ordenador normal hace falta `npx playwright install chromium` una vez, o la variable `CUADERNO_CHROMIUM` con la ruta
-de otro Chromium). `node pruebas/recorrido.js <carpeta>` recorre un cuaderno y lista los enlaces rotos.
+de otro Chromium). `npm run test:electron` lanza el recorrido de la app de escritorio (necesita el binario de Electron;
+sin pantalla, `xvfb-run -a npm run test:electron`). `node pruebas/recorrido.js <carpeta>` recorre un cuaderno y lista los
+enlaces rotos.
 
 ## Estado
 

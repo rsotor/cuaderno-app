@@ -2,7 +2,8 @@
 #   push (solo main)    → Linux: npm test + recorridos de navegador. En una rama, la lanza su pull request (no dos veces el mismo commit).
 #   pull_request        → Linux, macOS y Windows: lo mismo en los tres (el run de Windows compila node-pty con Node 24).
 #   workflow_dispatch   → los tres sistemas, a mano, desde la pestaña Actions.
-# Solo se lanza cuando cambia algo que afecta a los tests: código, pantalla, tests, dependencias o este fichero.
+# Solo se lanza cuando cambia algo que afecta a los tests: código, pantalla, la app de escritorio (electron/ y su
+# empaquetado), tests, dependencias o este fichero (el filtro `*.js` no cruza directorios: electron/** va aparte).
 # Un commit que solo toca docs/, capturas o Markdown no gasta nada.
 # El coste en repo privado: macOS cuenta ×10 y Windows ×2 contra la cuota; en repo público, cero.
 name: Tests
@@ -13,20 +14,26 @@ on:
     paths:
       - "*.js"
       - "public/**"
+      - "electron/**"
       - "tests/**"
       - "pruebas/**"
       - "package.json"
       - "package-lock.json"
+      - "electron-builder.yml"
       - ".github/workflows/tests.yml"
+      - ".github/workflows/empaquetar.yml"
   pull_request:
     paths:
       - "*.js"
       - "public/**"
+      - "electron/**"
       - "tests/**"
       - "pruebas/**"
       - "package.json"
       - "package-lock.json"
+      - "electron-builder.yml"
       - ".github/workflows/tests.yml"
+      - ".github/workflows/empaquetar.yml"
   workflow_dispatch:
 
 concurrency:
