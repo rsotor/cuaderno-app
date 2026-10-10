@@ -33,6 +33,9 @@ tocar nada y mantenlo al día mientras trabajas (su §0 es el fichero de estado 
 - **Node 24 o más reciente.** Dependencias: las menos posibles; cada una nueva se justifica en el plan vivo.
 - **Commits pequeños, y todo entra por PR** (squash con el título del PR, la CI en verde antes de mergear; §6 del
   plan vivo), con mensaje en castellano.
+- **Al cerrar una sesión en la que se ha mergeado en `main` algo que cambia la app** (código, `public/`, `electron/`,
+  dependencias), Claude lanza `npm run instalar` en el checkout principal del Mac de Roberto y dice la versión que
+  quedó. Si la app no se deja cerrar (cambios sin guardar), se le avisa y no se fuerza.
 - **Cada desarrollo trae su caso al cuaderno de ejemplo.** Lo que la app aprende a pintar o hacer se añade a
   `ejemplos/cuaderno-ejemplo/` en una nota o carpeta nueva (no se tocan las que ya tienen tests con cifras exactas),
   con su fila en el índice `ejemplos/cuaderno-ejemplo.md` y un test o recorrido que lo use. Así la CI lo cubre.
