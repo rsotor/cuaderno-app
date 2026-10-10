@@ -5,6 +5,10 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 let arbol = [], rutaActual = null, info = { cuaderno: null, configuracion: {} };
 const cuaderno = () => info.cuaderno;
 
+// En la app de escritorio (Electron) el preload deja window.cuadernoApp; sin él, la pantalla es la del navegador y nada cambia.
+const enApp = () => !!window.cuadernoApp;
+// Lo que supone una terminal se dice de otra forma en la app: no hay terminal donde reiniciarla, se cierra y se vuelve a abrir.
+if (enApp()) { const a = $('#aviso-reinicio'); for (const n of [...a.childNodes]) if (n.id !== 'aviso-cerrar') n.remove(); a.prepend('La app se ha actualizado mientras estaba abierta. Cierra y vuelve a abrir la app para que todo funcione. '); }
 // El aviso de «la app se ha actualizado» se cierra y no vuelve en esta pestaña (Roberto, 2026-10-09).
 let avisoCerrado = false;
 $('#aviso-cerrar').addEventListener('click', () => { avisoCerrado = true; $('#aviso-reinicio').hidden = true; });
@@ -15,7 +19,7 @@ async function api(p, body) {
   const d = await r.json().catch(() => ({ error: `respuesta ${r.status}` }));
   if (!r.ok) {
     if (r.status === 404 && p.startsWith('/api/') && !avisoCerrado) $('#aviso-reinicio').hidden = false;   // una ruta que el servidor no conoce: es de antes
-    if (r.status === 403) avisarError('Esta pestaña ha perdido el permiso: arranca la app desde la terminal y entra por la pestaña que abre.');
+    if (r.status === 403) avisarError(enApp() ? 'Esta ventana ha perdido el permiso: cierra y vuelve a abrir la app.' : 'Esta pestaña ha perdido el permiso: arranca la app desde la terminal y entra por la pestaña que abre.');
     if (r.status === 409 && rutaActual && !edicion) { avisarError('Esta nota cambió en el disco mientras la tenías abierta. La he vuelto a cargar: repite el cambio.'); abrirNota(rutaActual); }
     throw Object.assign(new Error(d.error || `error ${r.status}`), { status: r.status });
   }
@@ -866,8 +870,9 @@ async function abrirCuadernos() {
   rutaActual = null; $('#nota').hidden = true; $('#panel').hidden = false;
   $('#miga').innerHTML = '<strong>Cuadernos</strong>';
   const lista = await api('/api/cuadernos');
-  $('#panel').innerHTML = `<h1>Cuadernos</h1><p class="resumen">Cada cuaderno es una carpeta de notas con su propio repositorio. Abre uno reciente o escribe la ruta de otra carpeta.</p>
-    <form class="nueva-tarea" id="abrir-carpeta"><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="Ruta de la carpeta del cuaderno, por ejemplo ~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button></form>`
+  // En la app de escritorio, además de la casilla, el diálogo del sistema («Elegir carpeta…»); el camino después es el mismo.
+  $('#panel').innerHTML = `<h1>Cuadernos</h1><p class="resumen">Cada cuaderno es una carpeta de notas con su propio repositorio. ${enApp() ? 'Abre uno reciente, elige otra carpeta o escribe su ruta.' : 'Abre uno reciente o escribe la ruta de otra carpeta.'}</p>
+    <form class="nueva-tarea" id="abrir-carpeta"><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="Ruta de la carpeta del cuaderno, por ejemplo ~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button>${enApp() ? '<button type="button" id="elegir-carpeta" class="secundario">Elegir carpeta…</button>' : ''}</form>`
     + (lista.length ? lista.map(c => `<section class="grupo cuaderno${c.abiertoAhora ? ' abierto' : ''}${c.existe ? '' : ' ausente'}"><h2>${c.existe ? `<a href="#/" data-abrir="${esc(c.ruta)}">${esc(c.nombre)}</a>` : esc(c.nombre)}${c.abiertoAhora ? '<span class="solo-lectura">abierto ahora</span>' : ''}</h2><p class="ruta"><code>${esc(c.ruta)}</code></p><p class="detalle">${!c.existe ? 'La carpeta ya no está' : c.git ? textoGit(c.git) : 'No es un repositorio: desde aquí no se puede guardar'}</p><button type="button" class="secundario pequeno" data-olvidar="${esc(c.ruta)}">Quitar de la lista</button></section>`).join('')
       : '<section class="grupo"><p>Todavía no has abierto ningún cuaderno.</p></section>');
 }
@@ -878,8 +883,18 @@ async function abrirCarpeta(ruta) {
   location.hash = cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/';
   if (location.hash === '#/') enrutar();
 }
+// Solo en la app de escritorio: el diálogo del sistema (window.cuadernoApp, del preload de Electron) da la ruta, que se
+// enseña en la casilla y sigue el camino de siempre (/api/abrir). Cancelar no hace nada.
+async function elegirCarpeta() {
+  let ruta = null;
+  try { ruta = await window.cuadernoApp.elegirCarpeta(); } catch (e) { avisarError('No se ha podido abrir el diálogo de carpetas.', e.message); return; }
+  if (!ruta) return;
+  const campo = $('#ruta-carpeta'); if (campo) campo.value = ruta;
+  await abrirCarpeta(ruta);
+}
 $('#panel').addEventListener('click', async e => {
   const a = e.target.closest('a[data-abrir]'); if (a) { e.preventDefault(); return abrirCarpeta(a.dataset.abrir); }
+  if (e.target.closest('#elegir-carpeta')) return elegirCarpeta();
   const b = e.target.closest('button[data-olvidar]'); if (b) { await api('/api/olvidar', { ruta: b.dataset.olvidar }); abrirCuadernos(); }
 });
 $('#panel').addEventListener('submit', e => { if (e.target.id !== 'abrir-carpeta') return; e.preventDefault(); const v = e.target.querySelector('input').value.trim(); if (v) abrirCarpeta(v); });
