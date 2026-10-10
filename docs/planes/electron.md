@@ -487,6 +487,40 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
   instaladores como artefactos del run (y como Release si es etiqueta). Dependabot: grupo `electron` mensual.
 - **Criterios:** PR en verde con el recorrido Electron; un `workflow_dispatch` deja `.dmg` y `.exe` descargables.
 - **Estimación:** un día. **Depende de:** T6.
+- **Hecha (2026-10-10, sin poder correr GitHub Actions desde el contenedor: validado en local y a falta del primer run
+  real).** `tests.yml`: tras los recorridos de navegador, cuatro pasos con la misma condición
+  (`runner.os == 'Linux' || github.event_name == 'workflow_dispatch'`): la versión de Electron leída de
+  `node_modules/electron/package.json` para la clave de la caché (`electron-<sistema>-<arquitectura>-<versión>`),
+  `actions/cache@v4` sobre la caché de descargas de `@electron/get` (las tres rutas por defecto, una por sistema:
+  `~/.cache/electron`, `~/Library/Caches/electron`, `~/AppData/Local/electron/Cache`; las que no existen en ese runner
+  se ignoran), `node node_modules/electron/install.js` y **«Recorridos de Electron»** (`xvfb-run -a npm run test:electron`
+  en Linux, `npm run test:electron` en Mac y Windows) con `timeout-minutes: 10`. **Sin variables de entorno para la
+  caché:** `install.js` solo pasa `cacheRoot` si existe `electron_config_cache`, y electron-builder (`app-builder-lib`
+  26.15.3, `ElectronFramework.js` → `downloadElectronArtifactZip` sin `cacheDir`) deja el `cacheRoot` sin fijar: los dos
+  caen en el mismo directorio por defecto de `@electron/get`, así que una sola caché sirve al recorrido y al empaquetado.
+  Los `paths` de T1 se mantienen. **`empaquetar.yml`** (nuevo): `workflow_dispatch` y `push` de etiquetas `v*`; matriz
+  `macos-latest` (`.dmg` arm64 y x64, los targets de `electron-builder.js`) y `windows-latest` (`.exe` NSIS);
+  `permissions: contents: write`; `CSC_IDENTITY_AUTO_DISCOVERY=false` en el entorno del job (inocua para la firma ad hoc:
+  `MacTargetHelper.findSigningIdentity` entra por la rama `qualifier === "-"` y firma ad hoc igual; la variable solo
+  cuenta cuando no hay identidad); `npm ci`, la misma caché de Electron (sin `install.js`: electron-builder baja su zip
+  por arquitectura al mismo directorio), `npm run empaquetar:instaladores`, `actions/upload-artifact@v4`
+  (`cuaderno-macOS` y `cuaderno-Windows`, `if-no-files-found: error`) y, si el disparador es una etiqueta, la Release
+  con `gh release` y el `GITHUB_TOKEN` del run (`view || create --generate-notes || true` y `upload --clobber`: los dos
+  jobs acaban cuando acaban y el que pierde la carrera de crearla sigue; sin acciones de terceros ni secretos nuevos).
+  **Dependabot:** grupo `electron` (`electron`, `electron-builder`) en la entrada semanal, con `cooldown` de 30 días
+  para los dos; Dependabot no acepta dos entradas para el mismo ecosistema y directorio salvo con `target-branch`
+  distinto, así que la cadencia mensual la pone el reposo, no un segundo calendario. **Cobertura:** nada nuevo que
+  excluir: `npm run test:cobertura` 229 tests (227 pass, 2 skipped), 99,32 % líneas / 90,98 % ramas / 97,51 % funciones;
+  los ficheros de `electron/` que cargan en Node están entre el 80 % (`hijo.js`, funciones) y el 100 %, y el suelo es
+  global. **Validado en local (Linux, Node 22 del contenedor):** `npm ci` 8 s; `node node_modules/electron/install.js`
+  con la caché presente 2,2 s (solo extrae); `xvfb-run -a npm run test:electron` 13 de 13 en 13,5 s;
+  `npx electron-builder --dir --linux` 9 s; los tres YAML parseados con PyYAML. **Queda para el primer run real:** que
+  `actions/cache` expanda `~` y encuentre la ruta en Mac y Windows (si al guardar avisa «Path Validation Error», la ruta
+  no es esa); el recorrido Electron en `macos-latest` y `windows-latest` (un `workflow_dispatch`), sus tiempos dentro de
+  los 20 min del job y del tope de 10 del paso; el `.dmg` arm64 y x64 construidos en el runner arm64 de Mac y el `.exe` en
+  Windows; que `gh release create --generate-notes` y la carrera entre los dos jobs van bien con una etiqueta `v*`; el
+  coste real en cuota (Mac ×10 en privado); y que el validador de Dependabot acepte `cooldown` (si lo rechaza, lo dice
+  en Insights → Dependency graph → Dependabot; la alternativa es quitar `cooldown` y dejar el grupo semanal).
 
 ### T8 · Cierre: plan vivo, README, la etiqueta de la web y la crítica de diseño
 - **Qué:** §0, §6 (filas Plataforma, Arranque, CI, Teclado, Seguridad) y §8 del plan vivo; README con «Arrancar»
