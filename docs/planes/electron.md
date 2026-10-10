@@ -107,7 +107,8 @@ electron/
   arrancando.html    página local mínima («Arrancando…», fondo del tema) que la ventana enseña hasta que llega el puerto
   preload.js         contextBridge.exposeInMainWorld('cuadernoApp', { elegirCarpeta(), alAccion(cb), version })
   menu.js            tabla → plantilla de Menu (puro: etiquetas, aceleradores y acciones por plataforma)
-  entorno.js         entornoDeLaShell(), nodeDelKit(), esquemaPermitido(url), temaNativo(tema) (puros, probados)
+  entorno.js         entornoDeLaShell() (asíncrona), nodeDelKit(), esquemaPermitido(url), temaNativo(tema) (puros, probados)
+  ventana.js         lo del navegador que en la app cambia (T2): enlaces fuera, «¿Descartar lo escrito?», permisos, tema (Electron inyectado)
   registro.js        escribir(linea) a registro.log con rotación; leer() para Ayuda
   icono/             icono.png (1024) generado desde el SVG elegido por pruebas/icono.js; electron-builder hace .icns e .ico
 server.js            sigue igual: el modo web (npm start)
@@ -279,6 +280,44 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
   enlace externo interceptado (con `openExternal` sustituido por IPC de pruebas, nunca abriendo un navegador en
   CI) y cierre con cambios (diálogo sustituido por respuesta fija en pruebas).
 - **Estimación:** un día. **Depende de:** T1.
+- **Hecha (2026-10-10, rama `electron`, en paralelo con T4, pendiente de PR).** Lo que hay y cómo difiere de lo escrito arriba:
+  (1) Todo lo de la ventana va en un módulo nuevo, `electron/ventana.js` (`preparar`, `prepararVentana`, `aplicarTema`,
+  `vigilarTema`, `permisos`, `colorDeFondo`…), con Electron inyectado y probado en Node (`tests/electron-ventana.test.js`,
+  13 tests); `app.js` lo llama en dos líneas (el fondo y el `themeSource` antes de crear la ventana, `preparar` después), para
+  no chocar con T4. (2) Enlaces fuera: `esquemaPermitido` en `entorno.js` (solo `http:`, `https:`, `mailto:`);
+  `setWindowOpenHandler` y `will-navigate` dejan lo propio (`http` en `localhost` o `127.0.0.1` con **el puerto de ahora**: tras un
+  relanzado el viejo ya no es nuestro), mandan lo permitido a `shell.openExternal` y anotan lo demás sin hacer nada; una ventana
+  hija (`window.open` de un fichero del cuaderno, `did-create-window`) recibe los mismos tratos. En pruebas,
+  `CUADERNO_SIN_NAVEGADOR` anota el enlace en vez de abrir el navegador. (3) Cerrar con cambios: `will-prevent-unload` con
+  `dialog.showMessageBoxSync(ventana, …)` «¿Descartar lo escrito?» (Descartar / Seguir editando, por defecto y al cancelar la
+  segunda); vale para Ver → Recargar (el recorrido lo prueba con `webContents.reload()` desde el principal, que es lo que hará el
+  menú). **Un solo mecanismo** de pruebas: `CUADERNO_SIN_DIALOGO=descartar` descarta, cualquier otro valor (`seguir`, el `1` del
+  recorrido) sigue editando; el diálogo de error de T1 sigue saltándose con cualquier valor. (4) Permisos:
+  `session.fromPartition('cuaderno').setPermissionRequestHandler` concede solo `clipboard-sanitized-write` (`permisoConcedido`,
+  lista pura; el comentario sobre un futuro `setPermissionCheckHandler` está en `ventana.js`); el recorrido comprueba que
+  `navigator.clipboard.writeText` funciona. (5) Tema: `temaNativo` puro; `nativeTheme.themeSource` según `config.tema` antes del
+  primer píxel; `backgroundColor` con `colorDeFondo` (con `auto`, `nativeTheme.shouldUseDarkColors`: nunca blanco sobre un
+  sistema oscuro); el padre vigila **la carpeta** de configuración con `fs.watch` (no el fichero: así vale aunque `config.json`
+  aún no exista; la crea si falta; con `try/catch`) y reaplica `themeSource` y el fondo cuando cambia `config.json`, anotándolo;
+  se cierra en `before-quit`. Probado con vigilante falso y con `fs.watch` de verdad. (6) `entornoDeLaShell` es **asíncrona**
+  (`spawn` con promesa, mismo contrato: `{ stdout, status, error }` con `ETIMEDOUT`/`ENOENT`; al vencer el tope se mata la shell y
+  se sueltan sus tuberías para que un nieto no la retenga); el test de la shell lenta comprueba que el bucle de eventos late
+  mientras se espera. Resuelve el punto (9) de T1. (7) `crearServidor({ shellLogin, enApp })`: con `shellLogin`, la terminal
+  lanza la shell con `-l` en Mac y Linux (nada en Windows); con `enApp`, el 403 sin cookie dice «Esta ventana aún no ha entrado
+  en la app. Cierra y vuelve a abrir la app» en vez de mandar a la terminal. `electron/hijo.js` pasa los dos. Tests en
+  `tests/servidor.test.js` (pty falsa que anota los args; los de las rutas y el pty viven ahí, **no en `rutas.test.js`**, que
+  es la comprobación estática de rutas) y en `electron-hijo.test.js`. La elección de la shell del pty usa ahora la `plataforma`
+  inyectada (antes `process.platform` a secas). (8) `sistema.abrirUrl` no se llama en la app: solo lo hace `server.js`, que
+  ningún módulo de `electron/` carga; un test estático en `electron-hijo.test.js` lo vigila. (9) Recorrido Electron
+  (`tests/electron/ventana.test.js`, fila 26 del ejemplo): el enlace `https://example.com` de `render/enlaces.md` queda en el
+  registro y la ventana no cambia (Playwright necesita `noWaitAfter` en el clic: esperaría una navegación que la app impide), y
+  recargar con el editor sucio pregunta y se queda (con `pagina.on('dialog')` inofensivo: Playwright intenta cerrar el
+  `beforeunload` como diálogo de Chromium y, sin oyente, falla fuera del test). La rama «descartar» solo con el Electron falso
+  (sería otro arranque). **No hecho aquí, es de T4 (`public/`):** los textos de `app.js` l.18 y `#aviso-reinicio` con
+  `cuadernoApp`, y la nota de Ajustes sobre `comando_agente` como ejecutable. **Sin menú aún** (T5): el handler de recargar está
+  en `webContents`, que es lo que el menú usará. Cifras: `npm run test:cobertura` 178 tests en verde, todo 99,2 % líneas /
+  90,4 % ramas / 97,1 % funciones (`ventana.js` 100 / 96,6 / 95,5); `xvfb-run -a npm run test:electron` 5 tests, ~3 s, tres
+  veces seguidas en verde.
 
 ### T3 · Guardar y corregir con kit desde la app: el Node del kit
 - **Hecha (2026-10-10, en un árbol aparte, integrada en `7532d26`):** el código lo dejó el spike (`5b613eb`) y T3 lo limpió
