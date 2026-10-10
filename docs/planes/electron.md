@@ -90,7 +90,7 @@ revisión de confirmación. Quien tome una tarea lee §1-§4 enteros y su tarea;
 | Una instancia | `app.requestSingleInstanceLock()`; la segunda apertura trae la ventana al frente y, si trae una carpeta en `argv`, la abre | Dos servidores sobre el mismo cuaderno pisarían el vigilante y la cookie |
 | Abrir carpeta | Diálogo del sistema (`dialog.showOpenDialog`), **más** `app.on('open-file')` (Mac: arrastrar al icono) y la carpeta en `argv` (Windows y Linux, y `second-instance`) | Es lo que un usuario del Finder o del Explorador espera; cuesta lo mismo que el diálogo |
 | Registro | **Registro a fichero** en la carpeta de configuración (`registro.log`, rotado a 1 MB) con lo que hoy va a `console.error`, más Ayuda → «Mostrar registro» y «Diagnóstico» (versiones, puerto, `PATH` resuelto, `node-pty` cargado o no) | Sin terminal, los errores desaparecen; es la única manera de depurar el Windows del padre a distancia |
-| Menú y atajos | Menú propio en castellano (Cuaderno, Edición, Ver, Ventana, Ayuda). Los atajos del menú **mandan un mensaje a la pantalla** (`webContents.send('accion', 'guardar')`) y la pantalla hace lo que ya sabe hacer | La lógica sigue en la pantalla; el menú solo la nombra. **Los atajos concretos los decide Roberto (§8)**: el plan arranca con ⌘S / Ctrl S → Guardar, ⌘, → Ajustes y ⌘O → Abrir carpeta |
+| Menú y atajos | Menú propio en castellano (Cuaderno, Edición, Ver, Ventana, Ayuda). Los atajos del menú **mandan un mensaje a la pantalla** (`webContents.send('accion', 'guardar')`) y la pantalla hace lo que ya sabe hacer | La lógica sigue en la pantalla; el menú solo la nombra. **Los atajos concretos los decide Roberto (§8)**: el plan arrancaba con ⌘S / Ctrl S → Guardar, ⌘, → Ajustes y ⌘O → Abrir carpeta; decididos el 2026-10-10 (§8.1; la tabla, en T5 «Hecha») |
 | Icono | Se elige al crear la app entre las tres propuestas de `docs/diseno/logo/` (decisión de Roberto del 2026-10-09); electron-builder genera `.icns` e `.ico` desde un PNG de 1024 px rasterizado con el Chromium de Playwright (sin `sharp`) | Lo decidido ya; la app sin icono propio parece rota; sin dependencia nueva |
 | Nombre del producto | `Cuaderno` (`productName`), `appId` `es.cuaderno.app` (sin dominio real detrás: es un identificador) | Sin rutas ni nombres de nadie (principio 5) |
 | Actualizaciones | **Sin `autoUpdater`** (sin firma no funciona en Mac). «Buscar versión nueva» en Ayuda solo tiene sentido con el repo público (API de Releases sin token): decisión de Roberto en §8 | Con dos usuarios no compensa más |
@@ -384,6 +384,50 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
 - **Tests:** `tests/electron-menu.test.js` (puro: etiquetas, aceleradores y acciones por plataforma); recorrido
   Electron: `accion: guardar` por IPC de pruebas llega a la pantalla; fila en la tabla de casos (⌘S).
 - **Estimación:** medio día. **Depende de:** T1, T4.
+- **Hecha (2026-10-10, sobre T2 y T4 integradas; empezada en un wip y retomada por otro agente).** Lo que hay y lo que
+  difiere de lo escrito arriba: (1) `electron/menu.js`: `plantillaMenu({ plataforma, recientes, version, acciones })` es pura
+  (una tabla `ATAJOS` → la plantilla de `Menu.buildFromTemplate`, con etiquetas en castellano, aceleradores `CmdOrCtrl` y
+  roles estándar en Edición, Ver y Ventana); `instalarMenu` la engancha a Electron y la **reconstruye cuando cambian los
+  recientes** con el mismo vigilante de `config.json` que ya tenía el tema (`ventana.js` acepta `alCambiar`: un solo
+  `fs.watch`), sin tocar nada si solo cambió el tema o un ajuste. En Mac va primero el menú de la app (Acerca de, Ajustes,
+  Servicios, ocultar, Salir de Cuaderno) y Cuaderno no los repite; en Windows y Linux, Ajustes y Salir van en Cuaderno y
+  Acerca de en Ayuda. (2) Los elementos propios mandan `webContents.send('accion', nombre)`; `public/app.js`, solo con
+  `window.cuadernoApp`, los atiende en `ACCIONES_APP` haciendo lo que ya hace su botón o su tecla (Guardar es el botón
+  Guardar, del repositorio: `/api/guardar`, con aviso si no hay cuaderno o el botón está deshabilitado; Ajustes, su botón;
+  Abrir carpeta…, el diálogo del sistema de T4; Abrir nota… y Buscar…, el buscador; Nueva tarea, la casilla de Tareas o el
+  buscador con «+»); con un diálogo abierto la acción se ignora (⌘S sobre el propio modal de Guardar no apila otro). Sin
+  `cuadernoApp` nada cambia y la web no gana ningún atajo. (3) **Los atajos, decididos por Roberto (§8.1)**:
+
+  | Atajo (⌘ en Mac, Ctrl en Windows y Linux) | Menú | Acción que recibe la pantalla | Qué hace |
+  |---|---|---|---|
+  | ⌘O | Cuaderno → Abrir nota… | `abrir-nota` | enfoca el buscador con el texto seleccionado: nombre de nota o carpeta del cuaderno, Enter abre |
+  | ⌘F | Cuaderno → Buscar… | `buscar` | hoy lo mismo que ⌘O (el buscador busca por nombre y por texto); acción aparte porque divergirán |
+  | ⌘T | Cuaderno → Nueva tarea | `nueva-tarea` | la casilla «Nueva tarea» si está Tareas; si no, el buscador con «+ » (Enter la añade) |
+  | ⌘S | Cuaderno → Guardar | `guardar` | el botón Guardar (del repositorio) |
+  | ⇧⌘O | Cuaderno → Abrir carpeta… | `abrir-carpeta` | cambiar de cuaderno con el diálogo del sistema (T4) |
+  | — | Cuaderno → Cuadernos recientes | (el principal: `POST /api/abrir` y recarga, como open-file) | uno por reciente, el más nuevo primero; sin ninguno, «Sin recientes» deshabilitado |
+  | ⌘, | Cuaderno → Ajustes… (en Mac, menú de la app) | `ajustes` | abre Ajustes |
+  | ⌘K | **reservada, sin acción** | — | será la paleta de «acciones rápidas» (bloque posterior del plan vivo); hoy la web la usa para el buscador desde la propia pantalla |
+  | ⌘R, ⌘+/−/0, pantalla completa, deshacer/cortar/copiar/pegar, Salir | Ver, Edición, Cuaderno/app | roles de Electron | — |
+
+  No hay ⌘P ni «abrir página»: una nota se abre con el buscador. **Un atajo nuevo es una fila en `ATAJOS` de `menu.js` y una
+  en `ACCIONES_APP` de `public/app.js`** (y su caso en `tests/electron-menu.test.js`); el test vigila que ninguno use ⌘K ni
+  pise un rol. (4) Ayuda: «Plan vivo (en GitHub)» abre con `shell.openExternal` la URL del repo público (sin token ni nada
+  en la URL); «Mostrar registro», `shell.openPath(registro.log)`; «Diagnóstico», un diálogo (con «Copiar» al portapapeles)
+  con versión de la app, Electron, Node y Chromium, sistema, ejecutable, puerto, **si `node-pty` cargó** (el hijo lo manda
+  con `{ puerto, token, pty }`: solo él lo sabe), PATH resuelto y su origen (`estado.entorno`), carpeta de configuración y
+  registro; el texto va también al registro y **nunca lleva el token**; «Acerca de», versión y repo. En pruebas,
+  `CUADERNO_SIN_NAVEGADOR` anota en vez de abrir y `CUADERNO_SIN_DIALOGO` anota el diálogo. (5) Lo que difiere del plan: el
+  recorrido no manda `accion: guardar` «por IPC de pruebas» sino que **pulsa el elemento del menú desde el principal**
+  (`Menu.getApplicationMenu().getMenuItemById('guardar').click()`, lo mismo que hace el acelerador), sin canal de pruebas.
+  Y el preload (aviso de la revisión de T2/T4) pone **un solo oyente** de `accion` por ventana: `alAccion(cb)` guarda el
+  callback y la segunda llamada lo sustituye, sin acumular oyentes; la pantalla lo llama una vez (`ACCIONES_APP`).
+  (6) Tests: `tests/electron-menu.test.js` (puro), `tests/electron-app.test.js` (menú instalado y reconstruido con el
+  vigilante, acciones por el canal, recientes, Diagnóstico sin token, Ayuda), `alCambiar` en `tests/electron-ventana.test.js`,
+  y el recorrido `tests/electron/menu.test.js` (fila 28 del ejemplo: Guardar hace el commit en una copia con `git init`,
+  buscador, Ajustes, cambiar de cuaderno con el menú reconstruido, Diagnóstico). (7) Nota para Mac y Windows (sin probar
+  aquí): con el foco en la terminal del cajón, en Windows y Linux Ctrl S llega primero a xterm (XOFF) y el acelerador no
+  salta; en Mac el menú gana. Y «⌘S guarda y no abre Guardar como» no hay quien lo dispute: Electron no trae ese diálogo.
 
 ### T6 · Icono y empaquetado sin firma
 - **Qué:** elegir el logo (Roberto, §8); `pruebas/icono.js` rasteriza el SVG a `electron/icono/icono.png` (1024)
@@ -429,9 +473,13 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
 
 ## 8. Lo que decide Roberto antes de empezar
 
-1. **La lista de atajos de app** («el par de cosas»): el plan arranca con ⌘S Guardar, ⌘, Ajustes, ⌘O Abrir
-   carpeta y los recientes. ¿Qué más? (candidatos: ⌘E editar, ⌘K acciones rápidas cuando llegue ese bloque, ⌘P
-   Profesor, ⌘1/⌘2 paneles).
+1. **La lista de atajos de app** («el par de cosas»): el plan arrancaba con ⌘S Guardar, ⌘, Ajustes, ⌘O Abrir
+   carpeta y los recientes (candidatos: ⌘E editar, ⌘K acciones rápidas cuando llegue ese bloque, ⌘P Profesor, ⌘1/⌘2
+   paneles). **Decidido (Roberto, 2026-10-10):** «los típicos: buscar, abrir, la T para la tarea; la K con dudas», y «el
+   de abrir que me abra la carpeta o nota dentro del cuaderno porque no tenemos un importar». Resolución: **⌘O Abrir
+   nota…** (el buscador, por nombre de nota o carpeta), **⌘F Buscar…**, **⌘T Nueva tarea**, **⌘S Guardar**, **⇧⌘O Abrir
+   carpeta…** (cambiar de cuaderno: el diálogo del sistema, lo que él ve como un «importar»), **⌘, Ajustes**, los
+   recientes; **⌘K reservada sin acción** para la paleta de acciones rápidas; sin ⌘P. La tabla completa, en T5 («Hecha»).
 2. **El logo**: 1, 2 o 3 de `docs/diseno/logo/` (recomendación de Claude del 2026-10-09: la 1).
 3. **La marca de la web**: etiqueta sola con línea en el README (recomendado), Release con zip, o carpeta
    `legado/` con un LEEME (§7).
