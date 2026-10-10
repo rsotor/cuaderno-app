@@ -53,7 +53,9 @@ function estadoGit(raiz) {
 
 function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null, ejecutar = null, ejecutarNode = null, plataforma = process.platform, fuentes = [__dirname, PUBLICO] }) {
   const estado = { cuaderno, kit };
-  const nodo = { ejecutarNode };   // con qué Node corren las herramientas del kit (null: el de este proceso)
+  // Con qué Node corren las herramientas del kit y el corrector (null: el de este proceso, como en la web). La app de
+  // escritorio inyecta el binario de Electron con ELECTRON_RUN_AS_NODE=1 (guardar.js y formulario.js lo explican).
+  const nodo = { ejecutarNode };
   const oyentes = new Set(), terminales = new Set();   // pestañas que escuchan cambios; conexiones de terminal abiertas
   const avisarCambio = f => { for (const ws of oyentes) ws.send(JSON.stringify({ fichero: f })); };
   if (cuaderno) cuaderno.vigilar(avisarCambio);
