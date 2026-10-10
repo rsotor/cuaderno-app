@@ -25,7 +25,11 @@ const files = [
   '!node_modules/playwright-core/**',
   '!node_modules/**/*.{md,markdown,ts,map,d.ts}',
   '!node_modules/**/{test,tests,__tests__,example,examples,docs,doc,.github}/**',
-  '!node_modules/node-pty/{src,deps,binding.gyp}/**',   // las fuentes nativas no hacen falta: el .node ya está compilado
+  // Las fuentes nativas de node-pty no hacen falta: el .node ya está compilado (prebuilds/ en Mac y Windows, build/ en
+  // Linux). node-addon-api son cabeceras de C++ que solo sirven para compilar.
+  '!node_modules/node-pty/{src,deps,scripts,node-addon-api,third_party}/**',
+  '!node_modules/node-pty/binding.gyp',
+  '!node_modules/node-addon-api/**',
   // Lo que no es de la app: tests, documentación, el cuaderno de ejemplo, las sondas, copias de prueba, la CI.
   '!tests/**', '!docs/**', '!ejemplos/**', '!pruebas/**', '!cuadernos-prueba/**', '!.github/**',
   '!dist-app/**', '!server.js', '!electron-builder.js', '!*.md', '!.cobertura-pantalla/**',
@@ -34,12 +38,13 @@ const files = [
 module.exports = {
   appId: 'es.cuaderno.app',          // un identificador, sin dominio real detrás (principio 5)
   productName: 'Cuaderno',
-  copyright: 'MIT',
+  copyright: 'Cuaderno, licencia MIT',   // sin nombre de nadie (principio 5); package.json no tiene `author` a propósito
   // Sin asar en la primera versión (plan §2, §9 objeción 11): no por el fs (Electron lo parchea) sino porque para dos
   // usuarios compensa poder abrir y parchear public/app.js dentro del bundle y que la señal «desactualizada» por mtime
-  // siga valiendo. Coste: miles de ficheros, primera apertura e instalación NSIS más lentas (medido en T6; cifras en
-  // el plan). Ruta de vuelta: asar: true con asarUnpack: ['node_modules/node-pty/**'] (sus ejecutables tienen que
-  // estar en disco; node-pty ya sabe buscarlos en app.asar.unpacked).
+  // siga valiendo. Coste medido en T6 (Linux, --dir): con `files` acotado son 423 ficheros en resources/app (13 MB),
+  // no miles, y el arranque hasta la portada no cambia frente a asar (cifras en el plan, T6). Ruta de vuelta: asar: true
+  // con asarUnpack: ['node_modules/node-pty/**'] (sus ejecutables tienen que estar en disco; node-pty ya sabe buscarlos
+  // en app.asar.unpacked).
   asar: false,
   // node-pty trae prebuilds N-API para Mac y Windows que valen tal cual en Electron 44: no se recompila nada (R3).
   // En Linux no hay prebuild: lo compila `npm ci` con el Node del sistema y, siendo N-API, Electron lo carga igual.
