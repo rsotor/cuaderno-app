@@ -41,8 +41,8 @@ navegador puede hablar con tu cuaderno. Para probar sin un cuaderno propio, `eje
 todo lo que la app sabe hacer (`ejemplos/cuaderno-ejemplo.md` dice qué hay en cada nota); cópialo antes de escribir
 en él. Necesita Node 24 o más reciente.
 
-La última versión solo web, de antes de la app de escritorio, es la etiqueta `web-0.1.0` sobre `main` (se pone al abrir
-el PR de Electron; hasta entonces, pendiente): `git clone --branch web-0.1.0` la trae y GitHub da su zip en Code → Tags.
+La última versión solo web, de antes de la app de escritorio, es la etiqueta `web-0.1.0` sobre `main`
+(puesta el 2026-10-10): `git clone --branch web-0.1.0` la trae y GitHub da su zip en Code → Tags.
 
 `npm test` lanza los tests. `npm run test:navegador` lanza los recorridos de navegador (Playwright con Chromium headless;
 en un ordenador normal hace falta `npx playwright install chromium` una vez, o la variable `CUADERNO_CHROMIUM` con la ruta
