@@ -101,7 +101,7 @@ jobs:
 
       # ── Recorridos de Electron ─────────────────────────────────────────────────────────────────────────────────────
       # En Linux siempre; en Mac y Windows solo a mano (workflow_dispatch): el run de Mac cuenta ×10 en repo privado y el
-      # recorrido es el mismo código en los tres sistemas. La misma condición en los tres pasos.
+      # recorrido es el mismo código en los tres sistemas. La misma condición en los cuatro pasos.
       - name: Versión de Electron (para la clave de la caché)
         id: electron
         if: runner.os == 'Linux' || github.event_name == 'workflow_dispatch'
