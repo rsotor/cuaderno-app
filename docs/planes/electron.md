@@ -87,6 +87,7 @@ revisión de confirmación. Quien tome una tarea lee §1-§4 enteros y su tarea;
 | Node para el kit y el corrector | **`process.execPath` con `ELECTRON_RUN_AS_NODE=1`** solo en el entorno del hijo que se lanza, inyectado como `ejecutarNode` en `crearServidor` (`guardar.js` y `formulario.js` dejan de leer `execPath` directamente; por defecto, el de siempre) | El binario de Electron se comporta como `node` con esa variable: las herramientas del kit corren sin exigir Node instalado. En macOS, `process.execPath` dentro del `utilityProcess` es probablemente el **helper** (`Cuaderno Helper.app/…`), que también honra la variable; aun así el padre pasa su propio `execPath` en el entorno del hijo (`CUADERNO_NODE`) y `nodeDelKit()` lo prefiere, y el spike anota qué binario se usó. **Depende del fuse `runAsNode`, habilitado por defecto; los fuses no se tocan** (`runAsNode` y `nodeCliInspect`: Playwright `_electron.launch` necesita el segundo). El kit ve el Node de Electron (24.18), no el del sistema; si una herramienta del kit lanza `node`, `npm` o `npx` **por nombre**, no los habrá: se comprueba en el spike (pregunta 3) |
 | Tema | `nativeTheme.themeSource = temaNativo(config.tema)` al arrancar y al cambiar Ajustes (`auto`/`claro`/`oscuro` → `system`/`light`/`dark`, función pura con test); `backgroundColor` de la ventana según el tema | Con `auto`, `prefers-color-scheme` ya sigue al sistema; con `claro`/`oscuro` fijos, la barra de título, el menú y el fondo antes de cargar no seguirían el ajuste (flash blanco en oscuro) |
 | Empaquetado | **electron-builder 26**, `.dmg` (arm64 y x64 por separado, sin universal) y `.exe` NSIS (x64, instalación por usuario), **sin notarización**, **firma ad hoc en Mac** (`mac.identity: "-"` y `hardenedRuntime: false`), `npmRebuild: false`, **sin asar en la primera versión** (`asar: false`) | Sin identidad, electron-builder **no firma nada** (no hay caída automática a ad hoc) y con `identity: null` tampoco: un `.dmg` descargado en un Mac arm64 sale «dañado», sin botón «Abrir de todos modos». Con `"-"` queda firmado ad hoc, que es lo que Gatekeeper admite tras «Abrir de todos modos». Sin asar no por el `fs` (Electron lo parchea y servir estáticos desde asar funciona) sino porque **para dos usuarios compensa poder abrir y parchear `public/app.js` dentro del bundle** y que la señal «desactualizada» por mtime siga teniendo sentido; coste: miles de ficheros, primera apertura y la instalación NSIS más lentas (se mide en el spike; ruta de vuelta: `asar: true` con `asarUnpack: node_modules/node-pty/**`). El universal duplica el tamaño sin ganar nada con dos máquinas conocidas |
+| electron-builder como dependencia | **Dependencia nueva de desarrollo (T6, 2026-10-10), justificada:** `electron-builder` **26.15.3** exacta (la versión cuyo `app-builder-lib` revisaron §9 y §10 por su `macOptions.d.ts`). Es la única pieza que hace en una sola configuración todo lo que el empaquetado necesita: el `.app` con su `Info.plist`, la firma ad hoc (`identity: "-"`), el `.dmg`, el instalador NSIS por usuario, y el `.icns` y el `.ico` a partir de un PNG. Alternativas descartadas: `@electron/packager` + `@electron/osx-sign` + `create-dmg` + `electron-winstaller` (cuatro paquetes, el `.dmg` a mano con `hdiutil` y sin NSIS) y Electron Forge (más paquetes, plantillas y su propio CLI). Coste real: **unos 270 paquetes más en el lock** (de 52 a 323, todos de desarrollo) y ~90 MB en `node_modules`; **nada de eso entra en la app** (`files` lo excluye y electron-builder solo mete las `dependencies`) ni corre en la web. Lo vigilan `tests/empaquetado.test.js` (versión exacta, solo en `devDependencies`, las invariantes de la configuración) y Dependabot (grupo `electron`, T7). La configuración va en `electron-builder.js` (CommonJS con comentarios, legible por el test), no en YAML | Empaquetar a mano es reescribir electron-builder; una dependencia que solo se usa al construir y que el paquete no lleva |
 | Una instancia | `app.requestSingleInstanceLock()`; la segunda apertura trae la ventana al frente y, si trae una carpeta en `argv`, la abre | Dos servidores sobre el mismo cuaderno pisarían el vigilante y la cookie |
 | Abrir carpeta | Diálogo del sistema (`dialog.showOpenDialog`), **más** `app.on('open-file')` (Mac: arrastrar al icono) y la carpeta en `argv` (Windows y Linux, y `second-instance`) | Es lo que un usuario del Finder o del Explorador espera; cuesta lo mismo que el diálogo |
 | Registro | **Registro a fichero** en la carpeta de configuración (`registro.log`, rotado a 1 MB) con lo que hoy va a `console.error`, más Ayuda → «Mostrar registro» y «Diagnóstico» (versiones, puerto, `PATH` resuelto, `node-pty` cargado o no) | Sin terminal, los errores desaparecen; es la única manera de depurar el Windows del padre a distancia |
@@ -141,7 +142,7 @@ el mismo código y la cubren los mismos tests (§7).
 | R8 | **Dos servidores a la vez** (web y app) escriben `recientes` | Media | **Asumido**: ya pasa hoy con dos `npm start`; instancia única evita dos apps; `listen(0)` tras `EADDRINUSE` si 7331 está ocupado | `rutas.test.js`: arrancar con el puerto ocupado |
 | R9 | **El recorrido Electron es frágil** (`_electron` experimental, sin pantalla en Linux, lento en Windows, lock de instancia única si Roberto tiene la app abierta) | Media | `xvfb-run`; `userData` temporal y variable para saltar el lock; tiempo máximo propio; si en dos semanas falla por su cuenta, pasa a manual y se anota | Primeras semanas de CI |
 | R10 | **Electron cada 8 semanas**; Dependabot propondrá saltos de mayor | Segura | Grupo `electron` mensual en `dependabot.yml`; se sube con el recorrido Electron en verde | `dependabot.yml` |
-| R11 | **Fuses**: si alguien «endurece» `runAsNode` o `nodeCliInspect`, se rompen el kit (R1) y el recorrido Electron | Baja | Anotado en §2; comentario en `electron-builder.yml` | Revisión del PR de T6 |
+| R11 | **Fuses**: si alguien «endurece» `runAsNode` o `nodeCliInspect`, se rompen el kit (R1) y el recorrido Electron | Baja | Anotado en §2; comentario en `electron-builder.js` | Revisión del PR de T6 |
 | R13 | **El hijo muere o no arranca** (fallo nativo, `EADDRINUSE`, excepción al cargar): sin camino de fallo, la ventana se queda muda (el WS de recarga no reconecta) o nunca aparece | Media | Puerto solo en `listening`, tope de 15 s, relanzar una vez, diálogo y salir; todo en el registro | Test de `arrancar` con un hijo falso que muere antes y después del puerto |
 | R12 | **Windows del padre**: conpty exige Windows 10 1809 o más; rutas y CRLF ya probados en la CI de Windows | Baja | Preguntar la versión (§8); `INSTALAR.md` lo dice | Prueba de instalación |
 
@@ -396,6 +397,44 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
   tiempo de arranque anotados. La prueba en las dos máquinas reales es §5 bis, con Roberto.
 - **Tests:** ninguno automático del binario; la CI de T7 comprueba que el empaquetado termina.
 - **Estimación:** un día (la primera vez con electron-builder siempre cuesta). **Depende de:** T1-T5.
+- **Hecha (2026-10-10, en dos sesiones: `412e752` a medias y el resto encima).** Lo que hay: `electron-builder.js`
+  (en JS, no YAML: lleva el porqué de cada decisión y `tests/empaquetado.test.js` lo lee con `require`) con todo lo
+  de §2: `appId es.cuaderno.app`, `productName Cuaderno`, `asar: false`, `npmRebuild: false`, `files` acotado (lista
+  explícita de los módulos de la raíz, sin `tests/`, `docs/`, `ejemplos/`, `pruebas/`, `cuadernos-prueba/`,
+  `.github/`, `server.js`, playwright ni electron-builder; de `node-pty` solo `lib/`, `build/` y `prebuilds/`), salida
+  en `dist-app/` (ignorada), `mac.identity: "-"` + `hardenedRuntime: false`, sin notarización, `dmg` arm64 y x64 por
+  separado, `nsis` x64 por usuario (`oneClick: false`, `perMachine: false`, sin preguntar dónde), «fuses sin tocar»
+  en comentario y sin `electronFuses`. Scripts: `npm run empaquetar` (`--dir`), `npm run empaquetar:instaladores`
+  (`electron-builder` a secas: los targets del sistema donde corre, `.dmg` en un Mac y `.exe` en un Windows; con
+  `--mac --win` fallaría en Windows y en la CI cada sistema construye el suyo) y `npm run icono`. `INSTALAR.md` con
+  Gatekeeper, SmartScreen, Windows 10 1809, dónde está `registro.log` y que la web sigue. **El icono** (decisión de
+  Roberto del día, §8.2: la propuesta 3): `pruebas/icono.js` rasteriza `docs/diseno/logo/propuesta-3.svg` con el
+  Chromium de Playwright a `electron/icono/icono.png` (1024 × 1024 RGBA, reproducible byte a byte: lo comprueba
+  `tests/navegador/icono.test.js`) sobre una **placa**, un cuadrado redondeado (radio 22 % del lado) del color de la
+  hoja en claro (`--papel`, `#fbfbfc`), con la «c» en tinta `#1b1b1f` y el subrayado `#ffe45c` del SVG, el dibujo al
+  70 % del lado y centrado; `--fondo=#rrggbb` y `--sin-fondo` por si se cambia, y el SVG como primer argumento para
+  cambiar de logo (`rasterizar(svg, destino, tamano, { fondo })` como función). `public/icono.svg` no se ha tocado.
+  **Prueba real en el contenedor Linux** (`npx electron-builder --dir --linux`, 12 s; el binario de `dist-app/`
+  lanzado con Playwright `_electron.launch({ executablePath })` bajo `xvfb-run`, configuración y `userData`
+  temporales sobre una copia del cuaderno de ejemplo): portada visible, cookie y API bien, y **la terminal funciona
+  en el paquete** (`/pty` por WebSocket desde la página: `echo $((40+2))` → 42; el hijo con Node 24.21.0 de Electron
+  y `node-pty` cargado desde `resources/app/node_modules`). **Medidas** (Linux x64, mismo contenedor): sin asar
+  **295 MB y 472 ficheros** en total, de los que `resources/` son 12 MB y 402 ficheros (no «miles»: el `files`
+  acotado lo deja en eso); arranque hasta la portada **1057, 980 y 1028 ms** (la primera tanda, con el binario recién
+  extraído: 3134, 1461, 2000). Con `asar: true` + `asarUnpack: ['node_modules/node-pty/**']`: 294 MB y 108 ficheros
+  (`app.asar` 9,3 MB + 2 MB desempaquetados), arranque 971, 1033 y 1253 ms (y en otra tanda 1136, 1927, 1736). Es
+  decir: el asar ahorra 364 ficheros y 1 MB y no cambia el arranque; **se queda sin asar** (la razón de §2 sigue:
+  parcheable y depurable para dos usuarios). Tests: `tests/icono.test.js` (página, argumentos, IHDR, flujo con un
+  Chromium falso), `tests/navegador/icono.test.js` (PNG real a 64 px con los píxeles leídos en un canvas: esquinas
+  transparentes, placa clara en el hueco, tinta en el arco, amarillo en el subrayado; y que el PNG del repo es el que
+  sale del script) y `tests/empaquetado.test.js` (invariantes de la configuración; cada módulo que requieren
+  `main.js` y `servidor-hijo.js`, recursivamente, está en `files` y ninguno sobra; scripts; versión exacta). De
+  paso: `tests.yml` filtraba por `electron-builder.yml`, ahora `.js`. **Queda para §5 bis** (solo en las máquinas
+  reales): el `.dmg` y el `.exe` construidos de verdad (`codesign -dv --verbose=2` → `Signature=adhoc`), si
+  Gatekeeper enseña «Abrir de todos modos» con ad hoc, que `spawn-helper` conserve el permiso de ejecución y pase la
+  firma dentro del bundle, SmartScreen y conpty en el Windows del padre, y los tamaños del `.dmg` y del `.exe`.
+  Sin tocar: `electron/app.js`, `electron/menu.js`, `public/` (T5). No añade caso al cuaderno de ejemplo: empaquetar
+  no pinta ni hace nada nuevo sobre un cuaderno.
 
 ### T7 · CI: recorrido Electron en los tests y empaquetado a mano o por etiqueta
 - **Qué:** `tests.yml` añade el paso `npm run test:electron` en Linux con `xvfb-run` (y en Mac y Windows cuando
@@ -432,7 +471,10 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
 1. **La lista de atajos de app** («el par de cosas»): el plan arranca con ⌘S Guardar, ⌘, Ajustes, ⌘O Abrir
    carpeta y los recientes. ¿Qué más? (candidatos: ⌘E editar, ⌘K acciones rápidas cuando llegue ese bloque, ⌘P
    Profesor, ⌘1/⌘2 paneles).
-2. **El logo**: 1, 2 o 3 de `docs/diseno/logo/` (recomendación de Claude del 2026-10-09: la 1).
+2. **El logo**: 1, 2 o 3 de `docs/diseno/logo/` (recomendación de Claude del 2026-10-09: la 1). **Decidido el
+   2026-10-10: la 3** («vamos con la 3», Roberto), la «c» subrayada. Para el icono de la app va sobre un cuadrado
+   redondeado del color de la hoja en claro (indicación suya: un dibujo de trazos sobre transparente queda raro en
+   el Dock); cómo se genera, en T6. `public/icono.svg` (el de la web) es otro cambio, fuera de T6.
 3. **La marca de la web**: etiqueta sola con línea en el README (recomendado), Release con zip, o carpeta
    `legado/` con un LEEME (§7).
 4. **Dónde se construye el `.dmg` de su Mac**: en CI (descarga con cuarentena: «Abrir de todos modos») o en su
