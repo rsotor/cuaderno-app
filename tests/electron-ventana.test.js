@@ -41,21 +41,25 @@ function montar({ env = {}, puerto = 7331, ...opcionesElectron } = {}) {
   return { ...f, ...r, v, wc, abrirVentana: url => wc.manejador({ url }).action, navegar: url => { const e = navegacion(); wc.emit('will-navigate', e, url); return e.impedida ? 'impedida' : 'navega'; }, cerrar: () => { const e = navegacion(); wc.emit('will-prevent-unload', e); return e.impedida ? 'descarta' : 'sigue editando'; } };
 }
 
-test('esPropia y tratarEnlace: solo http en localhost o 127.0.0.1 con el puerto de ahora es propio; lo permitido va fuera; lo demás se ignora y queda anotado', () => {
+test('esPropia y tratarEnlace: solo http en localhost con el puerto de ahora es propio (el origen de remitenteValido); localhost o 127.0.0.1 con otro puerto se ignora (no va al navegador); lo permitido va fuera; lo demás se ignora; todo anotado', () => {
   assert.equal(ventana.esPropia('http://localhost:7331/', 7331), true);
-  assert.equal(ventana.esPropia('http://127.0.0.1:7331/api/info', 7331), true);
+  assert.equal(ventana.esPropia('http://127.0.0.1:7331/api/info', 7331), false, 'la ventana entra por localhost: 127.0.0.1 no es propio (como en remitenteValido)');
   assert.equal(ventana.esPropia('http://localhost:7332/', 7331), false, 'otro puerto no es nuestro');
   assert.equal(ventana.esPropia('https://localhost:7331/', 7331), false);
   assert.equal(ventana.esPropia('http://localhost.example:7331/', 7331), false);
   assert.equal(ventana.esPropia('no es url', 7331), false);
+  assert.equal(ventana.esLocalAjena('http://localhost:7332/'), true); assert.equal(ventana.esLocalAjena('http://127.0.0.1:7331/'), true);
+  assert.equal(ventana.esLocalAjena('https://example.com'), false); assert.equal(ventana.esLocalAjena('no es url'), false);
   const r = registroFalso(), fuera = [];
   const tratar = u => ventana.tratarEnlace(u, { puerto: () => 7331, abrirFuera: x => fuera.push(x), anotar: r.anotar });
   assert.equal(tratar('http://localhost:7331/#/n/inicio.md'), 'propia');
   assert.equal(tratar('https://example.com'), 'fuera');
   assert.equal(tratar('mailto:alguien@example.com'), 'fuera');
   assert.equal(tratar('file:///etc/passwd'), 'ignorado');
+  assert.equal(tratar('http://localhost:7332/'), 'ignorado', 'otro puerto local: ni propio ni al navegador');
+  assert.equal(tratar('http://127.0.0.1:7331/api/info'), 'ignorado');
   assert.deepEqual(fuera, ['https://example.com', 'mailto:alguien@example.com']);
-  assert.deepEqual(r.lineas, ['enlace al navegador del sistema: https://example.com', 'enlace al navegador del sistema: mailto:alguien@example.com', 'enlace ignorado (esquema no permitido): file:///etc/passwd']);
+  assert.deepEqual(r.lineas, ['enlace al navegador del sistema: https://example.com', 'enlace al navegador del sistema: mailto:alguien@example.com', 'enlace ignorado (esquema no permitido): file:///etc/passwd', 'enlace ignorado (local pero no es nuestro servidor): http://localhost:7332/', 'enlace ignorado (local pero no es nuestro servidor): http://127.0.0.1:7331/api/info']);
 });
 
 test('un enlace https (target _blank o navegación) abre el navegador del sistema y la ventana no navega ni abre otra ventana', async () => {
@@ -88,12 +92,13 @@ test('lo propio (http://localhost:<puerto de ahora>/…) navega y abre ventana n
   const navegar = u => { const e = navegacion(); v.webContents.emit('will-navigate', e, u); return e.impedida ? 'impedida' : 'navega'; };
   assert.equal(v.webContents.manejador({ url: 'http://localhost:7331/fichero/material/largo.txt' }).action, 'allow');
   assert.equal(navegar('http://localhost:7331/?t=abc'), 'navega');
-  assert.equal(navegar('http://127.0.0.1:7331/'), 'navega');
+  assert.equal(navegar('http://127.0.0.1:7331/'), 'impedida', '127.0.0.1 no es el origen de la ventana');
   puerto = 45000;   // el servidor se relanzó en otro puerto
   assert.equal(navegar('http://localhost:7331/'), 'impedida', 'el puerto viejo ya no es nuestro');
   assert.equal(navegar('http://localhost:45000/'), 'navega');
   await tic();
-  assert.deepEqual(f.abiertos, ['http://localhost:7331/'], 'el puerto viejo es http: va fuera, como cualquier web');
+  assert.deepEqual(f.abiertos, [], 'ni el puerto viejo ni 127.0.0.1 van al navegador del sistema: se ignoran');
+  assert.ok(r.lineas.includes('enlace ignorado (local pero no es nuestro servidor): http://localhost:7331/'), r.lineas.join('\n'));
   // La ventana hija (window.open de un fichero del cuaderno) se trata igual: sus enlaces fuera salen al navegador.
   const hija = ventanaFalsa();
   v.webContents.emit('did-create-window', hija, { url: 'http://localhost:45000/fichero/x.html' });
@@ -274,5 +279,5 @@ test('preparar pasa alCambiar al vigilante', () => {
   ventana.preparar({ ventana: v, electron: f.electron, config: configFalsa({ valor: 'claro', carpeta: os.tmpdir() }), env: {}, particion: 'cuaderno', puerto: () => 7331, anotar: r.anotar, vigilar, alCambiar: () => llamadas++ });
   avisar('change', 'config.json');
   assert.equal(llamadas, 1);
-  f.eventosApp.emit('before-quit');
+  f.eventosApp.emit('will-quit');
 });

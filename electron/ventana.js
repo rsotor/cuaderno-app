@@ -3,7 +3,7 @@
 // (tests/electron-ventana.test.js); electron/app.js lo llama en dos líneas al crear la ventana.
 // - Enlaces fuera: lo que no sea nuestro http://localhost:<puerto> se intercepta (setWindowOpenHandler y will-navigate).
 //   Si el esquema está permitido (http, https, mailto: entorno.esquemaPermitido) va a shell.openExternal; si no (file:,
-//   javascript:, smb:…), se anota en el registro y no se hace nada. Lo propio (otra pestaña con un fichero del cuaderno)
+//   javascript:, smb:…), o si es localhost/127.0.0.1 con otro puerto (no es nuestro servidor), se anota y no se hace nada. Lo propio (otra pestaña con un fichero del cuaderno)
 //   navega o abre su ventana normal, y esa ventana hija recibe estos mismos tratos.
 // - Cerrar con cambios: en Electron un beforeunload que cancela no pregunta, bloquea el cierre en silencio; con
 //   `will-prevent-unload` se enseña «¿Descartar lo escrito?» y la pantalla no cambia. Vale también para Ver → Recargar.
@@ -24,14 +24,21 @@ const FICHERO_CONFIG = 'config.json';
 
 const permisoConcedido = permiso => PERMISOS.includes(permiso);
 
-// ¿Es una URL de nuestro servidor? Solo http en localhost o 127.0.0.1 con el puerto de ahora (puede cambiar tras un relanzado).
+// ¿Es una URL de nuestro servidor? Solo http en localhost con el puerto de ahora (puede cambiar tras un relanzado): el mismo
+// origen que valida carpeta.remitenteValido (la ventana entra por localhost; 127.0.0.1 redirige a él).
 function esPropia(url, puerto) {
-  try { const u = new URL(String(url)); return u.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(u.hostname) && u.port === String(puerto); } catch { return false; }
+  try { const u = new URL(String(url)); return u.protocol === 'http:' && u.hostname === 'localhost' && u.port === String(puerto); } catch { return false; }
+}
+// ¿Apunta a este ordenador (localhost o 127.0.0.1) sin ser nuestra? Otro puerto (el de un servidor relanzado que ya no existe,
+// una `npm start` aparte, cualquier otra cosa local): eso no va al navegador del sistema; se anota y nada.
+function esLocalAjena(url) {
+  try { const u = new URL(String(url)); return ['localhost', '127.0.0.1'].includes(u.hostname); } catch { return false; }
 }
 // Qué se hace con una URL a la que la pantalla quiere ir: 'propia' (se deja), 'fuera' (al navegador del sistema) o
 // 'ignorado' (ni una cosa ni otra, queda en el registro).
 function tratarEnlace(url, { puerto, abrirFuera, anotar }) {
   if (esPropia(url, puerto())) return 'propia';
+  if (esLocalAjena(url)) { anotar(`enlace ignorado (local pero no es nuestro servidor): ${url}`); return 'ignorado'; }
   if (esquemaPermitido(url)) { anotar(`enlace al navegador del sistema: ${url}`); abrirFuera(url); return 'fuera'; }
   anotar(`enlace ignorado (esquema no permitido): ${url}`);
   return 'ignorado';
@@ -115,4 +122,4 @@ function preparar({ ventana, electron, config, env, particion, puerto, anotar, v
   return vigilante;
 }
 
-module.exports = { preparar, prepararVentana, aplicarTema, vigilarTema, colorDeFondo, permisos, permisoConcedido, preguntarDescartar, tratarEnlace, esPropia, PERMISOS, FONDO };
+module.exports = { preparar, prepararVentana, aplicarTema, vigilarTema, colorDeFondo, permisos, permisoConcedido, preguntarDescartar, tratarEnlace, esPropia, esLocalAjena, PERMISOS, FONDO };
