@@ -19,7 +19,7 @@ on:
       - "pruebas/**"
       - "package.json"
       - "package-lock.json"
-      - "electron-builder.yml"
+      - "electron-builder.js"
       - ".github/workflows/tests.yml"
       - ".github/workflows/empaquetar.yml"
   pull_request:
@@ -31,7 +31,7 @@ on:
       - "pruebas/**"
       - "package.json"
       - "package-lock.json"
-      - "electron-builder.yml"
+      - "electron-builder.js"
       - ".github/workflows/tests.yml"
       - ".github/workflows/empaquetar.yml"
   workflow_dispatch:

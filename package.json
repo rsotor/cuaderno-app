@@ -12,7 +12,7 @@
     "app": "electron .",
     "icono": "node pruebas/icono.js",
     "empaquetar": "electron-builder --dir",
-    "empaquetar:instaladores": "electron-builder --mac --win",
+    "empaquetar:instaladores": "electron-builder",
     "test": "node --test \"tests/*.test.js\"",
     "test:navegador": "node --test --test-concurrency=2 \"tests/navegador/*.test.js\"",
     "test:electron": "node --test \"tests/electron/*.test.js\"",
