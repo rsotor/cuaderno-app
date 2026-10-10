@@ -84,14 +84,16 @@ const entornoFalso = (f, { PATH = '/shell/bin:/usr/bin' } = {}) => ({ env }) => 
 
 // Monta un arranque: `lock`, `fallosURL` y `sistemaOscuro` son del Electron falso; lo demás va a `arrancar`. Sin argumentos
 // (argv solo con el ejecutable y la app), toda ruta «existe», y las peticiones al hijo (POST /api/abrir) se anotan y contestan 200.
-function montar({ env = {}, config = configFalsa(), topePuerto = 500, lock, fallosURL, sistemaOscuro, empaquetada, areaDeTrabajo, ...paraArrancar } = {}) {
+// La plataforma (el menú) y el path.resolve (las carpetas de argv, escritas en POSIX aquí) van inyectados: los tests no dependen
+// del sistema en que corren (la CI los pasa en Linux, Mac y Windows); `plataforma` se puede cambiar por test.
+function montar({ env = {}, config = configFalsa(), topePuerto = 500, lock, fallosURL, sistemaOscuro, empaquetada, areaDeTrabajo, plataforma = 'linux', ...paraArrancar } = {}) {
   const f = electronFalso({ lock, fallosURL, sistemaOscuro, empaquetada, areaDeTrabajo });
   const registro = registroFalso();
   const entorno = entornoFalso(f);
   const vigilante = vigilanteFalso();
   const peticiones = [];
   const peticion = async (o, cuerpo) => { peticiones.push({ ...o, cuerpo }); return { status: 200, cuerpo: '{}' }; };
-  const estado = arrancar({ electron: f.electron, config, env: { PATH: '/usr/bin', ...env }, entorno, registro, topePuerto, execPath: '/apps/Cuaderno', existe: () => true, vigilar: vigilante.vigilar, argv: ['/apps/electron', '.'], peticion, ...paraArrancar });
+  const estado = arrancar({ electron: f.electron, config, env: { PATH: '/usr/bin', ...env }, entorno, registro, topePuerto, execPath: '/apps/Cuaderno', existe: () => true, vigilar: vigilante.vigilar, argv: ['/apps/electron', '.'], peticion, plataforma, resolver: path.posix.resolve, ...paraArrancar });
   return { ...f, registro, estado, vigilante, peticiones, get vistas() { return f.vistas; }, get menu() { return f.menus.at(-1); } };   // el menú instalado ahora (los getters no sobreviven al spread)
 }
 // Un arranque ya con la app cargada en el puerto 7331.
@@ -560,7 +562,7 @@ test('el menú se instala con la ventana, en castellano y con los recientes de c
   let recientes = [{ ruta: '/cuadernos/ultimo', nombre: 'Último', abierto: '2026-10-10' }];
   const m = await arrancado({ config: configFalsa({ recientes: () => recientes }) });
   assert.equal(m.menus.length, 1, 'instalado una vez al arrancar');
-  assert.deepEqual(etiquetasDe(m.menu.items), ['Archivo', 'Edición', 'Ver', 'Ventana', 'Ayuda'], 'en Linux (donde corre el test) no hay menú de la app');
+  assert.deepEqual(etiquetasDe(m.menu.items), ['Archivo', 'Edición', 'Ver', 'Ventana', 'Ayuda'], 'en Linux (la plataforma por defecto de estos tests) no hay menú de la app');
   assert.deepEqual(m.menu.getMenuItemById('recientes').submenu.map(e => e.label), ['Último']);
   assert.equal(m.menu.getMenuItemById('guardar').accelerator, 'CmdOrCtrl+S');
   // Abrir otro cuaderno lo registra como reciente y el hijo reescribe config.json: el vigilante avisa y el menú se rehace.
@@ -579,6 +581,20 @@ test('el menú se instala con la ventana, en castellano y con los recientes de c
   assert.deepEqual(m.menu.getMenuItemById('recientes').submenu.map(e => [e.label, e.enabled]), [['Sin recientes', false]]);
   assert.ok(m.registro.lineas.includes('[app] menú reconstruido: 0 recientes'));
   m.electron.app.emitir('will-quit');
+});
+
+test('la plataforma del menú va inyectada (no process.platform): en win32 y linux, Archivo es el primero; en darwin, antes va el menú de la app «Cuaderno» y Ajustes vive ahí', async () => {
+  for (const plataforma of ['win32', 'linux']) {
+    const m = await arrancado({ plataforma });
+    assert.deepEqual(etiquetasDe(m.menu.items), ['Archivo', 'Edición', 'Ver', 'Ventana', 'Ayuda'], plataforma);
+    assert.equal(m.menu.getMenuItemById('archivo').submenu.some(e => e.id === 'ajustes'), true, `${plataforma}: Ajustes en Archivo`);
+    m.electron.app.emitir('will-quit');
+  }
+  const mac = await arrancado({ plataforma: 'darwin' });
+  assert.deepEqual(etiquetasDe(mac.menu.items), ['Cuaderno', 'Archivo', 'Edición', 'Ver', 'Ventana', 'Ayuda']);
+  assert.equal(mac.menu.items[0].submenu.some(e => e.id === 'ajustes'), true, 'darwin: Ajustes en el menú de la app');
+  assert.equal(mac.menu.getMenuItemById('archivo').submenu.some(e => e.id === 'ajustes'), false);
+  mac.electron.app.emitir('will-quit');
 });
 
 test('si instalar el menú falla, se anota y se vuelve a intentar al siguiente cambio de config.json; un fallo en alCambiar no rompe el vigilante del tema', async () => {
@@ -642,7 +658,7 @@ test('Ayuda → Diagnóstico: un diálogo («Copiar y cerrar» / «Cerrar») con
   assert.equal(d.title, 'Diagnóstico'); assert.deepEqual(d.buttons, ['Copiar y cerrar', 'Cerrar']); assert.equal(d.ventana, m.ventanas[0]);
   const lineas = d.detail.split('\n');
   assert.deepEqual(lineas.slice(0, 6), ['node-pty cargado: sí', 'Entorno de la shell: shell -lc (/bin/zsh, 7 ms)', 'PATH: 2 rutas, empieza por /shell/bin', 'Puerto del servidor: 7331', `Carpeta de configuración: ${carpetaConfig}`, 'Registro: /config/registro.log']);
-  assert.equal(lineas[6], `Sistema: ${process.platform} ${process.arch}`);
+  assert.equal(lineas[6], `Sistema: linux ${process.arch}`, 'la plataforma inyectada (linux en estos tests), no la de la máquina');
   assert.equal(lineas[7], 'Ejecutable: /apps/Cuaderno');
   assert.match(lineas[8], new RegExp(`^Cuaderno ${require('../package.json').version.replace(/\\./g, '\\.')} · Electron \\(fuera de Electron\\) · Node \\d+\\.\\d+\\.\\d+ · Chromium \\?$`), 'en el test no hay Electron; en la app, sus tres versiones');
   assert.equal(lineas.length, 9);

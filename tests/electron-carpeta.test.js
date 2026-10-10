@@ -14,6 +14,7 @@ const { crearAbridor, carpetaDeArgv, remitenteValido, abrirEnServidor, pedir, CA
 const tic = () => new Promise(r => setImmediate(r));
 const CARPETAS = ['/cuadernos/a', '/cuadernos/b', '/cuadernos/c'];
 const existe = r => CARPETAS.includes(r);
+const posix = path.posix.resolve;   // las rutas de estos tests son POSIX en cualquier máquina (en Windows, path.resolve les pondría unidad y barras)
 
 // Un Electron de mentira con lo que carpeta.js usa: app (on, isPackaged), ipcMain.handle y dialog.showOpenDialog.
 function montar({ argv = ['/apps/electron', '.'], env = {}, puerto = null, token = 't0k', dialogo = { canceled: true, filePaths: [] }, respuesta = { status: 200, cuerpo: '{"cuaderno":{}}' }, empaquetada } = {}) {
@@ -26,13 +27,13 @@ function montar({ argv = ['/apps/electron', '.'], env = {}, puerto = null, token
   };
   const estado = { ventana, puerto, token };
   const peticion = async (o, cuerpo) => { peticiones.push({ ...o, cuerpo }); if (respuesta instanceof Error) throw respuesta; return respuesta; };
-  const abridor = crearAbridor({ electron, estado, anotar: l => lineas.push(l), existe, env, argv, cwd: '/trabajo', empaquetada, peticion, recargar: () => { pasos.push('recargar'); return true; } });
+  const abridor = crearAbridor({ electron, estado, anotar: l => lineas.push(l), existe, env, argv, cwd: '/trabajo', empaquetada, peticion, resolver: posix, recargar: () => { pasos.push('recargar'); return true; } });
   return { abridor, estado, eventos, canales, lineas, peticiones, dialogos, pasos, ventana };
 }
 const invocar = (m, origen) => m.canales[CANAL]({ senderFrame: origen == null ? null : { origin: origen, url: `${origen}/` } });
 
-test('carpetaDeArgv: el primer argumento que es una carpeta, saltando el ejecutable, la ruta de la app sin empaquetar (y «.») y los flags; relativas contra cwd; sin carpeta, null', () => {
-  const o = { existe, cwd: '/cuadernos' };
+test('carpetaDeArgv: el primer argumento que es una carpeta, saltando el ejecutable, la ruta de la app sin empaquetar (y «.») y los flags; relativas contra cwd; sin carpeta, null; con el path.resolve de Windows, rutas de Windows', () => {
+  const o = { existe, cwd: '/cuadernos', resolver: posix };
   assert.equal(carpetaDeArgv(['/apps/electron', '.', '/cuadernos/a'], o), '/cuadernos/a');
   assert.equal(carpetaDeArgv(['/apps/electron', '--inspect=0', '.', '--no-sandbox', '/cuadernos/b', '/cuadernos/a'], o), '/cuadernos/b', 'los flags no cuentan y la primera gana');
   assert.equal(carpetaDeArgv(['/apps/electron', '.', 'a'], o), '/cuadernos/a', 'relativa al cwd');
@@ -43,7 +44,13 @@ test('carpetaDeArgv: el primer argumento que es una carpeta, saltando el ejecuta
   assert.equal(carpetaDeArgv(['/apps/Cuaderno', '-psn_0_123', 'c'], { ...o, empaquetada: true }), '/cuadernos/c');
   assert.equal(carpetaDeArgv(['/apps/Cuaderno'], { ...o, empaquetada: true }), null);
   assert.equal(carpetaDeArgv(undefined, o), null);
-  assert.equal(carpetaDeArgv(['/apps/electron', '.', '/cuadernos/a'], { cwd: '/', existe: () => { throw new Error('EACCES'); } }), null, 'si no se puede mirar, no se abre');
+  assert.equal(carpetaDeArgv(['/apps/electron', '.', '/cuadernos/a'], { cwd: '/', resolver: posix, existe: () => { throw new Error('EACCES'); } }), null, 'si no se puede mirar, no se abre');
+  // En Windows (path.win32.resolve): la unidad y las barras invertidas; relativa contra el cwd de Windows.
+  const win = { existe: r => r === 'C:\\cuadernos\\a', cwd: 'C:\\cuadernos', resolver: path.win32.resolve };
+  assert.equal(carpetaDeArgv(['C:\\apps\\electron.exe', '.', 'C:\\cuadernos\\a'], win), 'C:\\cuadernos\\a');
+  assert.equal(carpetaDeArgv(['C:\\apps\\Cuaderno.exe', 'a'], { ...win, empaquetada: true }), 'C:\\cuadernos\\a', 'relativa al cwd de Windows');
+  assert.equal(carpetaDeArgv(['C:\\apps\\Cuaderno.exe', 'C:\\no\\existe'], { ...win, empaquetada: true }), null);
+  assert.equal(carpetaDeArgv(['/apps/electron', '.', '/cuadernos/a'], { existe, cwd: '/cuadernos' }), path.resolve('/cuadernos', '/cuadernos/a') === '/cuadernos/a' ? '/cuadernos/a' : null, 'sin resolver inyectado, el del sistema');
 });
 
 test('remitenteValido: el origen del frame tiene que ser exactamente http://localhost:<puerto>; «null» (un .html del cuaderno con CSP sandbox, origen opaco) se rechaza aunque su URL sea nuestra; sin puerto aún, nada vale', () => {

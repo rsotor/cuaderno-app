@@ -32,8 +32,9 @@ const sinToken = texto => String(texto).replace(/\?t=[0-9a-f]+/g, '?t=…');
 // CUADERNO_SIN_DIALOGO (el diálogo de error se anota y se da por cerrado; en ventana.js, además, su valor fija la respuesta
 // a «¿Descartar lo escrito?») y CUADERNO_DIALOGO_PRUEBA (electron/carpeta.js); en la app empaquetada (app.isPackaged) las
 // cuatro se ignoran (entorno.sinVariablesDePrueba) y queda anotado. `vigilar`: el fs.watch de config.json;
-// `argv`, `cwd` y `peticion` son del abridor de carpetas (carpeta.js); todos inyectables para los tests.
-function arrancar({ electron, config, env = process.env, entorno = entornoDeLaShell, registro = registroPorDefecto, topePuerto = TOPE_PUERTO, tregua = TREGUA, ahora = Date.now, execPath = process.execPath, existe = r => fs.statSync(r).isDirectory(), vigilar = undefined, argv = process.argv, cwd = process.cwd(), peticion }) {
+// `argv`, `cwd`, `peticion` y `resolver` (path.resolve) son del abridor de carpetas (carpeta.js); `plataforma`, del menú; todos
+// inyectables para que los tests no dependan del sistema en que corren.
+function arrancar({ electron, config, env = process.env, entorno = entornoDeLaShell, registro = registroPorDefecto, topePuerto = TOPE_PUERTO, tregua = TREGUA, ahora = Date.now, execPath = process.execPath, existe = r => fs.statSync(r).isDirectory(), vigilar = undefined, argv = process.argv, cwd = process.cwd(), peticion, plataforma = process.platform, resolver = path.resolve }) {
   const { app, BrowserWindow, utilityProcess, dialog } = electron;
   const anotar = linea => registro.escribir(`[app] ${sinToken(linea)}`);
   // Empaquetada, las variables de prueba no valen: el `env` que ven carpeta.js, ventana.js, menu.js y el hijo es el limpio.
@@ -49,7 +50,7 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
   if (!app.requestSingleInstanceLock()) { anotar('ya hay otra instancia abierta: esta sale y aquella pasa al frente'); app.quit(); estado.listo = Promise.resolve(false); return estado; }
   // Abrir carpeta por diálogo, argumentos, open-file y segunda instancia (carpeta.js, único dueño de `second-instance`: trae la
   // ventana al frente y abre la carpeta que traiga); open-file se registra aquí, antes de ready.
-  const carpetas = crearAbridor({ electron, estado, anotar, existe, env, argv, cwd, peticion, recargar: () => (estado.ventana ? cargarVentana(estado.ventana) : false) });
+  const carpetas = crearAbridor({ electron, estado, anotar, existe, env, argv, cwd, peticion, resolver, recargar: () => (estado.ventana ? cargarVentana(estado.ventana) : false) });
 
   const urlEntrada = () => `http://localhost:${estado.puerto}/?t=${estado.token}`;
   const matarHijo = () => { if (estado.hijo) { try { estado.hijo.kill(); } catch { /* ya muerto */ } } };
@@ -135,7 +136,7 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
     // Al cerrar, dónde y cuánto medía, para abrir igual la próxima vez (minimizada no: sus límites no son de verdad).
     ventana.on('close', () => { try { if (!ventana.isMinimized()) config.guardarVentana(ventana.getBounds()); } catch (e) { anotar(`no se ha podido guardar la ventana: ${e.message}`); } });
     // El menú, antes del primer píxel; sus recientes se reconstruyen cuando cambia config.json (el mismo vigilante que el tema).
-    estado.menu = instalarMenu({ electron, estado, config, registro, env, anotar, version: VERSION, execPath, abrirCarpeta: ruta => carpetas.llegada(ruta, 'menú') });
+    estado.menu = instalarMenu({ electron, estado, config, registro, env, anotar, version: VERSION, execPath, plataforma, abrirCarpeta: ruta => carpetas.llegada(ruta, 'menú') });
     ventanaApp.preparar({ ventana, electron, config, env, particion: PANTALLA.webPreferences.partition, puerto: () => estado.puerto, anotar, vigilar, alCambiar: () => estado.menu.reconstruir() });
     await ventana.loadFile(path.join(__dirname, 'arrancando.html'));
     const r = await entorno({ env });   // asíncrono: el proceso principal sigue atendiendo eventos mientras la shell contesta (hasta 10 s)

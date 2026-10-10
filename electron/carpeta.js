@@ -17,11 +17,12 @@ const DIALOGO = { title: 'Elegir la carpeta del cuaderno', buttonLabel: 'Abrir',
 // La carpeta que viene en los argumentos: el primero que exista como carpeta, saltando el ejecutable (argv[0]), la
 // ruta de la propia app cuando no está empaquetada (`electron .`: el primer argumento que no es un flag) y los flags
 // (`--inspect=0`, `--no-sandbox`, `-psn_…` en Mac). Las rutas relativas se resuelven contra `cwd` (la segunda instancia
-// dice el suyo). `existe(ruta)` dice si es una carpeta; si lanza, cuenta como que no.
-function carpetaDeArgv(argv, { empaquetada = false, existe, cwd = process.cwd() } = {}) {
+// dice el suyo) con `resolver` (path.resolve del sistema; los tests inyectan el de POSIX o el de Windows para probar los
+// dos en cualquier máquina). `existe(ruta)` dice si es una carpeta; si lanza, cuenta como que no.
+function carpetaDeArgv(argv, { empaquetada = false, existe, cwd = process.cwd(), resolver = path.resolve } = {}) {
   const sinFlags = (Array.isArray(argv) ? argv.slice(1) : []).filter(a => typeof a === 'string' && a && !a.startsWith('-'));
   for (const a of sinFlags.slice(empaquetada ? 0 : 1)) {
-    const r = path.resolve(cwd, a);
+    const r = resolver(cwd, a);
     let ok = false;
     try { ok = existe(r); } catch { /* no se puede mirar: no es una carpeta que abrir */ }
     if (ok) return r;
@@ -69,10 +70,10 @@ async function abrirEnServidor({ puerto, token, carpeta, peticion = pedir }) {
 //   despachar() lo que quedó pendiente entre el fork y el puerto: app.js lo llama cuando el servidor ya escucha
 // `recargar()` es lo que app.js hace para volver a entrar por la URL de entrada; `anotar` escribe en el registro.
 // Variable de pruebas CUADERNO_DIALOGO_PRUEBA=<ruta>: el diálogo no se abre y se devuelve esa ruta (vacía: cancelar).
-function crearAbridor({ electron, estado, anotar, existe, recargar, env = process.env, argv = process.argv, cwd = process.cwd(), empaquetada = !!electron.app.isPackaged, peticion = pedir }) {
+function crearAbridor({ electron, estado, anotar, existe, recargar, env = process.env, argv = process.argv, cwd = process.cwd(), empaquetada = !!electron.app.isPackaged, peticion = pedir, resolver = path.resolve }) {
   const { app, ipcMain, dialog } = electron;
   const esCarpeta = r => { try { return !!existe(r); } catch { return false; } };
-  const abridor = { pendiente: carpetaDeArgv(argv, { empaquetada, existe, cwd }) };
+  const abridor = { pendiente: carpetaDeArgv(argv, { empaquetada, existe, cwd, resolver }) };
   if (abridor.pendiente) anotar(`carpeta en los argumentos: ${abridor.pendiente}`);
 
   abridor.tomar = () => { const c = abridor.pendiente; abridor.pendiente = null; return c; };
@@ -98,7 +99,7 @@ function crearAbridor({ electron, estado, anotar, existe, recargar, env = proces
   // Es el único oyente de `second-instance` de la app (app.js no pone otro).
   app.on('second-instance', (evento, argvSegunda, directorio) => {
     alFrente();
-    const c = carpetaDeArgv(argvSegunda, { empaquetada, existe, cwd: directorio || cwd });
+    const c = carpetaDeArgv(argvSegunda, { empaquetada, existe, cwd: directorio || cwd, resolver });
     if (c) abridor.llegada(c, 'segunda instancia');
   });
   // El diálogo del sistema, pedido por la pantalla. Solo atiende a nuestra pantalla: cualquier otro frame (un .html del
