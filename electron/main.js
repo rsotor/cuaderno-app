@@ -1,4 +1,4 @@
-// SPIKE 2026-10-10: se reescribe en la tarea T1 con sus tests (docs/planes/electron.md §6)
 'use strict';
-// Punto de entrada de la app de escritorio: diez líneas que inyectan lo real en electron/app.js.
+// Punto de entrada de la app de escritorio (`npm run app`, campo `main` de package.json): inyecta lo real en
+// electron/app.js, que es lo que se prueba con un Electron falso.
 require('./app').arrancar({ electron: require('electron'), config: require('../config'), env: process.env });
