@@ -776,9 +776,15 @@ window.addEventListener('resize', aplicarCajon);
 // El asa: arrastrar cambia el tamaño en vivo (acotado), soltar lo guarda; las flechas lo mueven de 16 en 16; doble clic
 // vuelve al de siempre. El valor se guarda redondeado: la validación del servidor solo admite enteros.
 const ponerTamanoCajon = (pos, v) => $('#app').style.setProperty(pos === 'derecha' ? '--panel-ancho' : '--panel-alto', `${v}px`);
+// Solo manda la respuesta del último guardado: con varios en vuelo (un doble clic son dos clics y el dblclick), una
+// respuesta vieja que llegue tarde no pinta un ancho ya sustituido (CI de Windows, 2026-10-10: guardado 420, pintado 520).
+let guardadoCajon = 0;
 async function guardarTamanoCajon(pos, v) {
   v = acotarCajon(v, pos); ponerTamanoCajon(pos, v);
-  info.configuracion = await api('/api/configuracion', pos === 'derecha' ? { panel_ancho: v } : { panel_alto: v });
+  const n = ++guardadoCajon;
+  const c = await api('/api/configuracion', pos === 'derecha' ? { panel_ancho: v } : { panel_alto: v });
+  if (n !== guardadoCajon) return;
+  info.configuracion = c;
   aplicarCajon();
 }
 {
@@ -795,7 +801,8 @@ async function guardarTamanoCajon(pos, v) {
     origen.ultimo = acotarCajon(origen.pos === 'derecha' ? origen.tam + origen.x - e.clientX : origen.tam + origen.y - e.clientY, origen.pos);
     ponerTamanoCajon(origen.pos, origen.ultimo);
   });
-  const soltar = () => { if (!origen) return; const { pos, ultimo } = origen; origen = null; asa.classList.remove('arrastrando'); document.body.classList.remove('redimensionando'); guardarTamanoCajon(pos, ultimo); };
+  // Soltar sin haber movido el tamaño (un clic, o cada clic de un doble clic) no guarda nada.
+  const soltar = () => { if (!origen) return; const { pos, tam, ultimo } = origen; origen = null; asa.classList.remove('arrastrando'); document.body.classList.remove('redimensionando'); if (ultimo !== tam) guardarTamanoCajon(pos, ultimo); };
   asa.addEventListener('pointerup', soltar); asa.addEventListener('pointercancel', soltar);
   asa.addEventListener('dblclick', () => guardarTamanoCajon(posicionCajon(), CAJON_DEFECTO[posicionCajon()]));
   asa.addEventListener('keydown', e => {
