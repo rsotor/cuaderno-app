@@ -214,6 +214,37 @@ En el Mac de Roberto, desde una descarga real del artefacto de CI: ¿qué pide G
 empaquetar` en su ordenador (sin cuarentena). En el Windows del padre: SmartScreen, terminal (conpty), un
 cuaderno con CRLF. Tamaños del `.dmg` y del `.exe`. Resultado en este documento y en el plan vivo.
 
+#### Resultado en el Mac (2026-10-10, MacBook arm64, macOS 26, Node 24.21.0; guía `electron-prueba-local.md`)
+
+Hecho todo lo que no necesita GitHub (§0 a §4 de la guía). Falta §5 (la descarga con cuarentena desde la CI) y §6
+(el Windows del padre).
+
+| Qué | Resultado | Lo visto |
+|---|---|---|
+| `npm ci` | Sí, con aviso | npm 11 no ejecuta los scripts de instalación (`allowScripts`): `spawn-helper` queda sin permiso de ejecución. En desarrollo lo arregla `sistema.js` al arrancar; en el paquete, ahora `afterPack` (abajo). |
+| Batería de Node (`test:cobertura`) | Sí, tras un arreglo | Falló 1: el test del menú esperaba el de Linux. `arrancar` acepta ya la plataforma y la pasa al menú; test nuevo para Mac. Al final: 245 tests, 243 pasan, 2 saltados por diseño, 14 s; 99,4 % líneas / 91,4 % ramas / 97,7 % funciones. |
+| Recorridos de Electron, con pantalla real | Sí | 14 de 14 a la primera (14 s); 15 de 15 con el recorrido nuevo de ⌘S en el editor. |
+| Recorridos de navegador | Sí | 120 de 120, 45 s. |
+| Arranque (`npm run app`) | Sí | «Abriendo el cuaderno…» y la portada; el servidor escucha 0,7 s después de lanzar. |
+| **Entorno de la shell (P2)** | **Sí** | Diagnóstico: `shell -lc (/bin/zsh)`, 105-117 ms en desarrollo y **146 ms en la app empaquetada abierta desde el Finder**; nunca `respaldo`. En la terminal del cajón `which git`, `which claude` y `which node` dan lo mismo que en Terminal.app (Homebrew y nvm). Única diferencia: falta `~/.rbenv/shims` (su `init` no corre con `-lc`); menor. En desarrollo el PATH lleva además los `node_modules/.bin` de `npm run`. |
+| **`process.execPath` en el hijo** | **El principal** | Desarrollo: `…/Electron.app/Contents/MacOS/Electron`. Empaquetada: `/Applications/Cuaderno.app/Contents/MacOS/Cuaderno`, no `Cuaderno Helper`. node-pty carga. |
+| Menú | Sí | Primero el de la app y luego «Archivo» (no dos «Cuaderno»). En desarrollo el de la app y el Dock dicen «Electron» (el Info.plist es el de Electron); en el paquete, «Cuaderno». |
+| Atajos | Sí | ⌘O, ⌘F, ⌘T, ⌘N, ⇧⌘O, ⌘, y ⌘[ / ⌘] hacen lo suyo; ⌘K nada. Roberto: ⌘O y ⌘F hacen lo mismo y no tiene sentido (Inbox). |
+| **⌘S con el editor abierto** | **No → arreglado** | Roberto editó, pulsó ⌘S y la nota no se escribía (⌘S era solo el Guardar del repositorio: «nada que guardar»). **Decisión de Roberto (§8.8): con el editor abierto, ⌘S escribe la nota (como Aplicar / ⌘Enter); sin editor, Guardar del repositorio.** Con su recorrido en `tests/electron/menu.test.js`. |
+| Título de la ventana | Sí | «inicio.md — ejemplo» y cambia con la nota. |
+| Cerrar con cambios | Sí | ⌘W → «¿Descartar lo escrito?» → «Seguir editando» deja la app viva y el menú sigue llegando a la pantalla; «Descartar» cierra. Ningún proceso al cerrar; el servidor sale con código 0. |
+| Ventana recordada | En parte | Vuelve con el tamaño y el sitio guardados, pero no **maximizada** (se guarda `getBounds()`, no el estado). Y abre `inicio.md`, no la última nota (no estaba en el bloque). Las dos, al Inbox. |
+| Elegir carpeta… y segunda instancia | Sí | El diálogo del sistema abre; `electron . <carpeta>` con la app abierta la abre en la que ya estaba. |
+| **Arrastrar una carpeta al Dock** | **No → arreglado** | El `.app` no declaraba que admite carpetas. Ahora `mac.extendInfo.CFBundleDocumentTypes` (`public.folder`, rango `Alternate`: no pasa a ser la app de las carpetas del Finder). En el paquete: funciona (`open-file` en el registro). En desarrollo no puede (Info.plist de Electron). |
+| **Guardar con un kit de verdad** | **Sí** | Copia de un cuaderno real con su `.git` en temporal, con `origin` apuntando a un repositorio local (Guardar del kit hace `push`). Desde la app (desarrollo y empaquetada): la salida del kit en pantalla («Guardado y subido»), el commit en la copia y en el remoto local; el repo real y GitHub, sin tocar. |
+| `grep` en profesor-kit | Uno a mirar | Ninguna herramienta lanza `node`, `npm` o `npx` por nombre ni mira `versions.electron`. Las que se relanzan con `process.execPath` heredan el entorno (con `ELECTRON_RUN_AS_NODE`). **Excepción: `verificar-ejercicio.js`** lanza `process.execPath --permission …` con `env: {}`: dentro de la app pierde `ELECTRON_RUN_AS_NODE` y arrancaría Electron, no Node (y falta ver si Electron admite `--permission`). Tarea del kit. |
+| Empaquetar (`empaquetar:instaladores`) | Sí | 70 s la primera vez (baja el zip de Electron x64 y dmgbuild), 49 s después. `.dmg` arm64 130,4 MB, x64 137,2 MB; `.app` 300 MB. |
+| `codesign -dv --verbose=2` | Sí | `Identifier=es.cuaderno.app`, `Signature=adhoc`; `codesign --verify --deep --strict` pasa. `spctl` lo rechaza, como se espera sin notarizar. |
+| **`spawn-helper` en el paquete** | **No → arreglado** | Salía con el permiso que tuviera `node_modules`: en el `.app` x64, `-rw-r--r--`. Al arrancar, `sistema.js` lo intenta, pero una app en cuarentena abierta sin moverla corre traslocada, en solo lectura, y la terminal no abriría. Ahora un `afterPack` (`pruebas/permisos-empaquetado.js`) le da 0o755 antes de firmar y falla el empaquetado si no puede. Comprobado: con `node_modules` sin permiso, los dos `.app` salen `rwxr-xr-x`, y el permiso no rompe la firma. |
+| `.dmg` construido en el Mac | Sí | Sin cuarentena: abre sin Gatekeeper. Icono en el Dock del tamaño de sus vecinos (Roberto: «creo que es igual»). Terminal, Diagnóstico y Guardar con kit, bien en el paquete. |
+| Descarga con cuarentena (§5 de la guía) | Pendiente | Necesita un run de `empaquetar.yml`; va con la decisión §8.5. |
+| Windows (§6 de la guía) | Pendiente | Cuando toque, con el `.exe` de la CI. |
+
 ## 6. Tareas (cada una, un PR pequeño en castellano, CI en verde, su fila en el plan vivo)
 
 Formato: **qué** · criterios de aceptación · tests · estimación · depende de. Las estimaciones son de trabajo de
@@ -612,6 +643,10 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
 6. **Arranque al iniciar sesión**: fuera (recomendado: sin firma falla en silencio en Mac) o a mano para el
    padre (carpeta Inicio de Windows).
 7. **Qué Windows tiene su padre** (conpty necesita Windows 10 1809 o más).
+8. **⌘S con el editor de la nota abierto** (salió en la prueba en su Mac, §5 bis). **Decidido (Roberto, 2026-10-10):
+   la opción A**: con el editor abierto, ⌘S escribe la nota (lo mismo que Aplicar / ⌘Enter); sin editor, sigue siendo el
+   Guardar del repositorio. Descartada la B (⌘S siempre del repositorio y la nota solo con ⌘Enter): coherente, pero lo
+   que le pasó a él le pasaría a cualquiera.
 
 ## 9. Abogado del diablo (2026-10-10)
 
