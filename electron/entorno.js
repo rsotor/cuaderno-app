@@ -43,18 +43,27 @@ const MAX_SALIDA = 8 * 1024 * 1024;   // bytes de stdout que se aceptan de la sh
 
 // Lanza la shell y resuelve con { stdout, status, error? } (el contrato de spawnSync, que es lo que había): error con
 // code ETIMEDOUT si pasa el tope (se mata la shell y se sueltan sus tuberías: un `sleep` nieto no la retiene), ENOENT
-// si no existe. Nunca rechaza.
-function ejecutarShell(shell, args, { timeout, env }) {
+// si no existe. Nunca rechaza. Resuelve en `exit` en cuanto la salida ya trae los dos marcadores (`listo(stdout)`): un
+// nieto que herede el stdout de la shell de login (un agente de claves, tmux, algo mal daemonizado en el perfil) mantiene
+// la tubería abierta y `close` no llegaría hasta el tope entero aunque el `env -0` ya esté. Sin marcadores, se espera a
+// `close` (lo que quede por leer). `listo` es inyectable para probarlo; por defecto, parsear() encuentra los marcadores.
+function ejecutarShell(shell, args, { timeout, env, listo = salida => parsear(salida) !== null }) {
   return new Promise(resolver => {
-    let stdout = '', hijo, acabado = false, temporizador;
+    let stdout = '', hijo, acabado = false, temporizador, salida = null;   // `salida`: el código con el que la shell terminó, cuando lo haya hecho
     const acabar = r => { if (acabado) return; acabado = true; clearTimeout(temporizador); resolver(r); };
     const soltar = () => { for (const t of [hijo.stdout, hijo.stderr]) { try { t.destroy(); } catch { /* ya cerrada */ } } };
+    const comprobar = () => { if (salida !== null && listo(stdout)) { soltar(); acabar({ stdout, status: salida.status }); } };
     try { hijo = spawn(shell, args, { env, stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { return acabar({ stdout: '', status: null, error: e }); }
     temporizador = setTimeout(() => { try { hijo.kill('SIGKILL'); } catch { /* ya muerta */ } soltar(); acabar({ stdout, status: null, error: Object.assign(new Error(`${shell}: no ha contestado en ${timeout} ms`), { code: 'ETIMEDOUT' }) }); }, timeout);
     hijo.stdout.setEncoding('utf8');
-    hijo.stdout.on('data', d => { stdout += d; if (stdout.length > MAX_SALIDA) { try { hijo.kill('SIGKILL'); } catch { /* ya muerta */ } soltar(); acabar({ stdout: '', status: null, error: Object.assign(new Error(`${shell}: demasiada salida`), { code: 'ENOBUFS' }) }); } });
+    hijo.stdout.on('data', d => {
+      stdout += d;
+      if (stdout.length > MAX_SALIDA) { try { hijo.kill('SIGKILL'); } catch { /* ya muerta */ } soltar(); return acabar({ stdout: '', status: null, error: Object.assign(new Error(`${shell}: demasiada salida`), { code: 'ENOBUFS' }) }); }
+      comprobar();   // la shell ya salió y lo que faltaba por leer acaba de llegar
+    });
     hijo.stderr.resume();   // el ruido de la shell se descarta, pero hay que leerlo para que no se atasque
     hijo.on('error', e => acabar({ stdout, status: null, error: e }));
+    hijo.on('exit', status => { salida = { status }; comprobar(); });
     hijo.on('close', status => acabar({ stdout, status }));
   });
 }

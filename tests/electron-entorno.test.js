@@ -25,6 +25,8 @@ const ruidosa = shell('ruidosa', 'echo "Bienvenido al sistema (MOTD)"; echo "nvm
 const soloInteractiva = shell('solo-interactiva', 'if [ "$1" = "-ilc" ]; then export PATH="/interactiva/bin:$PATH"; eval "$2"; else echo "nada, el PATH está en el .bashrc"; fi');
 const lenta = shell('lenta', 'sleep 5; eval "$2"');
 const rota = shell('rota', 'echo "error al cargar el perfil" >&2; exit 1');
+// Una shell cuyo perfil deja un nieto con su stdout heredado (un agente de claves mal daemonizado, tmux): sale enseguida, pero la tubería sigue abierta.
+const conNieto = shell('con-nieto', 'export PATH="/ruta/de/la/shell/bin:$PATH"; eval "$2"; sleep 30 &');
 const env = { PATH: '/usr/bin:/bin', HOME: home, SHELL: ruidosa, PROPIA: 'sí' };
 test.after(() => fs.rmSync(base, { recursive: true, force: true }));
 
@@ -126,6 +128,20 @@ test('nodeDelKit: el binario del padre (CUADERNO_NODE) con ELECTRON_RUN_AS_NODE;
   assert.deepEqual(nodeDelKit({ CUADERNO_NODE: '/apps/Cuaderno' }), { cmd: '/apps/Cuaderno', env: { ELECTRON_RUN_AS_NODE: '1' } });
   assert.deepEqual(nodeDelKit({}), { cmd: process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' } });
   assert.equal(nodeDelKit().cmd, process.execPath);
+});
+
+test('un nieto que hereda el stdout de la shell (sleep 30 & sin redirigir) no retiene el arranque: con los marcadores ya leídos se resuelve al salir la shell, en menos de un segundo', { skip: sinSh }, async () => {
+  const t0 = Date.now();
+  const r = await entornoDeLaShell({ env: { ...env, SHELL: conNieto }, home, plataforma: 'linux', tope: 10_000 });
+  assert.ok(Date.now() - t0 < 1000, `ha tardado ${Date.now() - t0} ms: esperó al nieto`);
+  assert.equal(r.origen, 'shell -lc');
+  assert.equal(r.error, undefined);
+  assert.ok(r.env.PATH.startsWith('/ruta/de/la/shell/bin:'), r.env.PATH);
+  // Y ejecutarShell a secas: con `listo` que nunca da por buena la salida, espera a close (aquí, el tope), como antes.
+  const t1 = Date.now();
+  const sinMarcadores = await ejecutarShell(conNieto, ['-lc', 'printf hola'], { timeout: 300, env: { PATH: '/usr/bin:/bin' }, listo: () => false });
+  assert.ok(Date.now() - t1 >= 250, 'sin marcadores no se adelanta a close');
+  assert.equal(sinMarcadores.error.code, 'ETIMEDOUT');
 });
 
 test('ejecutarShell: el contrato de spawnSync en asíncrono (stdout, status; error con ETIMEDOUT o ENOENT), y el tope por defecto son 10 s', { skip: sinSh }, async () => {
