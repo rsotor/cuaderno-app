@@ -7,8 +7,23 @@ const cuaderno = () => info.cuaderno;
 
 // En la app de escritorio (Electron) el preload deja window.cuadernoApp; sin él, la pantalla es la del navegador y nada cambia.
 const enApp = () => !!window.cuadernoApp;
+const enMac = /Mac/i.test(navigator.platform);
+// Las pistas de teclado de la pantalla: en la web, las de la página («Ctrl K»); en la app de escritorio, las del menú
+// (electron/menu.js), con ⌘ en Mac y Ctrl en los demás (crítica 2026-10-10, 10). `conAtajo` añade la pista a un título solo en la app.
+const pista = (web, app) => (enApp() ? (enMac ? `⌘${app}` : `Ctrl ${app}`) : web);
+const conAtajo = (texto, tecla) => (enApp() ? `${texto} (${pista('', tecla)})` : texto);
+// El título de la ventana: en la web, «<cuaderno> · Cuaderno»; en la app, lo que está abierto («inicio.md — cuaderno-ejemplo»,
+// «Tareas — cuaderno-ejemplo», «Cuadernos — Cuaderno»), que es lo que lee la barra de título y el selector de ventanas.
+let vistaTitulo = null;
+function pintarTitulo() {
+  const c = cuaderno();
+  if (!enApp()) { document.title = c ? `${c.nombre} · Cuaderno` : 'Cuaderno'; return; }
+  document.title = vistaTitulo === 'Cuadernos' ? 'Cuadernos — Cuaderno' : !c ? 'Cuaderno' : vistaTitulo ? `${vistaTitulo} — ${c.nombre}` : c.nombre;
+}
+const ponerVista = v => { vistaTitulo = v; pintarTitulo(); };
 // Lo que supone una terminal se dice de otra forma en la app: no hay terminal donde reiniciarla, se cierra y se vuelve a abrir.
 if (enApp()) { const a = $('#aviso-reinicio'); for (const n of [...a.childNodes]) if (n.id !== 'aviso-cerrar') n.remove(); a.prepend('La app se ha actualizado mientras estaba abierta. Cierra y vuelve a abrir la app para que todo funcione. '); }
+if (enApp()) { $('#buscador').placeholder = `Buscar… o + tarea  (${pista('Ctrl K', 'F')})`; $('#btn-nueva-nota').title = conAtajo('Crear una nota nueva', 'N'); $('#btn-ajustes').title = conAtajo('Ajustes de la app', ','); }
 // El aviso de «la app se ha actualizado» se cierra y no vuelve en esta pestaña (Roberto, 2026-10-09).
 let avisoCerrado = false;
 $('#aviso-cerrar').addEventListener('click', () => { avisoCerrado = true; $('#aviso-reinicio').hidden = true; });
@@ -267,8 +282,8 @@ function ancho(si, todo = false) { $('#nota').classList.toggle('ancha', si); $('
 
 // ---------- nota
 function sinPortada() {
-  $('#miga').innerHTML = '<strong>Cuaderno</strong>';
-  $('#nota').innerHTML = `<h1>${esc(cuaderno().nombre)}</h1><p class="resumen">Esta carpeta no tiene una nota de portada. Elige una nota en el árbol de la izquierda o busca con <kbd>Ctrl K</kbd>.</p>`;
+  $('#miga').innerHTML = '<strong>Cuaderno</strong>'; ponerVista(null);
+  $('#nota').innerHTML = `<h1>${esc(cuaderno().nombre)}</h1><p class="resumen">Esta carpeta no tiene una nota de portada. Elige una nota en el árbol de la izquierda o busca con <kbd>${pista('Ctrl K', 'F')}</kbd>.</p>`;
 }
 // La tabla de propiedades (frontmatter) de la lectura; el editor pinta la misma, de solo lectura.
 const htmlPropiedades = fm => fm ? `<dl class="propiedades">${Object.entries(fm).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${Array.isArray(v) ? v.map(x => `<span class="etiqueta">${esc(x)}</span>`).join('') : esc(v)}</dd>`).join('')}</dl>` : '';
@@ -288,6 +303,7 @@ async function abrirNotaTurno(ruta, lineaDestino, { desdeCambios = false } = {})
   let n;
   try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { if (turno !== turnoNota) return pendienteNota; $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   if (turno !== turnoNota) return pendienteNota;
+  ponerVista(ruta.split('/').pop());
   $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonCopiar(ruta) + (n.generado ? '' : botonPapelera(ruta, ruta.split('/').pop()));   // una nota que regenera el profesor no se manda a la papelera desde aquí
   ancho(!!n.esHtml, !!n.esHtml);
   propiedadesActual = htmlPropiedades(n.frontmatter);
@@ -655,7 +671,7 @@ function filtrosRecordados() { try { return localStorage.getItem(claveFiltros())
 async function abrirTareas() {
   if (location.hash === '#/tareas' && filtrosRecordados()) history.replaceState(null, '', `#/tareas?${filtrosRecordados()}`);
   $('#nota').hidden = true; $('#panel').hidden = false; rutaActual = null;
-  $('#miga').innerHTML = '<strong>Tareas</strong>';
+  $('#miga').innerHTML = '<strong>Tareas</strong>'; ponerVista('Tareas');
   const g = await api('/api/tareas');
   if (!enTareas()) return;   // mientras llegaba la respuesta se cambió de pantalla
   // Si el panel ya estaba pintado (recarga en vivo, tarea nueva), el foco y lo escrito en «Nueva tarea» se conservan.
@@ -718,7 +734,7 @@ $('#panel').addEventListener('change', async e => { const t = e.target; if (t.ty
 let comentariosPanel = [];   // los que enseña el panel, para sus botones Editar y Cerrar
 async function abrirComentarios() {
   $('#nota').hidden = true; $('#panel').hidden = false; rutaActual = null;
-  $('#miga').innerHTML = '<strong>Comentarios</strong>';
+  $('#miga').innerHTML = '<strong>Comentarios</strong>'; ponerVista('Comentarios');
   const c = comentariosPanel = await api('/api/comentarios');
   const quien = x => esc(x.cita || String(x.texto).slice(0, 40));   // de qué comentario es el botón, para el lector de pantalla
   $('#panel').innerHTML = `<h1>Comentarios</h1><p class="resumen">Lo que has anotado en las notas. Tu profesor los ve en la siguiente sesión y los convierte en dudas o aportaciones.</p>`
@@ -874,13 +890,19 @@ const hace = iso => { if (!iso) return 'nunca'; const d = (Date.now() - new Date
 const textoGit = g => !g ? 'sin repositorio' : `guardado ${hace(g.ultimo)}${g.cambios ? `, ${g.cambios} ${g.cambios === 1 ? 'cambio' : 'cambios'} por guardar` : ''}${g.sinSubir ? `, ${g.sinSubir} sin subir` : ''}`;
 async function abrirCuadernos() {
   rutaActual = null; $('#nota').hidden = true; $('#panel').hidden = false;
-  $('#miga').innerHTML = '<strong>Cuadernos</strong>';
+  $('#miga').innerHTML = '<strong>Cuadernos</strong>'; ponerVista('Cuadernos');
   const lista = await api('/api/cuadernos');
-  // En la app de escritorio, además de la casilla, el diálogo del sistema («Elegir carpeta…»); el camino después es el mismo.
-  $('#panel').innerHTML = `<h1>Cuadernos</h1><p class="resumen">Cada cuaderno es una carpeta de notas con su propio repositorio. ${enApp() ? 'Abre uno reciente, elige otra carpeta o escribe su ruta.' : 'Abre uno reciente o escribe la ruta de otra carpeta.'}</p>
-    <form class="nueva-tarea" id="abrir-carpeta"><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="Ruta de la carpeta del cuaderno, por ejemplo ~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button>${enApp() ? '<button type="button" id="elegir-carpeta" class="secundario">Elegir carpeta…</button>' : ''}</form>`
-    + (lista.length ? lista.map(c => `<section class="grupo cuaderno${c.abiertoAhora ? ' abierto' : ''}${c.existe ? '' : ' ausente'}"><h2>${c.existe ? `<a href="#/" data-abrir="${esc(c.ruta)}">${esc(c.nombre)}</a>` : esc(c.nombre)}${c.abiertoAhora ? '<span class="solo-lectura">abierto ahora</span>' : ''}</h2><p class="ruta"><code>${esc(c.ruta)}</code></p><p class="detalle">${!c.existe ? 'La carpeta ya no está' : c.git ? textoGit(c.git) : 'No es un repositorio: desde aquí no se puede guardar'}</p><button type="button" class="secundario pequeno" data-olvidar="${esc(c.ruta)}">Quitar de la lista</button></section>`).join('')
-      : '<section class="grupo"><p>Todavía no has abierto ningún cuaderno.</p></section>');
+  const recientes = lista.length ? lista.map(c => `<section class="grupo cuaderno${c.abiertoAhora ? ' abierto' : ''}${c.existe ? '' : ' ausente'}"><h2>${c.existe ? `<a href="#/" data-abrir="${esc(c.ruta)}">${esc(c.nombre)}</a>` : esc(c.nombre)}${c.abiertoAhora ? '<span class="solo-lectura">abierto ahora</span>' : ''}</h2><p class="ruta"><code>${esc(c.ruta)}</code></p><p class="detalle">${!c.existe ? 'La carpeta ya no está' : c.git ? textoGit(c.git) : 'No es un repositorio: desde aquí no se puede guardar'}</p><button type="button" class="secundario pequeno" data-olvidar="${esc(c.ruta)}">Quitar de la lista</button></section>`).join('')
+    : '<section class="grupo"><p>Todavía no has abierto ningún cuaderno.</p></section>';
+  if (enApp()) {
+    // En la app de escritorio (crítica 2026-10-10, 4): los recientes primero, que es lo que se abre casi siempre, y debajo «Otro
+    // cuaderno»: el diálogo del sistema («Elegir carpeta…») o la ruta escrita; un solo formulario y Enter es Abrir.
+    $('#panel').innerHTML = `<h1>Cuadernos</h1><p class="resumen">Cada cuaderno es una carpeta de notas con su propio repositorio. Abre uno reciente o, abajo, otro cuaderno.</p>${recientes}
+      <section class="grupo otro-cuaderno"><form class="nueva-tarea" id="abrir-carpeta"><span class="etiqueta">Otro cuaderno:</span><button type="button" id="elegir-carpeta">Elegir carpeta…</button><span class="etiqueta">o escribe la ruta</span><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button></form></section>`;
+    return;
+  }
+  $('#panel').innerHTML = `<h1>Cuadernos</h1><p class="resumen">Cada cuaderno es una carpeta de notas con su propio repositorio. Abre uno reciente o escribe la ruta de otra carpeta.</p>
+    <form class="nueva-tarea" id="abrir-carpeta"><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="Ruta de la carpeta del cuaderno, por ejemplo ~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button></form>${recientes}`;
 }
 async function abrirCarpeta(ruta) {
   try { info = await api('/api/abrir', { ruta }); } catch (e) { avisarError('No se ha podido abrir esa carpeta.', e.message); return; }
@@ -1030,11 +1052,11 @@ function pintarEstado() {
   const c = cuaderno();
   $('#lateral').classList.toggle('sin-cuaderno', !c);
   $('#nombre-curso').textContent = c ? c.nombre : 'Cuaderno';
-  document.title = c ? `${c.nombre} · Cuaderno` : 'Cuaderno';
+  pintarTitulo();
   $('#estado-git').textContent = c ? textoGit(c.git) : '';
   $('#lateral').classList.toggle('sin-repo', !!c && !c.git && c.kit !== 'kit');
   $('#btn-guardar').disabled = $('#btn-traer').disabled = $('#btn-deshacer').disabled = !!c && c.kit === 'salida-sin-motor';
-  $('#btn-guardar').title = c && c.kit === 'salida-sin-motor' ? 'Este cuaderno es una salida del kit sin motor: no se puede guardar desde aquí' : 'Guardar en el repositorio del cuaderno';
+  $('#btn-guardar').title = c && c.kit === 'salida-sin-motor' ? 'Este cuaderno es una salida del kit sin motor: no se puede guardar desde aquí' : conAtajo('Guardar en el repositorio del cuaderno', 'S');
   $('#link-inicio').href = c && c.portada ? `#/n/${encodeURI(c.portada)}` : '#/';
 }
 async function cargarCuaderno() {

@@ -243,6 +243,11 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .cuaderno.ausente h2 { color: var(--mal); }
 .nueva-tarea { display: flex; gap: 8px; margin: 0 0 14px; }
 .nueva-tarea input { flex: 1; padding: 8px 12px; }
+/* Cuadernos en la app de escritorio: «Otro cuaderno: [Elegir carpeta…] o escribe la ruta [casilla] [Abrir]», una frase (crítica 2026-10-10, 4) */
+.otro-cuaderno { padding: 14px 0 0; border-top: 1px solid var(--linea); }
+.otro-cuaderno form { flex-wrap: wrap; align-items: center; margin: 0; }
+.otro-cuaderno .etiqueta { color: var(--tinta-suave); }
+.otro-cuaderno input { flex: 0 1 28ch; min-width: 14ch; }
 /* filtros del panel Tareas: una fila que se parte en estrecho; el foco es el anillo global */
 .filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 6px; padding: 8px 0; border-top: 1px solid var(--linea); font-size: 13px; color: var(--tinta-suave); }
 .filtros label { color: var(--tinta-suave); }

@@ -20,7 +20,7 @@ const dormir = ms => new Promise(r => setTimeout(r, ms));
 
 let reciente, porArgv, elegida, segunda, configDir, userData, app, pagina, entorno, registro;
 const base = fs.mkdtempSync(path.join(os.tmpdir(), 'cuaderno-electron-carpeta-'));
-const titulo = c => `${path.basename(c.raiz)} · Cuaderno`;
+const titulo = c => `inicio.md — ${path.basename(c.raiz)}`;   // en la app, el título es lo abierto (la portada) y el cuaderno
 // Espera la portada del cuaderno `c` (las copias son iguales: las distingue el título de la ventana, con su carpeta).
 // Mientras la ventana navega (arrancando.html → URL de entrada → /), title() falla: se reintenta.
 async function esperarTitulo(c) {
@@ -68,8 +68,17 @@ test('abrir carpeta en la app de escritorio: «Elegir carpeta…» en Cuadernos 
   await pagina.evaluate(() => { location.hash = '#/cuadernos'; });
   const boton = pagina.locator('#elegir-carpeta', { hasText: 'Elegir carpeta…' });
   await boton.waitFor({ state: 'visible' });
+  assert.equal(await pagina.title(), 'Cuadernos — Cuaderno', 'el título de la ventana en Cuadernos');
   await pagina.locator('#ruta-carpeta').waitFor({ state: 'visible' });
-  assert.match(await pagina.locator('#panel .resumen').textContent(), /elige otra carpeta/);
+  assert.match(await pagina.locator('#panel .resumen').textContent(), /Abre uno reciente o, abajo, otro cuaderno\.$/);
+  // Los recientes primero y «Otro cuaderno» debajo, en una frase: [Elegir carpeta…] (sin .secundario) o escribe la ruta [casilla] [Abrir]; Enter en la casilla es Abrir.
+  const orden = await pagina.evaluate(() => [...document.querySelectorAll('#panel > section')].map(s => s.className.split(' ')[1] || s.className));
+  assert.ok(orden.indexOf('cuaderno') < orden.indexOf('otro-cuaderno'), `los recientes van antes que «Otro cuaderno»: ${orden}`);
+  assert.equal(await pagina.locator('#panel .otro-cuaderno form#abrir-carpeta').count(), 1, 'un solo formulario');
+  assert.match(await pagina.locator('#panel .otro-cuaderno').textContent(), /Otro cuaderno:\s*Elegir carpeta…\s*o escribe la ruta/);
+  assert.equal(await boton.getAttribute('class'), null, 'el botón sin .secundario');
+  assert.equal(await pagina.locator('#ruta-carpeta').getAttribute('placeholder'), '~/cursos/finanzas');
+  assert.equal(await pagina.locator('#abrir-carpeta button[type=submit]').textContent(), 'Abrir');
   assert.ok(!(await recientes()).includes(elegida.raiz), 'la carpeta a elegir aún no es reciente');
   const [r] = await Promise.all([pagina.waitForResponse(x => x.url().endsWith('/api/abrir')), boton.click()]);
   assert.equal(r.status(), 200, 'abrir la carpeta elegida');

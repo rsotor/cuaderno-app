@@ -48,12 +48,12 @@ function vivo(pid) {
   return !!p && !p.zombi;
 }
 const pidDelServidor = () => arbolDe(app.process().pid).find(p => /utility-sub-type=node\.mojom\.NodeService/.test(p.args));
-// Espera a que la ventana enseñe la portada del cuaderno de ejemplo con su título.
+// Espera a que la ventana enseñe la portada del cuaderno de ejemplo con su título («inicio.md — <carpeta>»: en la app, lo abierto).
 async function esperarPortada() {
   await pagina.locator('#nota h1', { hasText: 'Mi curso' }).waitFor({ state: 'visible', timeout: ESPERA });
   const nombre = path.basename(c.raiz), fin = Date.now() + ESPERA;
-  while (Date.now() < fin && (await pagina.title()) !== `${nombre} · Cuaderno`) await dormir(50);
-  assert.equal(await pagina.title(), `${nombre} · Cuaderno`);
+  while (Date.now() < fin && (await pagina.title()) !== `inicio.md — ${nombre}`) await dormir(50);
+  assert.equal(await pagina.title(), `inicio.md — ${nombre}`, 'en la app el título es lo abierto: la nota y el cuaderno');
 }
 
 test.before(async () => {

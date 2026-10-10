@@ -24,7 +24,7 @@ const dormir = ms => new Promise(r => setTimeout(r, ms));
 let c, otro, configDir, userData, app, pagina, registro;
 const base = fs.mkdtempSync(path.join(os.tmpdir(), 'cuaderno-electron-menu-'));
 const git = (cuaderno, ...args) => execFileSync('git', args, { cwd: cuaderno.raiz, stdio: 'pipe', encoding: 'utf8' }).trim();
-const titulo = cuaderno => `${path.basename(cuaderno.raiz)} · Cuaderno`;
+const titulo = cuaderno => `inicio.md — ${path.basename(cuaderno.raiz)}`;   // en la app, el título es lo abierto (la portada) y el cuaderno
 const escapar = t => t.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
 // Espera la portada del cuaderno `cuaderno` (las copias se distinguen por el título de la ventana). Mientras navega, title() falla.
 async function esperarTitulo(cuaderno) {
@@ -66,6 +66,13 @@ test('el menú de la app de escritorio: en castellano, con los atajos de la tabl
   assert.deepEqual(await menu(), process.platform === 'darwin' ? ['Cuaderno', 'Archivo', 'Edición', 'Ver', 'Ventana', 'Ayuda'] : ['Archivo', 'Edición', 'Ver', 'Ventana', 'Ayuda']);
   const aceleradores = await app.evaluate(({ Menu }, ids) => ids.map(id => Menu.getApplicationMenu().getMenuItemById(id).accelerator), ATAJOS.map(a => a.id));
   assert.deepEqual(aceleradores, ATAJOS.map(a => a.accelerator), 'cada atajo de la tabla está en el menú instalado');
+  // Las pistas de la pantalla dicen lo que dice el menú (en Linux, Ctrl; en Mac dirían ⌘).
+  const mod = process.platform === 'darwin' ? '⌘' : 'Ctrl ';
+  assert.equal(await pagina.getAttribute('#buscador', 'placeholder'), `Buscar… o + tarea  (${mod}F)`);
+  assert.equal(await pagina.getAttribute('#btn-guardar', 'title'), `Guardar en el repositorio del cuaderno (${mod}S)`);
+  assert.equal(await pagina.getAttribute('#btn-nueva-nota', 'title'), `Crear una nota nueva (${mod}N)`);
+  assert.equal(await pagina.getAttribute('#btn-ajustes', 'title'), `Ajustes de la app (${mod},)`);
+  assert.equal(await pagina.getAttribute('#btn-terminal', 'title'), 'Abrir la terminal (Ctrl `)', 'el menú también usa Ctrl para la terminal');
   // Un cambio en una nota (en el disco, como lo haría el editor) y Guardar desde el menú: el diálogo de la pantalla, con el cambio contado.
   fs.appendFileSync(path.join(c.base, 'conceptos', 'capital.md'), '\nUna línea más desde la app.\n');
   await hasta(() => git(c, 'status', '--porcelain').length > 0, 'git no ve el cambio');
