@@ -1,19 +1,35 @@
 # Dependencias npm, una vez por semana. CodeMirror y Lezer van juntos: se resuelven sin bundler con un import map
 # (public/index.html) y dos versiones mezcladas de @codemirror/@lezer rompen el editor; tests/importmap.test.js lo vigila.
+# Electron y electron-builder van en su grupo y a otro ritmo (plan de Electron, R10 y T7): Electron saca una mayor cada 8
+# semanas y parches casi cada semana, y cada subida se mergea solo con el recorrido Electron en verde (tests.yml, paso
+# «Recorridos de Electron»; en Mac y Windows, a mano). Dependabot no admite dos entradas para el mismo ecosistema y
+# directorio con calendarios distintos (solo con target-branch distinto), así que la cadencia mensual se consigue con
+# `cooldown`: una versión nueva de electron o electron-builder no se propone hasta que tenga 30 días; el resto, sin espera.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 30
+      include:
+        - electron
+        - electron-builder
     groups:
       codemirror:
         patterns:
           - "@codemirror/*"
           - "@lezer/*"
+      electron:
+        patterns:
+          - electron
+          - electron-builder
       resto:
         patterns:
           - "*"
         exclude-patterns:
           - "@codemirror/*"
           - "@lezer/*"
+          - electron
+          - electron-builder
