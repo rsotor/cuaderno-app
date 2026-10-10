@@ -97,7 +97,8 @@ test('`ejecutar` inyectable (devuelva promesa o valor): se llama con -lc y la or
   assert.deepEqual(llamadas[0].args, ['-lc', `printf ${MARCADOR}; env -0; printf ${MARCADOR}`]);
   assert.equal(llamadas[0].o.timeout, 1234);
   assert.equal(r.origen, 'shell -lc'); assert.equal(r.env.LANG, 'C');
-  assert.ok(r.env.PATH.startsWith('/x:'));
+  assert.ok(r.env.PATH.startsWith('/x:'), `el PATH de Mac y Linux va con ':' aunque este test corra en Windows: ${r.env.PATH}`);
+  assert.equal(r.env.PATH, ['/x', ...respaldo(home)].join(':'));
   // Sin SHELL, /bin/sh.
   const r2 = await entornoDeLaShell({ env: { PATH: '/bin' }, home, plataforma: 'linux', ejecutar: (sh, a) => { llamadas.push({ sh, a }); return { stdout: '', status: 0 }; } });
   assert.equal(llamadas[1].sh, '/bin/sh'); assert.equal(llamadas[2].a[0], '-ilc'); assert.equal(r2.origen, 'respaldo');

@@ -89,9 +89,11 @@ async function entornoDeLaShell({ env = process.env, plataforma = process.platfo
     }
     resultado.error = vars ? `${shell} ${flags}: la shell contestó pero su entorno no trae PATH (código ${r.status})` : `${shell} ${flags}: sin marcadores en la salida (código ${r.status})`;
   }
-  const partes = (resultado.env.PATH || '').split(path.delimiter).filter(Boolean);
+  // Mac y Linux separan el PATH con ':' (Windows, que usa ';', ya ha salido arriba): el de la plataforma que se pidió, no
+  // el de la máquina en la que corre esto (los tests de Windows prueban Mac y Linux por inyección).
+  const partes = (resultado.env.PATH || '').split(':').filter(Boolean);
   for (const d of respaldo(home)) if (!partes.includes(d)) partes.push(d);
-  resultado.env.PATH = partes.join(path.delimiter);
+  resultado.env.PATH = partes.join(':');
   resultado.ms = Date.now() - t0;
   return resultado;
 }
