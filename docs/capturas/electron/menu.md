@@ -19,10 +19,12 @@ del sistema). Con un cuaderno reciente de ejemplo en Cuadernos recientes.
   - Mostrar todo (rol `unhide`)
   - ───
   - Salir de Cuaderno (rol `quit`)
-- Cuaderno
+- Archivo
+  - Nueva nota  ·  CmdOrCtrl+N
+  - Nueva tarea  ·  CmdOrCtrl+T
+  - ───
   - Abrir nota…  ·  CmdOrCtrl+O
   - Buscar…  ·  CmdOrCtrl+F
-  - Nueva tarea  ·  CmdOrCtrl+T
   - ───
   - Guardar  ·  CmdOrCtrl+S
   - ───
@@ -40,6 +42,12 @@ del sistema). Con un cuaderno reciente de ejemplo en Cuadernos recientes.
 - Ver
   - Recargar (rol `reload`)
   - ───
+  - Atrás  ·  CmdOrCtrl+[
+  - Adelante  ·  CmdOrCtrl+]
+  - ───
+  - Barra lateral  ·  Ctrl+\
+  - Terminal  ·  Ctrl+`
+  - ───
   - Acercar (rol `zoomIn`)
   - Alejar (rol `zoomOut`)
   - Tamaño real (rol `resetZoom`)
@@ -47,17 +55,22 @@ del sistema). Con un cuaderno reciente de ejemplo en Cuadernos recientes.
   - Pantalla completa (rol `togglefullscreen`)
 - Ventana (rol `windowMenu`: Electron pone Minimizar, Zoom y las ventanas)
 - Ayuda (rol `help`)
-  - Plan vivo (en GitHub)
+  - Cómo se usa Cuaderno
+  - Atajos de teclado
   - ───
   - Mostrar registro
   - Diagnóstico
+  - ───
+  - Plan vivo (para quien desarrolla)
 
 ## Windows (y Linux: la misma plantilla)
 
-- Cuaderno
+- Archivo
+  - Nueva nota  ·  CmdOrCtrl+N
+  - Nueva tarea  ·  CmdOrCtrl+T
+  - ───
   - Abrir nota…  ·  CmdOrCtrl+O
   - Buscar…  ·  CmdOrCtrl+F
-  - Nueva tarea  ·  CmdOrCtrl+T
   - ───
   - Guardar  ·  CmdOrCtrl+S
   - ───
@@ -79,6 +92,12 @@ del sistema). Con un cuaderno reciente de ejemplo en Cuadernos recientes.
 - Ver
   - Recargar (rol `reload`)
   - ───
+  - Atrás  ·  CmdOrCtrl+[
+  - Adelante  ·  CmdOrCtrl+]
+  - ───
+  - Barra lateral  ·  Ctrl+\
+  - Terminal  ·  Ctrl+`
+  - ───
   - Acercar (rol `zoomIn`)
   - Alejar (rol `zoomOut`)
   - Tamaño real (rol `resetZoom`)
@@ -86,10 +105,13 @@ del sistema). Con un cuaderno reciente de ejemplo en Cuadernos recientes.
   - Pantalla completa (rol `togglefullscreen`)
 - Ventana (rol `windowMenu`: Electron pone Minimizar, Zoom y las ventanas)
 - Ayuda (rol `help`)
-  - Plan vivo (en GitHub)
+  - Cómo se usa Cuaderno
+  - Atajos de teclado
   - ───
   - Mostrar registro
   - Diagnóstico
+  - ───
+  - Plan vivo (para quien desarrolla)
   - ───
   - Acerca de Cuaderno
 
