@@ -2,8 +2,8 @@
 
 **2026-10-10 · estado: plan redactado, pasado por abogado del diablo (§9: 15 objeciones, 14 aplicadas y 1
 aplicada en parte) y por una revisión de confirmación independiente (§10: «viable con cambios», 8 puntos, todos
-aplicados); pendiente de que Roberto lo apruebe y decida las preguntas de §8. Lo que confirma que funciona es el
-spike de §5, no otra lectura.** Es el «siguiente bloque»
+aplicados). **Spike técnico hecho el 2026-10-10 (§5, «Resultado»): las cuatro preguntas salen SÍ en Linux; se sigue
+con las tareas de §6.** Pendientes de Roberto: las decisiones de §8 y lo que solo se puede probar en su Mac.** Es el «siguiente bloque»
 del plan vivo (§0, decisión de Roberto del 2026-10-09): una ventana propia para él y su pareja, sin firma ni
 tienda, «como mucho hacer público el repo». Sus palabras: «tenerlo en navegador me mata» y hay «un par de cosas
 que podríamos hacer mejor con atajos de app».
@@ -82,7 +82,7 @@ revisión de confirmación. Quien tome una tarea lee §1-§4 enteros y su tarea;
 | Enlaces fuera | `setWindowOpenHandler` y `will-navigate`: lo que no sea nuestro `localhost` se intercepta; **solo `http:`, `https:` y `mailto:` van a `shell.openExternal`**, el resto se ignora con aviso | Una nota o un `.html` del cuaderno pueden llevar `file:`, `smb:`, `vnc:`, `javascript:`: la lista de seguridad de Electron dice no pasarlos a `openExternal`. Lista pura, con test |
 | Cerrar con cambios | **`webContents.on('will-prevent-unload')`** con un `dialog.showMessageBoxSync` «¿Descartar lo escrito?» | En Electron un `beforeunload` que cancela **no pregunta: bloquea el cierre en silencio** (doc de `BrowserWindow`, evento `close`). Con `will-prevent-unload` la pantalla no cambia, no hay IPC nuevo y cubre también Ver → Recargar |
 | Configuración | **La misma carpeta de `config.js`** (`~/.config/cuaderno`), no `app.getPath('userData')`; `userData` solo para lo que Electron necesite por su cuenta (el lock de instancia única) | Web y app comparten recientes, tema y código; ir y volver no pierde nada. Dos procesos escribiendo `recientes` es lo mismo que hoy con dos `npm start`: asumido (R8) |
-| Entorno de la shell | **Al arrancar, en Mac y Linux (no en Windows), leer el entorno de la shell de login** y pasárselo al hijo en `utilityProcess.fork(…, { env })`: `$SHELL -lc` (y `-ilc` solo si falta algo) ejecutando `env -0` entre **marcadores** (`__CUADERNO__`), tope de **10 s**, y de respaldo añadir siempre `/opt/homebrew/bin`, `/usr/local/bin`, `~/.local/bin` y `~/.nvm/versions/node/*/bin`. Se importan `PATH`, `LANG`, `LC_*`, `SSH_AUTH_SOCK` y `GIT_*`. fish: `string join : $PATH`. El resultado se ve en Ayuda → Diagnóstico | `echo $PATH` a secas se mezcla con el MOTD, el prompt de p10k o los avisos de nvm, y fish separa por espacios: es lo que hacen VS Code y los demás con marcadores y `env`. Pasarlo en el `fork` **antes de que el hijo cargue nada** resuelve que `guardar.js` congele su `ENV` al cargar (R2). `SSH_AUTH_SOCK` lo necesita el `push` por ssh en Linux. Un fallo aquí tiene que ser visible, no un «git: not found» misterioso |
+| Entorno de la shell | **Al arrancar, en Mac y Linux (no en Windows), leer el entorno de la shell de login** y pasárselo al hijo en `utilityProcess.fork(…, { env })`: `$SHELL -lc` (y `-ilc` solo si falta algo) ejecutando `env -0` entre **marcadores** (`__CUADERNO__`), tope de **10 s**, y de respaldo añadir siempre `/opt/homebrew/bin`, `/usr/local/bin`, `~/.local/bin` y `~/.nvm/versions/node/*/bin`. Se importan `PATH`, `LANG`, `LC_*`, `SSH_AUTH_SOCK` y `GIT_*` (con `env -0` fish también exporta `PATH` con `:`). El resultado se ve en Ayuda → Diagnóstico | `echo $PATH` a secas se mezcla con el MOTD, el prompt de p10k o los avisos de nvm, y fish separa por espacios: es lo que hacen VS Code y los demás con marcadores y `env`. Pasarlo en el `fork` **antes de que el hijo cargue nada** resuelve que `guardar.js` congele su `ENV` al cargar (R2). `SSH_AUTH_SOCK` lo necesita el `push` por ssh en Linux. Un fallo aquí tiene que ser visible, no un «git: not found» misterioso |
 | Terminal | `pty.spawn` de la shell **como login shell (`-l`)** solo en Electron | Que la terminal de la app sea la misma que la del Terminal del sistema |
 | Node para el kit y el corrector | **`process.execPath` con `ELECTRON_RUN_AS_NODE=1`** solo en el entorno del hijo que se lanza, inyectado como `ejecutarNode` en `crearServidor` (`guardar.js` y `formulario.js` dejan de leer `execPath` directamente; por defecto, el de siempre) | El binario de Electron se comporta como `node` con esa variable: las herramientas del kit corren sin exigir Node instalado. En macOS, `process.execPath` dentro del `utilityProcess` es probablemente el **helper** (`Cuaderno Helper.app/…`), que también honra la variable; aun así el padre pasa su propio `execPath` en el entorno del hijo (`CUADERNO_NODE`) y `nodeDelKit()` lo prefiere, y el spike anota qué binario se usó. **Depende del fuse `runAsNode`, habilitado por defecto; los fuses no se tocan** (`runAsNode` y `nodeCliInspect`: Playwright `_electron.launch` necesita el segundo). El kit ve el Node de Electron (24.18), no el del sistema; si una herramienta del kit lanza `node`, `npm` o `npx` **por nombre**, no los habrá: se comprueba en el spike (pregunta 3) |
 | Tema | `nativeTheme.themeSource = temaNativo(config.tema)` al arrancar y al cambiar Ajustes (`auto`/`claro`/`oscuro` → `system`/`light`/`dark`, función pura con test); `backgroundColor` de la ventana según el tema | Con `auto`, `prefers-color-scheme` ya sigue al sistema; con `claro`/`oscuro` fijos, la barra de título, el menú y el fondo antes de cargar no seguirían el ajuste (flash blanco en oscuro) |
@@ -134,7 +134,7 @@ el mismo código y la cubren los mismos tests (§7).
 | R2 | **El entorno de la sesión gráfica en Mac y Linux**: `git`, `claude`, `node` no están; y `guardar.js` congela su `ENV` al cargar | Alta con Homebrew o nvm | `entornoDeLaShell()` con marcadores y `env -0`, 10 s, respaldo de rutas conocidas; se pasa en el `fork` antes de que el hijo cargue nada; Diagnóstico lo enseña | Spike (pregunta 2) en el Mac de Roberto; tests de Node con una shell falsa (que imprime ruido, que tarda, fish) y uno que carga `guardar` con un entorno y comprueba lo que recibe la herramienta falsa |
 | R3 | **`node-pty` no carga en Electron** (ABI, `spawn-helper` sin permiso) | Baja | Prebuilds N-API (Mac y Windows); `npmRebuild: false`; sin asar; el chmod de `server.js` pasa a una función compartida que `servidor-hijo.js` llama (T1); si el hijo muere, el padre lo relanza una vez y lo anota (§2) | Spike: terminal en la app empaquetada, Mac y Windows |
 | R4 | **Gatekeeper y SmartScreen**: en macOS 15 ya no vale Control+clic, hay que ir a Privacidad y seguridad → «Abrir de todos modos»; y ese botón solo aparece si el bundle está firmado (ad hoc vale); sin firma ninguna sale «dañado». SmartScreen pide «Más información → Ejecutar de todas formas» en cada versión | Segura en descargas | `mac.identity: "-"`, `hardenedRuntime: false`; criterio: `codesign -dv --verbose=2` dice `Signature=adhoc` e `Identifier=es.cuaderno.app`; `INSTALAR.md` con los pasos; **alternativa para el Mac de Roberto: construir en su ordenador (`npm run empaquetar`), sin marca de cuarentena** | Prueba de instalación (§5 bis) con una descarga real |
-| R5 | **Coste de CI**: un build de Mac son 6-10 min ×10 contra la cuota del repo privado; `npm ci` descarga Electron (~100 MB) en cada job | Segura | Empaquetado solo en `workflow_dispatch` y etiquetas `v*`; recorrido Electron en PR solo en Linux (`xvfb-run`), Mac y Windows a mano; `ELECTRON_SKIP_BINARY_DOWNLOAD=1` en los jobs que no lo corren | `tests.yml`, `empaquetar.yml` |
+| R5 | **Coste de CI**: un build de Mac son 6-10 min ×10 contra la cuota del repo privado; el binario de Electron (~100 MB) hay que descargarlo en el job que lo use | Segura | Empaquetado solo en `workflow_dispatch` y etiquetas `v*`; recorrido Electron en PR solo en Linux (`xvfb-run`), Mac y Windows a mano; Electron ≥ 44 no descarga el binario en `npm ci` (sin `postinstall`): solo el job de `test:electron` lo baja, en un paso explícito y cacheado | `tests.yml`, `empaquetar.yml` |
 | R6 | **Tamaño**: ~200 MB instalados, `.dmg` de ~110 MB; sin asar, miles de ficheros | Segura | Asumido por Roberto el 2026-10-09; `files` del builder excluye `tests/`, `docs/`, `ejemplos/`, `pruebas/`, `cuadernos-prueba/`, `playwright`; medir arranque y primera apertura, con la ruta de vuelta al asar anotada | Spike (pregunta 1 y 4) |
 | R7 | **La pantalla supone navegador**: `beforeunload` bloquea el cierre en silencio; `target="_blank"`; textos «desde la terminal»; el visor de PDF | Segura | `will-prevent-unload` con diálogo; `_blank` → `openExternal` solo `http/https/mailto`; textos variados con `cuadernoApp`; PDF lo pinta Chromium (comprobar) | Recorrido Electron; `rutas.test.js` para los textos del 403 |
 | R8 | **Dos servidores a la vez** (web y app) escriben `recientes` | Media | **Asumido**: ya pasa hoy con dos `npm start`; instancia única evita dos apps; `listen(0)` tras `EADDRINUSE` si 7331 está ocupado | `rutas.test.js`: arrancar con el puerto ocupado |
@@ -167,6 +167,42 @@ falla, se anota aquí lo que se ha visto y se decide con Roberto. La prueba de i
 Entregable: una tabla de cuatro filas aquí (§5, «Resultado») con sí/no, cifras y lo que haya que cambiar del
 plan. El código del spike no se mergea: las tareas lo reescriben con sus tests.
 
+### Resultado (2026-10-10, en el contenedor Linux de la sesión, rama `electron`, commits `8999bd0`…`b02c287`)
+
+Medido con `xvfb-run -a node electron/spike-medir.js` (Playwright `_electron`) sobre una copia temporal del cuaderno de
+ejemplo con kit, `git init` y una herramienta `guardar.js` del kit falsa pero realista (hace el commit con git y dice
+con qué Node corre). Electron 44.7.0 (Node 24.21.0 dentro), `node-pty` compilado por `npm ci` con el Node 22 del
+sistema y cargado dentro del Node 24 de Electron (N-API, también en Linux).
+
+| Pregunta | Resultado | Cifras y evidencia |
+|---|---|---|
+| P1 servidor en `utilityProcess`, puerto al padre, ventana con cookie, portada; muerte del hijo | **SÍ** a todo | Arranque hasta la portada: **835, 813 y 782 ms** (binario frío, primera tanda: 1714, 1421, 1482). Ventana «Arrancando…» a los ~200 ms, entorno de la shell +25 ms, puerto a los ~400 ms, portada a los ~550 ms. Cookie: `/api/info` 200, ninguna respuesta ≥ 400 en 17; `document.cookie` vacío (HttpOnly). WebSocket `/cambios` abierto (Chromium pone el `Origin`). Con 7331 ocupado: «se escucha en uno libre», puerto 44407, portada igual. Hijo matado con `SIGKILL`: relanzado en **377 ms**, portada de vuelta; segunda muerte: «se ha caído dos veces» y la app sale |
+| P2 entorno de la shell de login (Linux) | **SÍ** en Linux; **Mac sin responder** | `bash -lc` con marcadores y `env -0`: **18-26 ms**, sin necesitar `-ilc`. El PATH resuelto es el de `bash -lc 'echo $PATH'` (con rutas que el proceso lanzador no tenía) más el respaldo; el hijo lo recibe y la herramienta del kit lanzada por `guardar.js` lo ve (`which git` → `/usr/bin/git`). Homebrew, nvm, zsh y fish: no hay en el contenedor |
+| P3 Guardar con kit con `ELECTRON_RUN_AS_NODE=1` | **SÍ**; **el grep del kit real, pendiente** | `/api/guardar` desde la ventana → código 0, commit «Guardado desde Electron kit», árbol limpio. La herramienta ve `execPath` = binario de Electron, `node 24.21.0`, `runAsNode=1`, `require('electron')` falla (bien) pero **`process.versions.electron` está definido** (una herramienta que detecte Electron por esa clave se confundiría). En Linux el `execPath` del hijo es el binario principal, no un helper; macOS sigue abierto. El `grep` de `spawn|exec|npx|execPath` en profesor-kit no se pudo hacer: el repo no está en esta sesión (acceso denegado) |
+| P4 `_electron.launch` con `xvfb-run`, `userData` temporal, título | **SÍ** | Tres arranques limpios. El lock de instancia única **sí es por `userData`** (`SingletonLock/Cookie/Socket`). Primer fallo: `Socket path too long` porque Chromium crea el socket del singleton bajo **`TMPDIR`** (límite ~108 caracteres), no en `userData`; con `TMPDIR` corto, resuelto (en CI `/tmp` y en macOS `/var/folders/…` no pasa). `--no-sandbox` lo añade Playwright solo cuando se es root; en CI no hace falta. Sin librerías que instalar. Ruido inofensivo: `Failed to connect to the bus` (sin dbus) y `Address family not supported (97)` (sin IPv6) |
+| Extra portapapeles | **SÍ, sin pedir permiso** | `writeText` y `readText` funcionan sin handler: el handler por defecto concede todo. T2 lo restringe |
+| Extra `node-pty` en el `utilityProcess` | **SÍ** | `/pty` por WebSocket desde la página: prompt en < 1 s, `echo $((40+2))` → 42 |
+| Extra tests de Node | **114 tests, 112 pass, 0 fail, 2 skipped** | `npm test` entero tras tocar `guardar.js`, `formulario.js` y `servidor.js` (con Node 22; no se quejó) |
+
+**Veredicto: se sigue con §6.** Lo que el spike ha demostrado falso o nuevo, y cómo cambia el plan:
+
+- **Electron 44 ya no tiene `postinstall`**: `npm install` no descarga el binario; lo baja el primer `require('electron')`
+  (lo hizo Playwright: 7,9 s y ~100 MB) o `node node_modules/electron/install.js`. Así que `ELECTRON_SKIP_BINARY_DOWNLOAD`
+  sobra, y el job de `test:electron` **descarga el binario en un paso explícito y lo cachea** (`actions/cache` sobre
+  `~/.cache/electron`) antes del test. R5, T1 y T7 corregidos.
+- **`app.quit()` mata al hijo con código 0 y el relanzado se disparaba**: `before-quit` marca `cerrando` antes. T1 lo
+  recoge con test (hijo falso que sale durante el cierre).
+- **Diálogo bloqueante en pruebas**: variable para sustituirlo por respuesta fija (ya previsto en T2; también en T1).
+- **Zombis `<defunct>`** unos segundos tras salir, cosa del contenedor sin init: el criterio «`ps` limpio» de T1 espera
+  hasta 2 s.
+- **El token lo leen padre e hijo** del mismo fichero: en T1 el hijo manda `{ puerto, token }` y el padre no lo lee.
+- **fish**: con `env -0` no hace falta `string join` (exporta `PATH` con `:`). §2 corregido.
+- **No medido**: con y sin asar (el spike no empaqueta; se mide en T6).
+
+**Pendiente que solo se puede hacer fuera de este contenedor:** (1) en el Mac de Roberto, P2 con Homebrew, nvm y zsh, y
+qué binario es `process.execPath` dentro del hijo (helper o principal); (2) el `grep` en profesor-kit (o darle acceso al
+repo a la sesión); (3) la prueba de instalación de §5 bis, después de T6.
+
 ### 5 bis. La prueba de instalación (después de T6, con Roberto)
 
 En el Mac de Roberto, desde una descarga real del artefacto de CI: ¿qué pide Gatekeeper, `codesign -dv
@@ -187,12 +223,14 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
   `spawn-helper` de `server.js` pasa a una función compartida que llama `servidor-hijo.js`; `npm run app`
   (`electron .`), campo `main` en `package.json`, `electron` como `devDependency` con versión exacta; **camino de
   fallo del hijo** (puerto en `listening`, `EADDRINUSE` → `listen(0)`, tope de 15 s, relanzar una vez, diálogo y
-  salir); cierre limpio (matar el hijo, que cierra vigilante y pty); instancia única con `userData`;
-  `ELECTRON_SKIP_BINARY_DOWNLOAD` documentado; **`tests.yml` añade `electron/**`, `electron-builder.yml` y
+  salir); cierre limpio (matar el hijo, que cierra vigilante y pty; `before-quit` marca `cerrando` para que la salida del hijo
+  al cerrar no dispare el relanzado); el hijo manda `{ puerto, token }`; instancia única con `userData`; variable de
+  pruebas que sustituye el diálogo por una respuesta fija; `node node_modules/electron/install.js` documentado como el
+  paso que baja el binario; **`tests.yml` añade `electron/**`, `electron-builder.yml` y
   `.github/workflows/empaquetar.yml` a los dos filtros `paths`** (sin eso un PR que solo toque `electron/` no
   corre la CI).
 - **Criterios:** `npm run app` abre una ventana con el último cuaderno (o Cuadernos); la dirección no se ve; cerrar
-  la ventana cierra el servidor y los pty (sin huérfanos: `ps` limpio en Mac y Linux, Administrador de tareas en
+  la ventana cierra el servidor y los pty (sin huérfanos: `ps` limpio en Mac y Linux pasados 2 s, Administrador de tareas en
   Windows); una segunda instancia trae la ventana al frente; con 7331 ocupado arranca en otro puerto; la ventana aparece
   antes de resolver el entorno; si se mata el hijo, el padre lo relanza y la pantalla vuelve; si el hijo no arranca,
   hay diálogo y la app sale con el motivo en el registro; en el Mac,
@@ -200,7 +238,7 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
   hoy va a `console.error`.
 - **Tests:** `tests/electron-app.test.js` (`arrancar` con un Electron falso y un hijo falso: crea la ventana antes
   del entorno, lanza el hijo con el entorno resuelto, carga la URL de entrada al llegar el puerto, relanza si el hijo
-  muere después, sale con diálogo si muere antes o vence el tope, cierra en orden); `rutas.test.js`: `listen` con
+  muere después, no relanza si el hijo sale durante el cierre, sale con diálogo si muere antes o vence el tope, cierra en orden); `rutas.test.js`: `listen` con
   7331 ocupado acaba en otro puerto; `tests/electron-entorno.test.js` (`entornoDeLaShell` con una shell falsa que imprime ruido antes y después de los marcadores, otra
   que tarda más del tope → respaldo, otra fish; un test que carga `guardar` con un entorno dado y comprueba el que
   recibe la herramienta falsa); `tests/electron/ventana.test.js` con `_electron.launch`: abre, lee «Cuaderno de
@@ -274,7 +312,7 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
 
 ### T7 · CI: recorrido Electron en los tests y empaquetado a mano o por etiqueta
 - **Qué:** `tests.yml` añade el paso `npm run test:electron` en Linux con `xvfb-run` (y en Mac y Windows cuando
-  se lanza a mano), `ELECTRON_SKIP_BINARY_DOWNLOAD=1` donde no se corre; `empaquetar.yml` nuevo,
+  se lanza a mano), con un paso previo que baja el binario de Electron y lo cachea (`actions/cache` sobre `~/.cache/electron`); `empaquetar.yml` nuevo,
   `workflow_dispatch` y `push` de etiquetas `v*`, construye en `macos-latest` y `windows-latest` y sube los
   instaladores como artefactos del run (y como Release si es etiqueta). Dependabot: grupo `electron` mensual.
 - **Criterios:** PR en verde con el recorrido Electron; un `workflow_dispatch` deja `.dmg` y `.exe` descargables.
