@@ -61,3 +61,4 @@ test del índice comprueba que el fichero existe y que tiene un recorrido que em
 | 23 | La hoja (claro, oscuro, estrecho) y el índice de la nota, solo si cabe | `tests/navegador/indice.test.js` | índice: | sin kit |
 | 24 | Barra lateral plegable en escritorio: botón, Ctrl+\, recordada | `tests/navegador/lateral.test.js` | barra lateral: | sin kit |
 | 25 | La app de escritorio abre el último cuaderno en su ventana y al cerrar no deja nada | `tests/electron/ventana.test.js` | la app de escritorio: | sin kit · **paso propio** (`npm run test:electron`: necesita el binario de Electron) |
+| 26 | Abrir una carpeta en la app de escritorio: «Elegir carpeta…» (el diálogo del sistema), la carpeta en los argumentos y la de una segunda instancia; en la web no aparece el botón | `tests/electron/carpeta.test.js` | abrir carpeta en la app de escritorio: | sin kit · **paso propio** (`npm run test:electron`); lo puro, en `tests/electron-carpeta.test.js` |
