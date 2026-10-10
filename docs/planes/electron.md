@@ -244,6 +244,21 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
   recibe la herramienta falsa); `tests/electron/ventana.test.js` con `_electron.launch`: abre, lee «Cuaderno de
   ejemplo», cierra, el puerto queda libre. Script `test:electron`.
 - **Estimación:** un día. **Depende de:** spike.
+- **Hecha (2026-10-10, rama `electron`, pendiente de PR).** Lo que difiere de lo escrito arriba, y por qué: (1) la lógica del
+  hijo va en `electron/hijo.js` (`arrancarHijo`, probada en Node con un `parentPort` falso: `tests/electron-hijo.test.js`,
+  que es donde se prueba `EADDRINUSE` → `listen(0)`, no en `rutas.test.js`), y `servidor-hijo.js` queda como punto de
+  entrada de seis líneas; así el camino del puerto entra en el suelo de cobertura. (2) El chmod compartido es
+  `sistema.repararAyudantePty()` (test en `sistema.test.js`). (3) El cuaderno lo decide el padre con
+  `config.cuadernoAlArrancar` y viaja al hijo en `CUADERNO_CARPETA`. (4) Variables de prueba: `CUADERNO_USERDATA`
+  (lock) y `CUADERNO_SIN_DIALOGO` (el diálogo se anota y se da por cerrado). (5) La segunda muerte solo cuenta si pasa
+  en menos de un minuto de la anterior (tregua inyectable); pasado el minuto se vuelve a relanzar. (6) `shellLogin` es
+  de T2 y no se pasa aún; el test «carga `guardar` con un entorno dado» es de T3 (`guardar.test.js`), no de aquí.
+  (7) Sin test con fish real (no hay en el contenedor): la shell falsa cubre ruido, `-ilc`, tope y fallo. (8) El tiempo
+  de arranque no es criterio de test: lo mide `pruebas/arranque-electron.js` (833, 828 y 782 ms el 2026-10-10, como el
+  spike). (9) `entornoDeLaShell` es sincrónica (`spawnSync`, hasta 10 s): la ventana ya está pintada, pero el proceso
+  principal no atiende eventos mientras espera; si en el Mac se nota, pasarla a `spawn` asíncrono es un cambio local.
+  El recorrido `tests/electron/ventana.test.js` (fila 25 del ejemplo) abre, mata al hijo y comprueba el relanzado, y
+  cierra comprobando puerto libre y `ps` limpio.
 
 ### T2 · Lo del navegador que en la app cambia
 - **Qué:** `setWindowOpenHandler` y `will-navigate` con `esquemaPermitido`; `will-prevent-unload` con el diálogo
