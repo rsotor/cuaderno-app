@@ -112,10 +112,16 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
     const reciente = estado.muertes.some(m => t - m < tregua);
     estado.muertes.push(t);
     if (reciente) return fallo(`El servidor se ha caído dos veces en menos de un minuto (código ${codigo}).`);
+    estado.puerto = null;   // sin servidor: una carpeta que llegue ahora (open-file, segunda instancia) se encola en vez de pedirse a un puerto muerto
     const { env: entornoHijo, carpeta } = entornoDelHijo();
     anotar(`se relanza el servidor con el mismo entorno${carpeta ? ` y el cuaderno ${carpeta}` : ''}`);
     lanzarHijo(entornoHijo)
-      .then(({ puerto, token }) => { estado.puerto = puerto; estado.token = token; anotar(`servidor relanzado en el puerto ${puerto}: se recarga la ventana`); return estado.ventana && cargarVentana(estado.ventana); })
+      .then(async ({ puerto, token }) => {
+        estado.puerto = puerto; estado.token = token;
+        anotar(`servidor relanzado en el puerto ${puerto}: se recarga la ventana`);
+        if (!estado.ventana) return false;
+        return (await carpetas.despachar()) || cargarVentana(estado.ventana);   // como en el arranque: lo encolado se abre en el servidor nuevo, y eso ya recarga
+      })
       .catch(e => fallo(`El servidor no ha vuelto a arrancar: ${e.message}`));
   };
 

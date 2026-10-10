@@ -467,6 +467,26 @@ test('open-file antes de arrancar (Mac: carpeta arrastrada al icono al abrir la 
   for (const l of m.registro.lineas) assert.ok(!l.includes('t0k'), `el token en el registro: ${l}`);
 });
 
+test('una carpeta que llega durante un relanzado (el hijo nuevo aún sin puerto) no se pierde: se encola (el puerto está a null) y se abre en el servidor nuevo, que recarga la ventana una sola vez', async () => {
+  const m = await arrancado({ config: configFalsa({ recientes: [{ ruta: '/cuadernos/a', abierto: '2026-10-10' }] }) });
+  m.hijos[0].muere(1); await tic();
+  assert.equal(m.hijos.length, 2, 'relanzando');
+  assert.equal(m.estado.puerto, null, 'sin puerto mientras no escuche el nuevo');
+  m.electron.app.emitir('open-file', { preventDefault() {} }, '/cuadernos/llegada');
+  await tic(); await tic();
+  assert.deepEqual(m.peticiones, [], 'no se pide nada al puerto muerto');
+  assert.ok(m.registro.lineas.includes('[app] carpeta por open-file antes de que arranque el servidor: /cuadernos/llegada (se abrirá al arrancar)'));
+  const cargasAntes = m.pasos.filter(p => p.startsWith('loadURL')).length;
+  m.hijos[1].escucha(7332, 't0k'); await tic(); await tic(); await tic(); await tic();
+  assert.equal(m.peticiones.length, 1);
+  assert.equal(m.peticiones[0].port, 7332, 'al servidor nuevo');
+  assert.deepEqual(JSON.parse(m.peticiones[0].cuerpo), { ruta: '/cuadernos/llegada' });
+  assert.deepEqual(m.ventanas[0].cargas.at(-1), { url: 'http://localhost:7332/?t=t0k' });
+  assert.equal(m.pasos.filter(p => p.startsWith('loadURL')).length, cargasAntes + 1, 'una sola recarga: la de abrir la carpeta');
+  assert.ok(m.registro.lineas.includes('[app] cuaderno abierto en el servidor: /cuadernos/llegada; se recarga la ventana'));
+  assert.deepEqual(m.salidas, []);
+});
+
 test('la segunda instancia con una carpeta en sus argumentos la abre en el servidor (además de traer la ventana al frente); sin carpeta, solo el frente', async () => {
   const m = await arrancado({ existe: r => r.startsWith('/cuadernos/') });
   m.electron.app.emitir('second-instance', {}, ['/apps/electron', '.', 'relativa'], '/cuadernos');   // sin empaquetar, la segunda también lleva «.»
