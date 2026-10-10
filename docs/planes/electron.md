@@ -407,7 +407,7 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
   | ⌘T | Archivo → Nueva tarea | `nueva-tarea` | la casilla «Nueva tarea» si está Tareas; si no, el buscador con «+ » (Enter la añade) |
   | ⌘O | Archivo → Abrir nota… | `abrir-nota` | enfoca el buscador con el texto seleccionado: nombre de nota o carpeta del cuaderno, Enter abre |
   | ⌘F | Archivo → Buscar… | `buscar` | hoy lo mismo que ⌘O (el buscador busca por nombre y por texto); acción aparte porque divergirán |
-  | ⌘S | Archivo → Guardar | `guardar` | el botón Guardar (del repositorio) |
+  | ⌘S | Archivo → Guardar | `guardar` | el botón Guardar (del repositorio); con el editor abierto, Aplicar (escribe la nota) |
   | ⇧⌘O | Archivo → Abrir carpeta… | `abrir-carpeta` | cambiar de cuaderno con el diálogo del sistema (T4) |
   | — | Archivo → Cuadernos recientes | (el principal: `POST /api/abrir` y recarga, como open-file) | uno por reciente, el más nuevo primero; sin ninguno, «Sin recientes» deshabilitado |
   | ⌘, | Archivo → Ajustes… (en Mac, menú de la app) | `ajustes` | abre Ajustes |

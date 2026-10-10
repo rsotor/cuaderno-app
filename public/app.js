@@ -1017,13 +1017,14 @@ $('#ajustes form').addEventListener('change', async () => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ajustes').hidden) cerrarAjustes(); });
 
 // ---------- acciones del menú de la app de escritorio (electron/menu.js → preload → aquí; en la web no hay menú y nada cambia)
-// Cada acción hace lo que ya hace su botón o su tecla: Guardar es el botón Guardar (del repositorio, /api/guardar), Ajustes
+// Cada acción hace lo que ya hace su botón o su tecla: Guardar es el botón Guardar (del repositorio, /api/guardar) y, con el
+// editor de la nota abierto, Aplicar (escribe la nota, como ⌘Enter; decisión de Roberto, 2026-10-10), Ajustes
 // el de Ajustes, Abrir carpeta… el diálogo del sistema (elegirCarpeta), Abrir nota… y Buscar… lo de Ctrl K (el buscador) y Nueva tarea el
 // camino de siempre: la casilla «Nueva tarea» si está la pantalla de Tareas, y si no el buscador con «+» delante (Enter la
-// añade). Con un diálogo abierto la acción se ignora: ⌘S sobre el propio modal de Guardar no apila otro. Un atajo nuevo
+// añade). Con un diálogo abierto la acción se ignora: ⌘S sobre el propio modal de Guardar no apila otro, ni aplica la edición por detrás del de «¿Descartar lo escrito?». Un atajo nuevo
 // (plan de Electron, §8.1) es una fila en ATAJOS de menu.js y una aquí.
 const ACCIONES_APP = {
-  guardar: () => { const b = $('#btn-guardar'); if (!cuaderno()) return avisar('No hay ningún cuaderno abierto: nada que guardar.'); if (b.disabled) return avisar(b.title); b.click(); },
+  guardar: () => { if (edicion) return aplicarEdicion(); const b = $('#btn-guardar'); if (!cuaderno()) return avisar('No hay ningún cuaderno abierto: nada que guardar.'); if (b.disabled) return avisar(b.title); b.click(); },
   ajustes: abrirAjustes,
   'abrir-carpeta': elegirCarpeta,
   // Abrir nota… y Buscar… hoy son lo mismo (el buscador busca por nombre de nota y de carpeta y por el texto; Enter abre);

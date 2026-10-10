@@ -96,6 +96,39 @@ test('el menú de la app de escritorio: en castellano, con los atajos de la tabl
   assert.match(registro(), /\[app\] menú: guardar/);
 });
 
+test('el menú de la app de escritorio: con el editor de la nota abierto, Guardar (⌘S) la escribe como Aplicar (y con el «¿Descartar lo escrito?» abierto se ignora); sin editor sigue siendo el Guardar del repositorio', async () => {
+  await esperarTitulo(c);
+  const fichero = path.join(c.base, 'conceptos', 'capital.md');
+  const antes = fs.readFileSync(fichero, 'utf8');
+  await pagina.evaluate(() => { location.hash = '#/n/conceptos/capital.md'; });
+  await pagina.locator('#btn-editar').click();
+  await pagina.locator('#edicion-cm .cm-content').waitFor();
+  await pagina.keyboard.type('ESCRITO-CON-CMD-S ');
+  await hasta(() => pagina.evaluate(() => !document.querySelector('#edicion-aplicar').disabled), 'el editor no se da por sucio');
+  // Con «¿Descartar lo escrito?» abierto, la acción se ignora: ni se escribe la nota ni se cierra el editor.
+  await pagina.locator('#edicion-cancelar').click();
+  await pagina.locator('#descartar').waitFor({ state: 'visible' });
+  await pulsar('guardar');
+  await dormir(300);
+  assert.equal(fs.readFileSync(fichero, 'utf8'), antes, 'el atajo ha escrito la nota por detrás del diálogo');
+  assert.ok(await pagina.locator('#descartar').isVisible(), 'el diálogo se ha cerrado');
+  await pagina.locator('#descartar-seguir').click();
+  await pagina.locator('#descartar').waitFor({ state: 'hidden' });
+  // Con el editor abierto y sin diálogo: escribe la nota y cierra el editor (no abre el diálogo de Guardar del repositorio).
+  await pulsar('guardar');
+  await hasta(() => /ESCRITO-CON-CMD-S/.test(fs.readFileSync(fichero, 'utf8')), 'la nota no tiene lo escrito');
+  await pagina.locator('#edicion-cm').waitFor({ state: 'hidden' });
+  await pagina.locator('#btn-editar').waitFor({ state: 'visible' });
+  assert.equal(await pagina.locator('#guardar').isVisible(), false, 'no es el Guardar del repositorio');
+  // Sin el editor, vuelve a ser el Guardar del repositorio (la nota escrita es un cambio que contar).
+  await pulsar('guardar');
+  await pagina.locator('#guardar').waitFor({ state: 'visible' });
+  await pagina.locator('#guardar-cancelar').click();
+  await pagina.locator('#guardar').waitFor({ state: 'hidden' });
+  await pagina.locator('#link-inicio').click();
+  await esperarTitulo(c);
+});
+
 test('el menú de la app de escritorio: Abrir nota… y Buscar… enfocan el buscador con el texto seleccionado, Nueva tarea lo deja con «+» para añadirla con Enter, y Ajustes… abre Ajustes', async () => {
   await esperarTitulo(c);
   await pagina.locator('#buscador').fill('capital');
