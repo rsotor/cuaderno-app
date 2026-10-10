@@ -10,19 +10,23 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { entornoDeLaShell } = require('./entorno');
+const { crearAbridor } = require('./carpeta');
 const registroPorDefecto = require('./registro');
+const { version: VERSION } = require('../package.json');
 
 const FONDO = { claro: '#ffffff', oscuro: '#1e1e1e', auto: '#ffffff' };   // el fondo hasta que carga la pantalla; T2 lo afina con nativeTheme
 const TOPE_PUERTO = 15_000;   // ms que se espera el puerto del hijo
 const TREGUA = 60_000;        // ms: dos muertes del hijo en menos de esto y la app se rinde
-const PANTALLA = { width: 1280, height: 800, title: 'Cuaderno', webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, partition: 'cuaderno' } };   // sin preload hasta T4
+// El preload corre en el sandbox y solo expone window.cuadernoApp (electron/preload.js); la versión le llega como argumento.
+const PANTALLA = { width: 1280, height: 800, title: 'Cuaderno', webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, partition: 'cuaderno', preload: path.join(__dirname, 'preload.js'), additionalArguments: [`--cuaderno-version=${VERSION}`] } };
 // El token nunca va al registro ni a un diálogo: los mensajes de Electron de un loadURL fallido traen la URL entera.
 const sinToken = texto => String(texto).replace(/\?t=[0-9a-f]+/g, '?t=…');
 
 // Devuelve el estado (ventana, hijo, puerto, entorno, muertes, cerrando) y `listo`, la promesa del arranque (true si
 // la ventana cargó la app). Variables de prueba: CUADERNO_USERDATA (dónde va el lock de instancia única) y
-// CUADERNO_SIN_DIALOGO (el diálogo de error se anota y se da por cerrado).
-function arrancar({ electron, config, env = process.env, entorno = entornoDeLaShell, registro = registroPorDefecto, topePuerto = TOPE_PUERTO, tregua = TREGUA, ahora = Date.now, execPath = process.execPath, existe = r => fs.statSync(r).isDirectory() }) {
+// CUADERNO_SIN_DIALOGO (el diálogo de error se anota y se da por cerrado) y CUADERNO_DIALOGO_PRUEBA (electron/carpeta.js).
+// `argv`, `cwd` y `peticion` son del abridor de carpetas (carpeta.js), inyectables para los tests.
+function arrancar({ electron, config, env = process.env, entorno = entornoDeLaShell, registro = registroPorDefecto, topePuerto = TOPE_PUERTO, tregua = TREGUA, ahora = Date.now, execPath = process.execPath, existe = r => fs.statSync(r).isDirectory(), argv = process.argv, cwd = process.cwd(), peticion }) {
   const { app, BrowserWindow, utilityProcess, dialog } = electron;
   const anotar = linea => registro.escribir(`[app] ${sinToken(linea)}`);
   const estado = { ventana: null, hijo: null, puerto: null, token: null, entorno: null, muertes: [], cerrando: false, listo: null };
@@ -31,6 +35,8 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
   if (env.CUADERNO_USERDATA) app.setPath('userData', env.CUADERNO_USERDATA);
   if (!app.requestSingleInstanceLock()) { anotar('ya hay otra instancia abierta: esta sale y aquella pasa al frente'); app.quit(); estado.listo = Promise.resolve(false); return estado; }
   app.on('second-instance', () => { const v = estado.ventana; if (!v) return; if (v.isMinimized()) v.restore(); v.focus(); });
+  // Abrir carpeta por diálogo, argumentos, open-file y segunda instancia (carpeta.js); open-file se registra aquí, antes de ready.
+  const carpetas = crearAbridor({ electron, estado, anotar, existe, env, argv, cwd, peticion, recargar: () => (estado.ventana ? cargarVentana(estado.ventana) : false) });
 
   const urlEntrada = () => `http://localhost:${estado.puerto}/?t=${estado.token}`;
   const matarHijo = () => { if (estado.hijo) { try { estado.hijo.kill(); } catch { /* ya muerto */ } } };
@@ -49,12 +55,12 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
     app.exit(1);
   };
 
-  // El entorno del hijo: el de la shell con CUADERNO_NODE y el cuaderno que toca ahora (sin argumentos: el último
-  // reciente; abrir uno lo registra, así que tras una caída se vuelve al que estaba abierto, no al del arranque). El
-  // kit hereda este entorno entero, con CUADERNO_* y ELECTRON_RUN_AS_NODE: no se filtra a propósito, y
-  // CUADERNO_CONFIG_DIR TIENE que viajar (el hijo lee el token y los recientes de esa carpeta).
+  // El entorno del hijo: el de la shell con CUADERNO_NODE y el cuaderno que toca ahora (la carpeta de argv u open-file
+  // si hay una esperando; si no, el último reciente; abrir uno lo registra, así que tras una caída se vuelve al que
+  // estaba abierto, no al del arranque). El kit hereda este entorno entero, con CUADERNO_* y ELECTRON_RUN_AS_NODE: no
+  // se filtra a propósito, y CUADERNO_CONFIG_DIR TIENE que viajar (el hijo lee el token y los recientes de esa carpeta).
   const entornoDelHijo = () => {
-    const { carpeta, origen } = config.cuadernoAlArrancar(null, config.leer().recientes, existe);
+    const { carpeta, origen } = config.cuadernoAlArrancar(carpetas.tomar(), config.leer().recientes, existe);
     const e = { ...estado.entorno.env, CUADERNO_NODE: execPath };
     if (carpeta) e.CUADERNO_CARPETA = carpeta;
     return { env: e, carpeta, origen };
@@ -114,7 +120,8 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
       const { puerto, token } = await lanzarHijo(entornoHijo);
       estado.puerto = puerto; estado.token = token;
       anotar(`servidor en el puerto ${puerto}; ${carpeta ? `${origen === 'reciente' ? 'el último cuaderno' : 'la carpeta'}: ${carpeta}` : 'sin cuaderno: pantalla de cuadernos'}`);
-      return cargarVentana(ventana);
+      // Una carpeta llegada entre el fork y el puerto (open-file) se abre ahora en el servidor, y eso ya recarga la ventana.
+      return (await carpetas.despachar()) || cargarVentana(ventana);
     } catch (e) { fallo(e.message); return false; }
   });
 

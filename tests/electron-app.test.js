@@ -1,7 +1,9 @@
 'use strict';
 // El proceso principal de la app de escritorio (electron/app.js) con un Electron falso y un hijo falso: el orden del
 // arranque (ventana antes del entorno), qué recibe el hijo, la URL de entrada, el relanzado del hijo que muere, el
-// cierre (sin relanzar, también a medio arrancar) y los fallos con diálogo y salida, sin que el token se filtre.
+// cierre (sin relanzar, también a medio arrancar) y los fallos con diálogo y salida, sin que el token se filtre. Y lo
+// que app.js engancha de electron/carpeta.js: la carpeta de argv va al hijo, y una que llega después (open-file,
+// segunda instancia) se abre en el servidor con POST /api/abrir y recarga la ventana (lo fino, en electron-carpeta.test.js).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -11,10 +13,10 @@ const { arrancar, sinToken, FONDO } = require('../electron/app');
 const tic = () => new Promise(r => setImmediate(r));
 const esperar = ms => new Promise(r => setTimeout(r, ms));
 
-// Un Electron de mentira: lo que app.js usa de app, BrowserWindow, utilityProcess y dialog, anotando cada paso en `pasos`.
-// `fallosURL`: errores con los que loadURL rechaza, en orden, antes de empezar a cargar bien.
+// Un Electron de mentira: lo que app.js usa de app, BrowserWindow, utilityProcess, dialog e ipcMain, anotando cada paso en
+// `pasos`. `fallosURL`: errores con los que loadURL rechaza, en orden, antes de empezar a cargar bien.
 function electronFalso({ lock = true, fallosURL = [] } = {}) {
-  const pasos = [], ventanas = [], hijos = [], dialogos = [], salidas = [];
+  const pasos = [], ventanas = [], hijos = [], dialogos = [], salidas = [], canales = {};
   const eventos = new EventEmitter();
   let pid = 100;
   class BrowserWindow {
@@ -41,7 +43,8 @@ function electronFalso({ lock = true, fallosURL = [] } = {}) {
     quit() { pasos.push('quit'); salidas.push('quit'); eventos.emit('before-quit'); }, exit(c) { pasos.push(`exit ${c}`); salidas.push(c); },
   };
   const dialog = { showMessageBoxSync(o) { dialogos.push(o); pasos.push('diálogo'); return 0; } };
-  return { electron: { app, BrowserWindow, utilityProcess, dialog }, pasos, ventanas, hijos, dialogos, salidas };
+  const ipcMain = { handle(canal, f) { canales[canal] = f; } };
+  return { electron: { app, BrowserWindow, utilityProcess, dialog, ipcMain }, pasos, ventanas, hijos, dialogos, salidas, canales };
 }
 // Una configuración de mentira; `recientes` puede ser una función para que cambie entre el arranque y una caída.
 const configFalsa = ({ tema = 'auto', recientes = [] } = {}) => ({ leer: () => ({ tema, recientes: typeof recientes === 'function' ? recientes() : recientes }), cuadernoAlArrancar: require('../config').cuadernoAlArrancar });
@@ -49,13 +52,16 @@ const registroFalso = () => { const lineas = []; return { lineas, escribir: l =>
 // Un entorno de la shell de mentira: anota cuántas ventanas había al llamarlo y devuelve un PATH propio.
 const entornoFalso = (f, { PATH = '/shell/bin:/usr/bin' } = {}) => ({ env }) => { f.vistas = f.ventanas.length; return { env: { ...env, PATH, LANG: 'es_ES.UTF-8' }, origen: 'shell -lc', ms: 7, shell: '/bin/zsh' }; };
 
-// Monta un arranque: `lock` y `fallosURL` son del Electron falso; lo demás va a `arrancar`.
+// Monta un arranque: `lock` y `fallosURL` son del Electron falso; lo demás va a `arrancar`. Sin argumentos (argv solo
+// con el ejecutable y la app), toda ruta «existe», y las peticiones al hijo (POST /api/abrir) se anotan y contestan 200.
 function montar({ env = {}, config = configFalsa(), topePuerto = 500, lock, fallosURL, ...paraArrancar } = {}) {
   const f = electronFalso({ lock, fallosURL });
   const registro = registroFalso();
   const entorno = entornoFalso(f);
-  const estado = arrancar({ electron: f.electron, config, env: { PATH: '/usr/bin', ...env }, entorno, registro, topePuerto, execPath: '/apps/Cuaderno', existe: () => true, ...paraArrancar });
-  return { ...f, registro, estado, get vistas() { return f.vistas; } };
+  const peticiones = [];
+  const peticion = async (o, cuerpo) => { peticiones.push({ ...o, cuerpo }); return { status: 200, cuerpo: '{}' }; };
+  const estado = arrancar({ electron: f.electron, config, env: { PATH: '/usr/bin', ...env }, entorno, registro, topePuerto, execPath: '/apps/Cuaderno', existe: () => true, argv: ['/apps/electron', '.'], peticion, ...paraArrancar });
+  return { ...f, registro, estado, peticiones, get vistas() { return f.vistas; } };
 }
 // Un arranque ya con la app cargada en el puerto 7331.
 async function arrancado(opciones) { const m = montar(opciones); await tic(); m.hijos[0].escucha(7331, 't0k'); assert.equal(await m.estado.listo, true); return m; }
@@ -70,7 +76,7 @@ test('arranca en orden: userData de pruebas, instancia única, ventana con el fo
   const v = m.ventanas[0];
   assert.equal(v.opciones.backgroundColor, FONDO.oscuro);
   assert.equal(v.opciones.title, 'Cuaderno');
-  assert.deepEqual(v.opciones.webPreferences, { contextIsolation: true, nodeIntegration: false, sandbox: true, partition: 'cuaderno' });
+  assert.deepEqual(v.opciones.webPreferences, { contextIsolation: true, nodeIntegration: false, sandbox: true, partition: 'cuaderno', preload: path.join(__dirname, '..', 'electron', 'preload.js'), additionalArguments: [`--cuaderno-version=${require('../package.json').version}`] });
   assert.equal(v.cargas[0].fichero, path.join(__dirname, '..', 'electron', 'arrancando.html'));
   assert.equal(m.vistas, 1, 'la ventana ya existía cuando se resolvió el entorno');
   assert.equal(m.hijos.length, 1);
@@ -322,4 +328,64 @@ test('sin CUADERNO_USERDATA no se toca userData; por defecto el tope es 15 s y l
   const { TOPE_PUERTO, TREGUA } = require('../electron/app');
   assert.equal(TOPE_PUERTO, 15_000); assert.equal(TREGUA, 60_000);
   m.electron.app.emitir('before-quit');
+});
+
+test('con una carpeta en argv (saltando la app y los flags), el hijo arranca con ESA carpeta y no con el último reciente; y queda en el registro', async () => {
+  const recientes = [{ ruta: '/cuadernos/ultimo', abierto: '2026-10-10' }];
+  const m = montar({ config: configFalsa({ recientes }), argv: ['/apps/electron', '--inspect=0', '.', '--no-sandbox', '/cuadernos/pedido'], existe: r => r === '/cuadernos/pedido' || r === '/cuadernos/ultimo' });
+  await tic();
+  assert.equal(m.hijos[0].opciones.env.CUADERNO_CARPETA, '/cuadernos/pedido');
+  m.hijos[0].escucha(7331, 't0k');
+  assert.equal(await m.estado.listo, true);
+  assert.deepEqual(m.peticiones, [], 'antes de arrancar no hace falta pedir nada al servidor: va en el entorno');
+  assert.ok(m.registro.lineas.includes('[app] carpeta en los argumentos: /cuadernos/pedido'));
+  assert.ok(m.registro.lineas.includes('[app] servidor en el puerto 7331; la carpeta: /cuadernos/pedido'));
+  // Si el hijo se cae, el relanzado ya no lleva la carpeta de argv: vuelve al último reciente (abrirla la registró).
+  m.hijos[0].muere(1); await tic();
+  assert.equal(m.hijos[1].opciones.env.CUADERNO_CARPETA, '/cuadernos/ultimo');
+});
+
+test('open-file antes de arrancar (Mac: carpeta arrastrada al icono al abrir la app) sustituye al último reciente; open-file con la app abierta hace POST /api/abrir al hijo con la cookie del código y recarga la ventana', async () => {
+  const antes = montar({ config: configFalsa({ recientes: [{ ruta: '/cuadernos/ultimo', abierto: '2026-10-10' }] }) });
+  antes.electron.app.emitir('open-file', { preventDefault() {} }, '/cuadernos/arrastrada');   // llega antes de ready: la ventana aún no existe
+  await tic();
+  assert.equal(antes.hijos[0].opciones.env.CUADERNO_CARPETA, '/cuadernos/arrastrada');
+  antes.hijos[0].escucha(7331); await antes.estado.listo;
+  assert.deepEqual(antes.peticiones, []);
+  const m = await arrancado({ config: configFalsa({ recientes: [{ ruta: '/cuadernos/a', abierto: '2026-10-10' }] }) });
+  assert.equal(m.hijos[0].opciones.env.CUADERNO_CARPETA, '/cuadernos/a');
+  m.ventanas[0].minimizada = true;
+  m.electron.app.emitir('open-file', { preventDefault() {} }, '/cuadernos/otra');
+  await tic(); await tic(); await tic();
+  assert.equal(m.peticiones.length, 1);
+  const p = m.peticiones[0];
+  assert.equal(p.host, 'localhost'); assert.equal(p.port, 7331); assert.equal(p.method, 'POST'); assert.equal(p.path, '/api/abrir');
+  assert.equal(p.headers.cookie, 'cuaderno=t0k');
+  assert.deepEqual(JSON.parse(p.cuerpo), { ruta: '/cuadernos/otra' });
+  assert.deepEqual(m.ventanas[0].cargas.at(-1), { url: 'http://localhost:7331/?t=t0k' }, 'la ventana vuelve a entrar por la URL de entrada');
+  assert.deepEqual(m.pasos.slice(-3), ['restore', 'focus', 'loadURL http://localhost:7331/?t=t0k'], 'y pasa al frente');
+  assert.equal(m.hijos.length, 1, 'el hijo es el mismo: no se relanza nada');
+  assert.ok(m.registro.lineas.includes('[app] carpeta por open-file: /cuadernos/otra'));
+  assert.ok(m.registro.lineas.includes('[app] cuaderno abierto en el servidor: /cuadernos/otra; se recarga la ventana'));
+  for (const l of m.registro.lineas) assert.ok(!l.includes('t0k'), `el token en el registro: ${l}`);
+});
+
+test('la segunda instancia con una carpeta en sus argumentos la abre en el servidor (además de traer la ventana al frente); sin carpeta, solo el frente', async () => {
+  const m = await arrancado({ existe: r => r.startsWith('/cuadernos/') });
+  m.electron.app.emitir('second-instance', {}, ['/apps/electron', '.', 'relativa'], '/cuadernos');   // sin empaquetar, la segunda también lleva «.»
+  await tic(); await tic(); await tic();
+  assert.equal(m.peticiones.length, 1);
+  assert.deepEqual(JSON.parse(m.peticiones[0].cuerpo), { ruta: '/cuadernos/relativa' }, 'relativa al directorio de la segunda instancia');
+  assert.ok(m.registro.lineas.includes('[app] carpeta por segunda instancia: /cuadernos/relativa'));
+  m.electron.app.emitir('second-instance', {}, ['/apps/electron', '.', '--flag'], '/cuadernos');
+  await tic(); await tic();
+  assert.equal(m.peticiones.length, 1, 'sin carpeta no se pide nada');
+  assert.equal(m.pasos.at(-1), 'focus');
+});
+
+test('el canal IPC elegir-carpeta queda registrado y, desde nuestra pantalla, con CUADERNO_DIALOGO_PRUEBA devuelve esa ruta sin abrir diálogo', async () => {
+  const m = await arrancado({ env: { CUADERNO_DIALOGO_PRUEBA: '/cuadernos/elegida' } });
+  assert.equal(typeof m.canales['elegir-carpeta'], 'function');
+  assert.equal(await m.canales['elegir-carpeta']({ senderFrame: { url: 'http://localhost:7331/' } }), '/cuadernos/elegida');
+  await assert.rejects(m.canales['elegir-carpeta']({ senderFrame: { url: 'http://localhost:7332/' } }), /remitente no permitido/);
 });
