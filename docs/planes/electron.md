@@ -1,9 +1,11 @@
 # La app de escritorio con Electron: plan de trabajo
 
-**2026-10-10 · estado: plan redactado, pasado por abogado del diablo (§9: 15 objeciones, 14 aplicadas y 1
-aplicada en parte) y por una revisión de confirmación independiente (§10: «viable con cambios», 8 puntos, todos
-aplicados). **Spike técnico hecho el 2026-10-10 (§5, «Resultado»): las cuatro preguntas salen SÍ en Linux; se sigue
-con las tareas de §6.** Pendientes de Roberto: las decisiones de §8 y lo que solo se puede probar en su Mac.** Es el «siguiente bloque»
+**2026-10-10 · estado: T1 a T8 hechas en la rama `electron`, a falta del PR** (texto en `pr-electron.md`), de la etiqueta
+`web-0.1.0` sobre `main` (§7), de la ronda de crítica de diseño sobre las capturas de T8 (`docs/capturas/electron/`) y de la
+prueba de instalación en las máquinas reales (§5 bis). Plan redactado, pasado por abogado del diablo (§9: 15 objeciones, 14
+aplicadas y 1 aplicada en parte) y por una revisión de confirmación independiente (§10: «viable con cambios», 8 puntos, todos
+aplicados); spike técnico hecho (§5, «Resultado»: las cuatro preguntas SÍ en Linux); revisión de código de T2 y T4 (§11: 10
+hallazgos, 9 aplicados). Pendientes de Roberto: las decisiones 3 a 7 de §8 y lo que solo se puede probar en su Mac.** Es el «siguiente bloque»
 del plan vivo (§0, decisión de Roberto del 2026-10-09): una ventana propia para él y su pareja, sin firma ni
 tienda, «como mucho hacer público el repo». Sus palabras: «tenerlo en navegador me mata» y hay «un par de cosas
 que podríamos hacer mejor con atajos de app».
@@ -529,6 +531,35 @@ del diablo lo dobló con razones, §9 objeción 10). Cada tarea con pantalla tra
   para la app y para la web; lo de §7 (etiqueta `web-0.1.0`); ronda de crítica de diseño sobre capturas de la
   ventana (menú, Cuadernos con el botón, icono en el Dock, Diagnóstico) como manda AGENTS.md.
 - **Estimación:** medio día. **Depende de:** todo.
+- **Hecha (2026-10-10, rama `electron`, pendiente de PR).** Lo que hay: (1) **Plan vivo:** §0 con el bloque hecho hasta T7 y el
+  cierre, con cifras y lo que queda; §6 con las filas Plataforma (app de escritorio con Electron, la web sigue), Arranque (la
+  app arranca su servidor; sustituye al servicio del sistema), Teclado (los atajos de T5), Seguridad del servidor local (lo de
+  la app: sesión en memoria, origen del IPC, permisos, enlaces fuera, variables de prueba) y la fila nueva **Dependencias de
+  escritorio** (`electron` 44.7.0 y `electron-builder` 26.15.3 exactas, con el porqué y el coste; la justificación larga sigue
+  en §2); la fase 11 marcada como sustituida por Electron; §8 «Fuera» coherente (Tauri sigue fuera; firma, tiendas,
+  `autoUpdater` y arranque al iniciar sesión, fuera); Inbox con lo que anotaron las tareas (`formulario.js` ya estaba; el
+  intermitente de `lateral.test.js`/`comentar.test.js` al correr a la vez que los recorridos de Electron; `process.versions.electron`
+  visible para el kit). (2) **README:** «Arrancar» con la app (`npm run app`, el binario con `node node_modules/electron/install.js`,
+  atajos, Ayuda → registro y Diagnóstico, `INSTALAR.md`) y la web como estaba, y la línea de la etiqueta `web-0.1.0` escrita
+  para que valga cuando exista (hoy, «pendiente»). (3) **Capturas para la crítica de diseño**, `docs/capturas/electron/`
+  (convención de `docs/capturas/`: `despues-electron-2026-10-10-<tema>-<vista>.png`), con el Electron de verdad bajo
+  `xvfb-run` sobre una copia del cuaderno de ejemplo en `/tmp/cuaderno-ejemplo` (ruta corta y neutra; configuración en
+  `/tmp/cuaderno-config`), en claro y en oscuro (`tema` en el `config.json` temporal): la portada en la ventana (1280 × 800),
+  Cuadernos con «Elegir carpeta…», «Arrancando…» (capturada de verdad: una `SHELL` de login que tarda 4 s deja la página local
+  a la vista hasta que llega el puerto), el diálogo de **Diagnóstico** (Playwright no ve un `showMessageBox` nativo: se
+  fotografía la pantalla entera de Xvfb con `import -window root` de ImageMagick, sin gestor de ventanas, así que el diálogo
+  GTK sale en la esquina sobre la ventana; su texto, además, en `…-texto-diagnostico.txt`, sacado del registro, con la raíz
+  del repo como `<repo>` y una shell de login neutra para que el `PATH` no lleve las rutas del contenedor) y el **icono** a
+  128, 48 (entre otros iconos, como en el Dock) y 32 px sobre fondo claro y oscuro (un HTML con el PNG, renderizado con el
+  Chromium de Playwright). El **menú** nativo no se puede capturar bajo Xvfb: `menu.md` vuelca la plantilla de
+  `plantillaMenu` para `darwin` y `win32` como lista indentada con sus aceleradores y roles. Sin rutas reales ni nombres de
+  nadie. El script no entra en el repo (era de usar y tirar). (4) **Comprobación final**, en serie: `npm run test:cobertura` 234
+  tests (232 pass, 2 skipped), 99,33 % líneas / 90,98 % ramas / 97,54 % funciones; `xvfb-run -a npm run test:electron` 13 de 13;
+  `npm run test:navegador` 120 de 120; `tests/ejemplo.test.js` 5 de 5. (5) **Texto del PR** en `docs/planes/pr-electron.md`
+  (título, qué entra T1-T7, qué no, cómo probar, cifras, documentos). **Queda, fuera de T8:** la etiqueta `web-0.1.0` (la pone
+  Roberto antes del PR; decisión 3 de §8); la ronda de crítica de diseño sobre estas capturas, en una ronda aparte, con sus
+  objeciones atendidas o razonadas en el plan vivo antes del PR o como tarea nueva; abrir el PR y su primer run real de CI en
+  Mac y Windows (T7); §5 bis; el `grep` del kit real; las decisiones 4 a 7 de §8.
 
 ## 7. La versión web: viva, y marcada
 
