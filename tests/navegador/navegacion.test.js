@@ -372,6 +372,7 @@ test('barra superior: la miga es una navegación con la nota actual marcada; Edi
   await e.ir('#/n/conceptos/capital.md');
   assert.equal(await e.pagina.evaluate(() => document.querySelector('#miga').tagName), 'NAV', 'barra: #miga no es una navegación');
   assert.equal(await e.pagina.getAttribute('#miga', 'aria-label'), 'Ruta de la nota');
+  assert.equal(await e.pagina.getAttribute('#miga', 'title'), 'conceptos/capital.md', 'barra: la miga no lleva la ruta entera en el title (se corta con «…»)');
   assert.equal(await e.pagina.locator('#miga strong').getAttribute('aria-current'), 'page', 'barra: la nota actual no lleva aria-current');
   assert.equal(await e.pagina.locator('#miga button').count(), 0, 'barra: la miga sigue llevando botones');
   const editar = await e.pagina.evaluate(() => { const s = getComputedStyle(document.querySelector('#btn-editar')); return { borde: s.borderTopWidth, fondo: s.backgroundColor }; });

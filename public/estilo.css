@@ -2,7 +2,7 @@
 :root {
   --papel: #fbfbfc; --fondo: #f2f3f5; --mesa: #e6e8ec; --lateral: #e6e8ec; --tinta: #1b1b1f; --tinta-suave: #5a5e66; --linea: #dcdfe4;
   --acento: #1e5a96; --acento-suave: #e3ecfa; --sobre-acento: #ffffff; --ok: #15803d; --aviso: #7a4a00; --mal: #b91c1c;
-  --terminal-fondo: #1b1d23; --marca: #fff3a8; --borde-arbol: rgba(27,27,31,.28);
+  --terminal-fondo: #1b1d23; --marca: #fff3a8; --borde-arbol: rgba(27,27,31,.4);
   --rotulador: #ffe45c;   /* lo comentado; en claro, contra --tinta (#1b1b1f) 13,5:1 y contra --acento (#1e5a96) 5,6:1 */
   --c-info: var(--acento); --c-question: #6d28d9; --c-warning: var(--aviso); --c-danger: var(--mal); --c-success: var(--ok);
   --c-quote: #4b5563; --c-example: #0e7490; --c-tip: #0f766e; --c-comment: #9a3412;
@@ -554,3 +554,5 @@ button.comentado:focus-visible { outline: 2px solid var(--acento); outline-offse
 .flecha:disabled { opacity: 1; color: var(--apagado, var(--tinta-suave)); cursor: default; }
 .flecha .icono { width: 19px; height: 19px; stroke-width: 2; }
 @media (max-width: 760px) { .flechas { display: none; } }
+/* En táctil, objetivos más grandes en la cabecera y la fila de accesos (crítica 2026-10-13 A2, 4 y 5) */
+@media (pointer: coarse) { .estado-linea .icono-solo { width: 36px; height: 36px; min-height: 36px; } .paginas .solo { width: 36px; min-height: 36px; } .paginas a, .paginas button { min-height: 36px; } #btn-deshacer { margin-left: 4px; } }

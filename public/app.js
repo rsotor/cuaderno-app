@@ -371,6 +371,7 @@ async function abrirNotaTurno(ruta, lineaDestino, { desdeCambios = false } = {})
   if (turno !== turnoNota) return pendienteNota;
   ponerVista(ruta.split('/').pop());
   $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong aria-current="page">${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('');
+  $('#miga').title = ruta;   // la ruta entera, para cuando la miga se corta con «…» (crítica 2026-10-13 A2, 6)
   menuNota.generado = !!n.generado; $('#btn-mas-nota').hidden = false;   // una nota que regenera el profesor no se manda a la papelera desde aquí
   ancho(!!n.esHtml, !!n.esHtml);
   propiedadesActual = htmlPropiedades(n.frontmatter);

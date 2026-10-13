@@ -58,6 +58,7 @@ enlaces rotos.
 
 Los atajos de la app de escritorio (⌘ en Mac; Ctrl en Windows y Linux, salvo donde se dice Ctrl, que es Ctrl en los tres).
 La búsqueda es una modal: ⌘K, ⌘F y ⌘O la abren, en la app y en la web (Ctrl en Windows y en la web; con el foco en la terminal, Ctrl K es del shell y no la abre). Dentro: ↑ ↓ eligen, Enter abre la nota, ⌘↵ (Ctrl ↵) apunta lo escrito como tarea y Esc cierra. En la web, los demás atajos de la página siguen igual (Ctrl \ barra lateral, Ctrl ` terminal, E editar, C comentar).
+El gesto de deslizar con el trackpad (Atrás y Adelante) solo llega a la app si en Preferencias del Sistema › Trackpad › Más gestos la opción «Deslizar entre páginas» está en «con dos o tres dedos»; con la opción por defecto, macOS no lo manda como gesto y no se atiende.
 
 | Atajo | Menú | Qué hace |
 |---|---|---|
@@ -69,7 +70,7 @@ La búsqueda es una modal: ⌘K, ⌘F y ⌘O la abren, en la app y en la web (Ct
 | ⇧⌘O | Archivo → Abrir carpeta… | cambiar de cuaderno con el diálogo del sistema |
 | — | Archivo → Cuadernos recientes | los últimos cuadernos abiertos |
 | ⌘, | Archivo → Ajustes… (en Mac, Cuaderno → Ajustes…) | Ajustes |
-| ⌘[ / ⌘] | Ver → Atrás / Adelante | el historial de la ventana |
+| ⌘[ / ⌘] | Ver → Atrás / Adelante | el historial del cuaderno abierto (las flechas ‹ › de la barra superior, los botones laterales del ratón y, en Mac, deslizar entre páginas hacen lo mismo; nunca vuelve a «Arrancando…» ni a una nota de otro cuaderno) |
 | Ctrl \ | Ver → Barra lateral | plegar y desplegar la barra lateral |
 | Ctrl ` | Ver → Terminal | abrir y cerrar la terminal |
 | ⌘R, ⌘+, ⌘−, ⌘0 | Ver → Recargar, Acercar, Alejar, Tamaño real | los del sistema |
