@@ -57,6 +57,8 @@
   <symbol id="i-lupa" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
   <symbol id="i-nota" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5"/></symbol>
   <symbol id="i-mas" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-abajo" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-cuaderno" viewBox="0 0 24 24"><path d="M6 3h12v18H6zM6 7h12M9 3v18"/></symbol>
 </svg>
 <a class="saltar" href="#nota">Saltar al contenido</a>
@@ -64,7 +66,8 @@
 <div id="app">
   <aside id="lateral" aria-label="Cuaderno">
     <header class="marca">
-      <a href="#/cuadernos" class="nombre-cuaderno" title="Todos los cuadernos"><svg class="icono" aria-hidden="true"><use href="#i-cuaderno"/></svg><span id="nombre-curso">Cuaderno</span></a><button type="button" id="btn-plegar" class="secundario plegar" aria-label="Plegar la barra lateral" aria-expanded="true" aria-controls="lateral" title="Plegar la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button>
+      <button type="button" id="btn-cuaderno" class="nombre-cuaderno" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-cuaderno" title="Cambiar de cuaderno"><svg class="icono" aria-hidden="true"><use href="#i-cuaderno"/></svg><span id="nombre-curso">Cuaderno</span><svg class="icono chevron" aria-hidden="true"><use href="#i-abajo"/></svg></button><button type="button" id="btn-plegar" class="secundario plegar" aria-label="Plegar la barra lateral" aria-expanded="true" aria-controls="lateral" title="Plegar la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button>
+      <div id="menu-cuaderno" class="menu" role="menu" aria-label="Cuadernos" hidden></div>
       <div class="estado-linea"><span id="estado-git" role="status" aria-live="off"></span><button type="button" id="btn-guardar" class="secundario" title="Guardar en el repositorio del cuaderno">Guardar</button><button type="button" id="btn-traer" class="secundario icono-solo" title="Traer lo que cambió en otro sitio" aria-label="Traer"><svg class="icono" aria-hidden="true"><use href="#i-traer"/></svg></button><button type="button" id="btn-deshacer" class="secundario icono-solo" title="Deshacer el último guardado" aria-label="Deshacer"><svg class="icono" aria-hidden="true"><use href="#i-deshacer"/></svg></button></div></header>
     <button type="button" id="btn-buscar" class="buscar-disparador" aria-haspopup="dialog" title="Buscar una nota o apuntar una tarea"><svg class="icono" aria-hidden="true"><use href="#i-lupa"/></svg><span class="texto">Buscar…</span><span class="pista-tecla" id="btn-buscar-pista"></span></button>
     <nav class="paginas" aria-label="Páginas">

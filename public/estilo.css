@@ -77,8 +77,22 @@ body:has(#aviso-reinicio:not([hidden])) #app { flex: 1; min-height: 0; height: a
 #app { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-rows: 1fr auto; height: 100vh; }
 #lateral { grid-row: 1 / 3; background: var(--lateral); border-right: 1px solid var(--linea); display: flex; flex-direction: column; min-height: 0; }
 .marca { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 12px 12px 6px; }
-.marca a { display: flex; gap: 8px; align-items: center; font-weight: 650; color: inherit; text-decoration: none; border-radius: var(--radio); min-height: 28px; min-width: 0; margin-right: 36px; }   /* el sitio del botón de plegar, a la derecha */
-.marca a span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* El nombre del cuaderno es el botón que abre el selector (Notion, Linear); a la derecha, el sitio del botón de plegar */
+.nombre-cuaderno { align-self: flex-start; max-width: calc(100% - 36px); justify-content: flex-start; gap: 8px; border: 0; background: none; padding: 3px 6px; min-height: 28px; font-weight: 650; color: var(--tinta); }
+.nombre-cuaderno:hover, .nombre-cuaderno[aria-expanded="true"] { background: rgba(127,127,127,.16); }
+.nombre-cuaderno #nombre-curso { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nombre-cuaderno .chevron { width: 15px; height: 15px; stroke-width: 2; color: var(--tinta-suave); }
+/* Menús desplegables (selector de cuaderno y «…» de la nota): papel, línea, sombra; las filas se llegan con las flechas */
+.menu { position: absolute; z-index: 30; min-width: 236px; max-width: calc(100% - 24px); background: var(--papel); border: 1px solid var(--linea); border-radius: 8px; box-shadow: var(--sombra); padding: 4px; }
+.menu [role^="menuitem"] { display: flex; width: 100%; justify-content: flex-start; align-items: center; border: 0; background: none; padding: 7px 10px; gap: 10px; color: var(--tinta); font-weight: 400; text-align: left; border-radius: var(--radio); }
+.menu [role^="menuitem"]:hover, .menu [role^="menuitem"]:focus-visible { background: rgba(127,127,127,.16); }
+.menu [role^="menuitem"][aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+.menu [role^="menuitem"] .texto { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu [role^="menuitem"] .icono { color: var(--tinta-suave); }
+.menu [role^="menuitem"] .marcado { margin-left: auto; color: var(--acento); }
+.menu hr { border: 0; border-top: 1px solid var(--linea); margin: 4px 2px; }
+.menu .menu-titulo { padding: 6px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--tinta-suave); }
+#menu-cuaderno { left: 12px; top: 44px; }
 /* La línea del estado (Roberto, 2026-10-13): texto corto que encoge y se corta con «…» (el entero, en el title), y los botones, que no encogen nunca.
    El texto de la cabecera va en em sobre la letra del cuerpo (el ajuste «Letra» y el 200 % lo agrandan); los iconos y su caja, en px. */
 .estado-linea { display: flex; align-items: center; gap: 6px; font-size: .8667em; }

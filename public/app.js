@@ -982,8 +982,12 @@ async function abrirCuadernos() {
   $('#panel').innerHTML = `<h1>Cuadernos</h1><p class="resumen">Cada cuaderno es una carpeta de notas con su propio repositorio. Abre uno reciente o escribe la ruta de otra carpeta.</p>
     <form class="nueva-tarea" id="abrir-carpeta"><label class="oculto" for="ruta-carpeta">Ruta de la carpeta</label><input id="ruta-carpeta" placeholder="Ruta de la carpeta del cuaderno, por ejemplo ~/cursos/finanzas" autocomplete="off"><button type="submit">Abrir</button></form>${recientes}`;
 }
+// El cuaderno que esta pestaña acaba de pedir abrir: alCambiarDisco no dice «otra pestaña ha abierto otro cuaderno» de lo que hizo ella misma
+// (el aviso de /api/abrir llega por el socket antes que su respuesta). La marca se borra al usarla o a los 10 s.
+let cuadernoPedido = null;
 async function abrirCarpeta(ruta) {
-  try { info = await api('/api/abrir', { ruta }); } catch (e) { avisarError('No se ha podido abrir esa carpeta.', e.message); return; }
+  cuadernoPedido = { ruta, hasta: Date.now() + 10000 };
+  try { info = await api('/api/abrir', { ruta }); } catch (e) { cuadernoPedido = null; avisarError('No se ha podido abrir esa carpeta.', e.message); return; }
   cerrarSesiones();   // las terminales eran del cuaderno anterior (el servidor ya ha matado sus ptys)
   await cargarCuaderno();
   location.hash = cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/';
@@ -1004,6 +1008,46 @@ $('#panel').addEventListener('click', async e => {
   const b = e.target.closest('button[data-olvidar]'); if (b) { await api('/api/olvidar', { ruta: b.dataset.olvidar }); abrirCuadernos(); }
 });
 $('#panel').addEventListener('submit', e => { if (e.target.id !== 'abrir-carpeta') return; e.preventDefault(); const v = e.target.querySelector('input').value.trim(); if (v) abrirCarpeta(v); });
+
+// ---------- menús desplegables: el selector de cuaderno y el «…» de la nota (WAI-ARIA menu button)
+// El botón abre; el foco entra en la fila marcada (o la primera); ↑ ↓ con vuelta, Inicio y Fin; Esc cierra y devuelve el foco al botón; Tab y un
+// clic fuera cierran. Las filas son botones (Enter y Espacio ya los pulsan); quien usa el menú escucha el clic de sus filas y llama a cerrar().
+function enlazarMenu(boton, menu, { alAbrir = null } = {}) {
+  const filas = () => [...menu.querySelectorAll('[role^="menuitem"]')];
+  const mover = i => { const l = filas(); if (!l.length) return; const k = (i + l.length) % l.length; l.forEach((x, j) => { x.tabIndex = j === k ? 0 : -1; }); l[k].focus(); };
+  const cerrar = (enfocar = true) => { if (menu.hidden) return; menu.hidden = true; boton.setAttribute('aria-expanded', 'false'); if (enfocar) boton.focus(); };
+  async function abrir() {
+    if (alAbrir) { try { await alAbrir(); } catch { return; } }
+    menu.hidden = false; boton.setAttribute('aria-expanded', 'true');
+    const marcada = filas().findIndex(x => x.getAttribute('aria-checked') === 'true');
+    mover(marcada >= 0 ? marcada : 0);
+  }
+  boton.addEventListener('click', () => (menu.hidden ? abrir() : cerrar()));
+  menu.addEventListener('keydown', e => {
+    const l = filas(), i = l.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); mover(i + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); mover(i < 0 ? -1 : i - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); mover(0); }
+    else if (e.key === 'End') { e.preventDefault(); mover(l.length - 1); }
+    else if (e.key === 'Escape') { e.preventDefault(); cerrar(); }
+    else if (e.key === 'Tab') cerrar();   // el foco vuelve al botón y el Tab sigue desde él
+  });
+  document.addEventListener('click', e => { if (!menu.hidden && !menu.contains(e.target) && !boton.contains(e.target)) cerrar(false); });
+  return { abrir, cerrar, cerrado: () => menu.hidden };
+}
+// El selector (el nombre del cuaderno): los recientes, el abierto marcado, el que ya no existe deshabilitado, y «Abrir carpeta…» (la
+// app, el diálogo del sistema; la web, la pantalla de Cuadernos). La lista va sin el estado de git (/api/cuadernos?sin-git=1).
+const filaCuaderno = c => `<button type="button" role="menuitemradio" tabindex="-1" aria-checked="${c.abiertoAhora}" data-ruta="${esc(c.ruta)}" title="${c.existe ? esc(c.ruta) : 'No está en esta ruta'}"${c.existe ? '' : ' aria-disabled="true"'}>${icono('cuaderno')}<span class="texto">${esc(c.nombre)}</span>${c.abiertoAhora ? icono('check').replace('class="icono"', 'class="icono marcado"') : ''}</button>`;
+const menuCuaderno = enlazarMenu($('#btn-cuaderno'), $('#menu-cuaderno'), { alAbrir: async () => {
+  const lista = await api('/api/cuadernos?sin-git=1');
+  $('#menu-cuaderno').innerHTML = `<div class="menu-titulo" role="presentation">Recientes</div>${lista.map(filaCuaderno).join('')}<hr><button type="button" role="menuitem" tabindex="-1" data-abrir-carpeta="1">${icono('carpeta')}<span class="texto">Abrir carpeta…</span></button>`;
+} });
+$('#menu-cuaderno').addEventListener('click', e => {
+  const b = e.target.closest('[role^="menuitem"]'); if (!b || b.getAttribute('aria-disabled') === 'true') return;
+  menuCuaderno.cerrar();
+  if (b.dataset.abrirCarpeta) { if (enApp()) elegirCarpeta(); else location.hash = '#/cuadernos'; return; }
+  if (!cuaderno() || b.dataset.ruta !== cuaderno().ruta) abrirCarpeta(b.dataset.ruta);
+});
 
 // ---------- guardar / traer / deshacer
 function abrirModal(id, primero) { foco = document.activeElement; $(id).hidden = false; sincronizarInerte(); if (primero) $(primero).focus(); }
@@ -1174,7 +1218,7 @@ window.addEventListener('hashchange', () => {
 // El socket de cambios se reabre solo si se cae (el Mac se duerme, el servidor de Electron se relanza): espera creciente
 // de 0,5 s hasta 10 s, un solo socket y un solo temporizador a la vez; al volver a abrir resincroniza como si hubiera
 // llegado un cambio, para recoger lo que cambió mientras estaba caído.
-async function alCambiarDisco() { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); pintarArbol(arbol); refrescarBusqueda(); if (escribiendo) { /* lo está escribiendo la propia app: aplicarEdicion repinta al acabar */ } else if (rutaActual && !Comentar.ocupado() && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual, null, { desdeCambios: true }); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }
+async function alCambiarDisco() { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { const propio = !!(cuadernoPedido && cuaderno() && cuadernoPedido.ruta === cuaderno().ruta && Date.now() < cuadernoPedido.hasta); cuadernoPedido = null; if (!propio) avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); pintarArbol(arbol); refrescarBusqueda(); if (escribiendo) { /* lo está escribiendo la propia app: aplicarEdicion repinta al acabar */ } else if (rutaActual && !Comentar.ocupado() && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual, null, { desdeCambios: true }); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }
 let cambiosWs = null, cambiosEspera = 500, cambiosTemporizador = null, cambiosAbierto = false;
 function conectarCambios() {
   cambiosTemporizador = null;

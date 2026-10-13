@@ -115,3 +115,101 @@ for (const tema of ['claro', 'oscuro']) {
     } finally { await e.pagina.evaluate(() => { delete document.documentElement.dataset.tema; }); }
   });
 }
+
+// ---------- el selector de cuaderno (T2.2)
+
+const { crearCuaderno } = require('../ayuda');
+const pedirAbrir = (ruta, pagina = e.pagina) => pagina.request.post(`${e.base}/api/abrir`, { data: { ruta }, headers: { origin: e.base } });
+const nombreDe = ruta => path.basename(ruta);
+const enfocado = (pagina = e.pagina) => pagina.evaluate(() => document.activeElement && (document.activeElement.id || `${document.activeElement.tagName}.${document.activeElement.textContent.trim().slice(0, 30)}`));
+// Deja en recientes: el de las pruebas (abierto), otro y un tercero que ya no existe.
+async function prepararRecientes() {
+  const otro = crearCuaderno({ kit: false }), tercero = crearCuaderno({ kit: false });
+  await pedirAbrir(tercero.raiz); await pedirAbrir(otro.raiz); await pedirAbrir(e.c.raiz);
+  tercero.borrar();
+  await e.ir('#/n/conceptos/capital.md');
+  await e.pagina.waitForTimeout(500);   // el aviso de «otro cuaderno» de las llamadas de arriba, si llegara, ya ha pasado
+  const olvidar = ruta => e.pagina.request.post(`${e.base}/api/olvidar`, { data: { ruta }, headers: { origin: e.base } });
+  return { otro, tercero, limpiar: async () => { await olvidar(tercero.raiz); await olvidar(otro.raiz); otro.borrar(); } };
+}
+
+test('selector: el nombre abre un menú con los recientes (el abierto marcado, el que ya no existe deshabilitado); ↓ y Enter abren el otro sin el aviso de «otra pestaña», y si otra pestaña cambia después, sí sale', async () => {
+  const r = await prepararRecientes();
+  try {
+    const boton = e.pagina.locator('#btn-cuaderno');
+    assert.equal(await boton.getAttribute('aria-haspopup'), 'menu', 'selector: el nombre no anuncia un menú');
+    assert.equal(await boton.getAttribute('aria-expanded'), 'false');
+    await boton.click();
+    await visible(e.pagina.locator('#menu-cuaderno'), 'selector', 'el menú de cuadernos');
+    assert.equal(await boton.getAttribute('aria-expanded'), 'true');
+    assert.equal(await e.pagina.getAttribute('#menu-cuaderno', 'role'), 'menu');
+    const radios = e.pagina.locator('#menu-cuaderno [role="menuitemradio"]');
+    await hasta(async () => (await radios.count()) === 3, 'selector', 'el menú no lista los tres recientes');
+    const filas = await radios.evaluateAll(l => l.map(x => ({ texto: x.textContent.trim(), marcado: x.getAttribute('aria-checked'), deshabilitado: x.getAttribute('aria-disabled'), titulo: x.title })));
+    assert.deepEqual(filas.map(f => f.marcado), ['true', 'false', 'false'], 'selector: el cuaderno abierto debe ser el único marcado');
+    assert.equal(filas[0].texto, nombreDe(e.c.raiz)); assert.equal(filas[1].texto, nombreDe(r.otro.raiz));
+    assert.deepEqual(filas.map(f => f.deshabilitado), [null, null, 'true'], 'selector: solo el que no existe va deshabilitado');
+    assert.equal(filas[2].titulo, 'No está en esta ruta', 'selector: el reciente ausente no dice por qué');
+    assert.match(await e.pagina.locator('#menu-cuaderno').textContent(), /Recientes/);
+    assert.match(await e.pagina.locator('#menu-cuaderno [role="menuitem"]').last().textContent(), /Abrir carpeta…/, 'selector: «Abrir carpeta…» no es el último');
+    // Teclado: el foco entra en el cuaderno marcado; ↓ baja, ↑ vuelve, con vuelta; Fin y Inicio.
+    assert.equal(await e.pagina.evaluate(() => document.activeElement.getAttribute('aria-checked')), 'true', 'selector: el foco no entra en el cuaderno abierto');
+    await e.pagina.keyboard.press('ArrowUp');
+    assert.match(await enfocado(), /Abrir carpeta/, 'selector: ↑ desde el primero no da la vuelta al último');
+    await e.pagina.keyboard.press('ArrowDown');
+    assert.equal(await e.pagina.evaluate(() => document.activeElement.getAttribute('aria-checked')), 'true', 'selector: ↓ desde el último no da la vuelta al primero');
+    await e.pagina.keyboard.press('End'); assert.match(await enfocado(), /Abrir carpeta/);
+    await e.pagina.keyboard.press('Home'); assert.equal(await e.pagina.evaluate(() => document.activeElement.getAttribute('aria-checked')), 'true');
+    await e.pagina.keyboard.press('ArrowDown');
+    assert.match(await enfocado(), new RegExp(nombreDe(r.otro.raiz)), 'selector: ↓ no llega al segundo reciente');
+    await e.pagina.keyboard.press('Enter');
+    await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(nombreDe(r.otro.raiz)), 'selector', 'el nombre del cuaderno elegido en la barra');
+    await oculto(e.pagina.locator('#menu-cuaderno'), 'selector', 'el menú tras elegir');
+    await e.pagina.waitForTimeout(900);   // la recarga en vivo de la propia apertura llega después
+    assert.equal(await e.pagina.locator('.aviso-flotante', { hasText: 'ha abierto otro cuaderno' }).count(), 0, 'selector: elegir un reciente enseña el aviso de «otra pestaña», que no lo es');
+    // Otra pestaña cambia de cuaderno después: ese aviso sí sale.
+    await pedirAbrir(e.c.raiz);
+    await visible(e.pagina.locator('.aviso-flotante', { hasText: 'ha abierto otro cuaderno' }), 'selector', 'el aviso cuando OTRA pestaña cambia de cuaderno');
+    await conTexto(e.pagina.locator('#nombre-curso'), new RegExp(nombreDe(e.c.raiz)), 'selector', 'de vuelta al cuaderno de las pruebas');
+    // Un reciente ausente no hace nada al pulsarlo.
+    await boton.click(); await visible(e.pagina.locator('#menu-cuaderno'), 'selector', 'el menú otra vez');
+    await e.pagina.locator('#menu-cuaderno [role="menuitemradio"][aria-disabled="true"]').click({ force: true });
+    await e.pagina.waitForTimeout(300);
+    assert.equal((await e.pagina.locator('#nombre-curso').textContent()).trim(), nombreDe(e.c.raiz), 'selector: pulsar un reciente que no existe cambió el cuaderno');
+    await e.pagina.keyboard.press('Escape');
+  } finally { await r.limpiar(); }
+});
+
+test('selector: Esc cierra y devuelve el foco al nombre; Tab y un clic fuera lo cierran; en la web «Abrir carpeta…» lleva a Cuadernos', async () => {
+  await e.ir('#/n/conceptos/capital.md');
+  const boton = e.pagina.locator('#btn-cuaderno');
+  await boton.click(); await visible(e.pagina.locator('#menu-cuaderno'), 'selector', 'el menú');
+  await e.pagina.keyboard.press('Escape');
+  await oculto(e.pagina.locator('#menu-cuaderno'), 'selector', 'el menú tras Esc');
+  assert.equal(await enfocado(), 'btn-cuaderno', 'selector: Esc no devuelve el foco al nombre');
+  assert.equal(await boton.getAttribute('aria-expanded'), 'false');
+  await boton.click(); await visible(e.pagina.locator('#menu-cuaderno'), 'selector', 'el menú');
+  await e.pagina.keyboard.press('Tab');
+  await oculto(e.pagina.locator('#menu-cuaderno'), 'selector', 'el menú tras Tab');
+  await boton.click(); await visible(e.pagina.locator('#menu-cuaderno'), 'selector', 'el menú');
+  await e.pagina.locator('#nota').click({ position: { x: 20, y: 20 } });
+  await oculto(e.pagina.locator('#menu-cuaderno'), 'selector', 'el menú tras un clic fuera');
+  await boton.click();
+  await e.pagina.locator('#menu-cuaderno [role="menuitem"]', { hasText: 'Abrir carpeta…' }).click();
+  await hasta(() => e.pagina.evaluate(() => location.hash === '#/cuadernos'), 'selector', 'en la web «Abrir carpeta…» no lleva a #/cuadernos');
+  await oculto(e.pagina.locator('#menu-cuaderno'), 'selector', 'el menú tras «Abrir carpeta…»');
+});
+
+test('selector: en la app, «Abrir carpeta…» llama al diálogo del sistema (elegirCarpeta)', async () => {
+  const ctx = await e.navegador.newContext({ viewport: { width: 1280, height: 800 } });
+  await ctx.addInitScript(() => { window.__elegirCarpeta = 0; window.cuadernoApp = { plataforma: 'darwin', alAccion() {}, elegirCarpeta: async () => { window.__elegirCarpeta++; return null; } }; });
+  const p = await ctx.newPage(); p.setDefaultTimeout(8000);
+  try {
+    await p.goto(e.server.urlEntrada());
+    await p.goto(`${e.base}/#/n/conceptos/capital.md`); await p.reload(); await p.locator('#miga strong').waitFor();
+    await p.locator('#btn-cuaderno').click();
+    await p.locator('#menu-cuaderno [role="menuitem"]', { hasText: 'Abrir carpeta…' }).click();
+    await hasta(async () => (await p.evaluate(() => window.__elegirCarpeta)) === 1, 'selector', 'en la app «Abrir carpeta…» no llama a elegirCarpeta');
+    assert.equal(await p.evaluate(() => location.hash), '#/n/conceptos/capital.md', 'selector: en la app «Abrir carpeta…» cambió de pantalla');
+  } finally { await ctx.close(); }
+});

@@ -93,7 +93,8 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
   // Una ruta del índice está oculta si lo está ella o una carpeta que la contiene (solo en la app; ver config.ocultar).
   const oculta = r => { if (!estado.cuaderno) return false; const l = config.ocultas(estado.cuaderno.raiz); return l.some(o => r === o || r.startsWith(o + '/')); };
   const comandoProfesor = () => { const k = estado.kit; if (!k) return null; return k.tipo === 'kit' ? k.comando : (k.tipo === 'carpeta' ? config.leer().comando_agente || null : null); };
-  const cuadernos = () => config.leer().recientes.map(r => ({ ...r, existe: fs.existsSync(r.ruta), abiertoAhora: !!estado.cuaderno && estado.cuaderno.raiz === r.ruta, git: fs.existsSync(r.ruta) ? estadoGit(r.ruta) : null }));
+  // `sinGit`: sin el estado de git de cada reciente (uno síncrono por cuaderno, hasta 4 s cada uno): lo pide el selector de cuaderno, que se abre a menudo.
+  const cuadernos = (sinGit = false) => config.leer().recientes.map(r => { const existe = fs.existsSync(r.ruta), c = { ...r, existe, abiertoAhora: !!estado.cuaderno && estado.cuaderno.raiz === r.ruta }; if (!sinGit) c.git = existe ? estadoGit(r.ruta) : null; return c; });
   const conCuaderno = () => { if (!estado.cuaderno) throw new ErrorPeticion('no hay ningún cuaderno abierto'); return estado.cuaderno; };
   // Guardar, traer y deshacer de uno en uno: dos a la vez sobre el mismo repo se pisarían.
   let ocupado = false;
@@ -156,7 +157,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
       if (p.startsWith('/public/')) return servir(res, path.join(PUBLICO, path.normalize(p.slice(8))));
       if (p.startsWith('/assets/')) return servir(res, path.join(NODE_MODULES, path.normalize(p.slice(8))));
       if (p === '/api/info') return json(res, info());
-      if (p === '/api/cuadernos') return json(res, cuadernos());
+      if (p === '/api/cuadernos') return json(res, cuadernos(url.searchParams.get('sin-git') === '1'));
       if (p === '/api/arbol') return json(res, conCuaderno().arbol().filter(r => !oculta(r)));
       if (p === '/api/ocultas') return json(res, config.ocultas(conCuaderno().raiz));
       if (p === '/api/titulos') return json(res, conCuaderno().titulos());
