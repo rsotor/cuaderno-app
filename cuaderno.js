@@ -403,7 +403,8 @@ class Cuaderno {
   vigilar(alCambiar) {
     let timer = null;
     try {
-      this.vigilante = fs.watch(this.base, { recursive: true }, (_, f) => {
+      this.vigilante = fs.watch(this.base, { recursive: true }, (ev, f) => {
+        console.error('[vigila]', Date.now(), ev, f);
         // Nada oculto, en ninguna parte de la ruta: .git/index.lock (cada `git status` lo crea) o .obsidian/ no son cambios del cuaderno.
         if (f && (f.includes('node_modules') || f.split(/[\\/]/).some(s => s.startsWith('.')))) return;
         this.invalidar();
