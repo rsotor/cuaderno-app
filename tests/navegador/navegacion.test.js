@@ -329,3 +329,92 @@ test('pie: en la app, Ajustes no se pinta en el lateral y la acción del menú (
     await oculto(p.locator('#ajustes'), 'pie', 'Ajustes tras cerrarlos');
   } finally { await ctx.close(); }
 });
+
+// ---------- la barra superior: Editar sin recuadro y el menú «…» de la nota (T2.5)
+
+const LARGA = 'navegacion/una-nota-con-un-nombre-muy-largo-para-la-barra-superior.md';
+// Dónde están Editar y «…» (borde derecho de cada uno) y si la miga se corta.
+const medirBarra = () => e.pagina.evaluate(() => {
+  const r = s => { const el = document.querySelector(s); if (!el || el.hidden) return null; const x = el.getBoundingClientRect(); return { x: x.x, derecha: x.right, cy: x.y + x.height / 2, w: x.width }; };
+  const miga = document.querySelector('#miga');
+  return { editar: r('#btn-editar'), mas: r('#btn-mas-nota'), miga: r('#miga'), cortada: miga.scrollWidth > miga.clientWidth, strong: r('#miga strong'), barra: r('.miga-barra'), desplegar: r('#btn-desplegar') };
+});
+
+test('barra superior: Editar queda en el mismo sitio (±1 px) en la portada, en capital, en interés y en la nota de nombre larguísimo; la miga larga se corta con «…» sin empujar a Editar ni al menú', async () => {
+  const sitios = [];
+  for (const ruta of ['#/', '#/n/conceptos/capital.md', '#/n/conceptos/interes.md', `#/n/${LARGA}`]) {
+    await e.ir(ruta);
+    await visible(e.pagina.locator('#btn-editar'), 'barra', `Editar en ${ruta}`);
+    const m = await medirBarra();
+    sitios.push({ ruta, ...m });
+  }
+  for (const s of sitios) {
+    assert.ok(Math.abs(s.editar.x - sitios[0].editar.x) <= 1, `barra: Editar está en x=${s.editar.x} en ${s.ruta} y en x=${sitios[0].editar.x} en la portada`);
+    assert.ok(Math.abs(s.mas.derecha - sitios[0].mas.derecha) <= 1, `barra: «…» se mueve entre ${s.ruta} y la portada`);
+  }
+  // Estrecho (800 px con el lateral abierto): la miga larga no cabe, se corta con «…» y todo lo demás se queda donde estaba.
+  await e.pagina.setViewportSize({ width: 800, height: 700 });
+  try {
+    await e.ir('#/n/conceptos/capital.md');
+    const corta = await medirBarra();
+    await e.ir(`#/n/${LARGA}`);
+    const larga = await medirBarra();
+    assert.equal(corta.cortada, false, 'barra: la miga corta se corta');
+    assert.equal(larga.cortada, true, 'barra: la miga larguísima no se corta con «…»');
+    assert.equal(await e.pagina.evaluate(() => getComputedStyle(document.querySelector('#miga')).textOverflow), 'ellipsis');
+    assert.ok(Math.abs(larga.editar.x - corta.editar.x) <= 1, `barra: la miga larga empuja a Editar (x=${larga.editar.x}, con la corta ${corta.editar.x})`);
+    assert.ok(Math.abs(larga.mas.derecha - corta.mas.derecha) <= 1, 'barra: la miga larga empuja al menú «…»');
+    assert.ok(larga.miga.derecha <= larga.editar.x + 0.5, 'barra: la miga pisa a Editar');
+  } finally { await e.pagina.setViewportSize({ width: 1280, height: 800 }); }
+});
+
+test('barra superior: la miga es una navegación con la nota actual marcada; Editar va sin recuadro; «…» abre el menú con Finder, ruta, Ocultar y la papelera al final en rojo, y Esc devuelve el foco a «…»', async () => {
+  await e.ir('#/n/conceptos/capital.md');
+  assert.equal(await e.pagina.evaluate(() => document.querySelector('#miga').tagName), 'NAV', 'barra: #miga no es una navegación');
+  assert.equal(await e.pagina.getAttribute('#miga', 'aria-label'), 'Ruta de la nota');
+  assert.equal(await e.pagina.locator('#miga strong').getAttribute('aria-current'), 'page', 'barra: la nota actual no lleva aria-current');
+  assert.equal(await e.pagina.locator('#miga button').count(), 0, 'barra: la miga sigue llevando botones');
+  const editar = await e.pagina.evaluate(() => { const s = getComputedStyle(document.querySelector('#btn-editar')); return { borde: s.borderTopWidth, fondo: s.backgroundColor }; });
+  assert.equal(editar.borde, '0px', 'barra: Editar sigue con recuadro'); assert.match(editar.fondo, /rgba\(0, 0, 0, 0\)|transparent/, 'barra: Editar lleva relleno');
+  const mas = e.pagina.locator('#btn-mas-nota');
+  assert.equal(await mas.getAttribute('aria-haspopup'), 'menu'); assert.equal(await mas.getAttribute('aria-label'), 'Más acciones de la nota');
+  await mas.click();
+  await visible(e.pagina.locator('#menu-nota'), 'barra', 'el menú de la nota');
+  assert.equal(await e.pagina.getAttribute('#menu-nota', 'role'), 'menu');
+  const filas = await e.pagina.locator('#menu-nota [role="menuitem"]').evaluateAll(l => l.map(x => x.textContent.trim().replace(/\s+/g, ' ')));
+  assert.deepEqual(filas, ['Mostrar en el Finder', 'Copiar la ruta', 'Ocultar solo en la app', 'Mover a la papelera'], 'barra: el menú no tiene esas cuatro acciones en ese orden');
+  assert.equal(await e.pagina.locator('#menu-nota hr').count(), 1, 'barra: falta el separador antes de la papelera');
+  const color = await e.pagina.evaluate(() => { const p = document.createElement('span'); p.style.color = 'var(--mal)'; document.body.append(p); const mal = getComputedStyle(p).color; p.remove(); return { mal, ultimo: getComputedStyle([...document.querySelectorAll('#menu-nota [role="menuitem"]')].at(-1)).color }; });
+  assert.equal(color.ultimo, color.mal, 'barra: «Mover a la papelera» no va en el color de peligro');
+  await e.pagina.keyboard.press('Escape');
+  await oculto(e.pagina.locator('#menu-nota'), 'barra', 'el menú tras Esc');
+  assert.equal(await enfocado(), 'btn-mas-nota', 'barra: Esc no devuelve el foco a «…»');
+  // Una nota que regenera el profesor (inicio.md) no se manda a la papelera desde aquí.
+  await e.ir('#/n/inicio.md');
+  await e.pagina.locator('#btn-mas-nota').click();
+  await visible(e.pagina.locator('#menu-nota'), 'barra', 'el menú de inicio.md');
+  assert.deepEqual(await e.pagina.locator('#menu-nota [role="menuitem"]').evaluateAll(l => l.map(x => x.textContent.trim().replace(/\s+/g, ' '))), ['Mostrar en el Finder', 'Copiar la ruta', 'Ocultar solo en la app'], 'barra: inicio.md (lo genera el profesor) ofrece la papelera');
+  await e.pagina.keyboard.press('Escape');
+});
+
+test('barra superior: Ocultar, desde el menú «…», saca la nota del árbol (y Ajustes la devuelve)', async () => {
+  await e.ir(`#/n/${LARGA}`);
+  await hasta(() => e.pagina.locator(`#arbol a.hoja[data-ruta="${LARGA}"]`).count(), 'barra', 'la nota larga no sale en el árbol');
+  try {
+    await e.pagina.locator('#btn-mas-nota').click();
+    await e.pagina.locator('#menu-nota [role="menuitem"]', { hasText: 'Ocultar' }).click();
+    await hasta(async () => (await e.pagina.locator(`#arbol a.hoja[data-ruta="${LARGA}"]`).count()) === 0, 'barra', 'Ocultar no saca la nota del árbol');
+    await oculto(e.pagina.locator('#menu-nota'), 'barra', 'el menú tras Ocultar');
+  } finally { await e.pagina.request.post(`${e.base}/api/ocultar`, { data: { ruta: LARGA, ocultar: false }, headers: { origin: e.base } }); }
+});
+
+test('barra superior: con la barra lateral plegada, el botón para abrirla y la miga están en el mismo eje (±1 px)', async () => {
+  await e.ir('#/n/conceptos/capital.md');
+  await e.pagina.locator('#btn-plegar').click();
+  try {
+    await visible(e.pagina.locator('#btn-desplegar'), 'barra', 'el botón de desplegar el lateral');
+    const m = await medirBarra();
+    assert.ok(Math.abs(m.desplegar.cy - m.strong.cy) <= 1, `barra: con el lateral plegado, el botón de desplegar está a y=${m.desplegar.cy} y la miga a y=${m.strong.cy}`);
+    assert.ok(Math.abs(m.desplegar.cy - m.editar.cy) <= 1, `barra: el botón de desplegar (y=${m.desplegar.cy}) y Editar (y=${m.editar.cy}) no comparten eje`);
+  } finally { await e.pagina.locator('#btn-desplegar').click(); }
+});

@@ -57,6 +57,7 @@
   <symbol id="i-lupa" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
   <symbol id="i-nota" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5"/></symbol>
   <symbol id="i-mas" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-puntos" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
   <symbol id="i-abajo" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-cuaderno" viewBox="0 0 24 24"><path d="M6 3h12v18H6zM6 7h12M9 3v18"/></symbol>
@@ -83,7 +84,7 @@
     </footer>
   </aside>
   <main id="centro">
-    <div class="miga-barra"><button type="button" id="btn-desplegar" class="secundario" aria-label="Abrir la barra lateral" aria-expanded="false" aria-controls="lateral" title="Abrir la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button><button type="button" id="btn-menu" class="secundario" aria-label="Abrir el menú" aria-controls="lateral" aria-expanded="false"><svg class="icono" aria-hidden="true"><use href="#i-menu"/></svg></button><div id="miga" aria-label="Ruta de la nota"></div><span id="editando" class="editando" hidden>Editando</span><span id="editando-aviso" class="oculto" role="status"></span><button type="button" id="btn-editar" class="secundario" title="Editar la nota (E)" hidden><svg class="icono" aria-hidden="true"><use href="#i-lapiz"/></svg>Editar</button></div>
+    <div class="miga-barra"><button type="button" id="btn-desplegar" class="secundario" aria-label="Abrir la barra lateral" aria-expanded="false" aria-controls="lateral" title="Abrir la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button><button type="button" id="btn-menu" class="secundario" aria-label="Abrir el menú" aria-controls="lateral" aria-expanded="false"><svg class="icono" aria-hidden="true"><use href="#i-menu"/></svg></button><nav id="miga" aria-label="Ruta de la nota"></nav><span class="miga-espacio"></span><span id="editando" class="editando" hidden>Editando</span><span id="editando-aviso" class="oculto" role="status"></span><button type="button" id="btn-editar" title="Editar la nota (E)" hidden><svg class="icono" aria-hidden="true"><use href="#i-lapiz"/></svg><span class="txt">Editar</span></button><button type="button" id="btn-mas-nota" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-nota" aria-label="Más acciones de la nota" title="Más acciones de la nota" hidden><svg class="icono puntos" aria-hidden="true"><use href="#i-puntos"/></svg></button><div id="menu-nota" class="menu" role="menu" aria-label="Más acciones de la nota" hidden></div></div>
     <article id="nota" tabindex="-1"></article>
     <section id="panel" hidden></section>
     <nav id="indice" aria-label="Índice de la nota" hidden></nav>

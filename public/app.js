@@ -284,7 +284,6 @@ const PAPELERA = /Win/i.test(navigator.platform) ? 'la papelera de reciclaje' : 
 // Copiar la ruta completa del fichero (para pegarla en la terminal, al profesor o en el Finder), con el separador
 // del sistema donde corre la app.
 const rutaCompleta = ruta => { const c = cuaderno(); if (!c.base || !c.sep) throw new Error('Reinicia la app: el servidor es de una versión anterior y no da la ruta completa'); return c.base + c.sep + ruta.split('/').join(c.sep); };
-const botonCopiar = ruta => `<button type="button" class="copiar" data-copiar="${esc(ruta)}" title="Copiar la ruta del fichero" aria-label="Copiar la ruta de ${esc(ruta.split('/').pop())}">${icono('copiar')}</button>`;
 async function copiarRuta(ruta) {
   let texto; try { texto = rutaCompleta(ruta); } catch (e) { return avisarError('No se ha podido copiar la ruta.', e.message); }
   try { await navigator.clipboard.writeText(texto); } catch {
@@ -292,7 +291,6 @@ async function copiarRuta(ruta) {
   }
   avisar('Ruta copiada');
 }
-document.addEventListener('click', e => { const b = e.target.closest('button[data-copiar]'); if (!b) return; e.preventDefault(); copiarRuta(b.dataset.copiar); });
 const botonPapelera = (ruta, nombre) => `<button type="button" class="papelera" data-papelera="${esc(ruta)}" title="Mandar a ${PAPELERA}" aria-label="Mandar ${esc(String(nombre).replace(/<[^>]*>/g, ''))} a ${PAPELERA}">${icono('papelera')}</button>`;
 async function mandarAPapelera(ruta) {
   try { await api('/api/papelera', { ruta }); } catch (e) { avisarError(`No se ha podido mandar a ${PAPELERA}.`, e.message); return; }
@@ -350,7 +348,7 @@ function ancho(si, todo = false) { $('#nota').classList.toggle('ancha', si); $('
 
 // ---------- nota
 function sinPortada() {
-  $('#miga').innerHTML = '<strong>Cuaderno</strong>'; ponerVista(null);
+  $('#miga').innerHTML = '<strong aria-current="page">Cuaderno</strong>'; ponerVista(null);
   $('#nota').innerHTML = `<h1>${esc(cuaderno().nombre)}</h1><p class="resumen">Esta carpeta no tiene una nota de portada. Elige una nota en el árbol de la izquierda o busca con <kbd>${pista('Ctrl K', 'F')}</kbd>.</p>`;
 }
 // La tabla de propiedades (frontmatter) de la lectura; el editor pinta la misma, de solo lectura.
@@ -365,14 +363,15 @@ async function abrirNotaTurno(ruta, lineaDestino, { desdeCambios = false } = {})
   const turno = ++turnoNota;   // si mientras llega la respuesta se pide otra nota (o esta otra vez), esta ya no pinta: lo viejo no pisa lo nuevo
   // La misma nota otra vez (recarga en vivo, un comentario recién escrito) conserva el scroll; una nota nueva empieza arriba.
   const recarga = rutaActual === ruta && !$('#nota').hidden && lineaDestino == null;
-  if (rutaActual !== ruta) { vistaNota = null; ultimoMostrado = null; notaPintada = null; }
+  if (rutaActual !== ruta) { vistaNota = null; ultimoMostrado = null; notaPintada = null; menuNota.cerrar(false); }
   rutaActual = ruta;
   $('#panel').hidden = true; $('#nota').hidden = false; delete $('#nota').dataset.vista;
   let n;
   try { n = await api(`/api/nota?p=${encodeURIComponent(ruta)}`); } catch (e) { if (turno !== turnoNota) return pendienteNota; $('#nota').innerHTML = `<h1>No se puede abrir</h1><p><code>${esc(ruta)}</code>: ${esc(e.message)}</p>`; return; }
   if (turno !== turnoNota) return pendienteNota;
   ponerVista(ruta.split('/').pop());
-  $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong>${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('') + botonMostrar(ruta, ruta.split('/').pop()) + botonCopiar(ruta) + (n.generado ? '' : botonPapelera(ruta, ruta.split('/').pop()));   // una nota que regenera el profesor no se manda a la papelera desde aquí
+  $('#miga').innerHTML = ruta.split('/').map((s, i, a) => i < a.length - 1 ? `<span>${esc(s)}</span> › ` : `<strong aria-current="page">${esc(n.esHtml ? tituloDe(ruta) : s)}</strong>`).join('');
+  menuNota.generado = !!n.generado; $('#btn-mas-nota').hidden = false;   // una nota que regenera el profesor no se manda a la papelera desde aquí
   ancho(!!n.esHtml, !!n.esHtml);
   propiedadesActual = htmlPropiedades(n.frontmatter);
   $('#btn-editar').hidden = !!(n.esFichero || n.esHtml);   // lo que no es Markdown no se edita aquí
@@ -739,7 +738,7 @@ function filtrosRecordados() { try { return localStorage.getItem(claveFiltros())
 async function abrirTareas() {
   if (location.hash === '#/tareas' && filtrosRecordados()) history.replaceState(null, '', `#/tareas?${filtrosRecordados()}`);
   $('#nota').hidden = true; $('#panel').hidden = false; rutaActual = null;
-  $('#miga').innerHTML = '<strong>Tareas</strong>'; ponerVista('Tareas');
+  $('#miga').innerHTML = '<strong aria-current="page">Tareas</strong>'; ponerVista('Tareas');
   const g = await api('/api/tareas');
   if (!enTareas()) return;   // mientras llegaba la respuesta se cambió de pantalla
   // Si el panel ya estaba pintado (recarga en vivo, tarea nueva), el foco y lo escrito en «Nueva tarea» se conservan.
@@ -802,7 +801,7 @@ $('#panel').addEventListener('change', async e => { const t = e.target; if (t.ty
 let comentariosPanel = [];   // los que enseña el panel, para sus botones Editar y Cerrar
 async function abrirComentarios() {
   $('#nota').hidden = true; $('#panel').hidden = false; rutaActual = null;
-  $('#miga').innerHTML = '<strong>Comentarios</strong>'; ponerVista('Comentarios');
+  $('#miga').innerHTML = '<strong aria-current="page">Comentarios</strong>'; ponerVista('Comentarios');
   const c = comentariosPanel = await api('/api/comentarios');
   const quien = x => esc(x.cita || String(x.texto).slice(0, 40));   // de qué comentario es el botón, para el lector de pantalla
   $('#panel').innerHTML = `<h1>Comentarios</h1><p class="resumen">Lo que has anotado en las notas. Tu profesor los ve en la siguiente sesión y los convierte en dudas o aportaciones.</p>`
@@ -972,7 +971,7 @@ const textoEstado = g => !g ? '' : g.cambios ? `${g.cambios} ${g.cambios === 1 ?
 const textoGit = g => !g ? 'sin repositorio' : `guardado ${hace(g.ultimo)}${g.cambios ? `, ${g.cambios} ${g.cambios === 1 ? 'cambio' : 'cambios'} por guardar` : ''}${g.sinSubir ? `, ${g.sinSubir} sin subir` : ''}`;
 async function abrirCuadernos() {
   rutaActual = null; $('#nota').hidden = true; $('#panel').hidden = false;
-  $('#miga').innerHTML = '<strong>Cuadernos</strong>'; ponerVista('Cuadernos');
+  $('#miga').innerHTML = '<strong aria-current="page">Cuadernos</strong>'; ponerVista('Cuadernos');
   const lista = await api('/api/cuadernos');
   const recientes = lista.length ? lista.map(c => `<section class="grupo cuaderno${c.abiertoAhora ? ' abierto' : ''}${c.existe ? '' : ' ausente'}"><h2>${c.existe ? `<a href="#/" data-abrir="${esc(c.ruta)}">${esc(c.nombre)}</a>` : esc(c.nombre)}${c.abiertoAhora ? '<span class="solo-lectura">abierto ahora</span>' : ''}</h2><p class="ruta"><code>${esc(c.ruta)}</code></p><p class="detalle">${!c.existe ? 'La carpeta ya no está' : c.git ? textoGit(c.git) : 'No es un repositorio: desde aquí no se puede guardar'}</p><button type="button" class="secundario pequeno" data-olvidar="${esc(c.ruta)}">Quitar de la lista</button></section>`).join('')
     : '<section class="grupo"><p>Todavía no has abierto ningún cuaderno.</p></section>';
@@ -1051,6 +1050,23 @@ $('#menu-cuaderno').addEventListener('click', e => {
   menuCuaderno.cerrar();
   if (b.dataset.abrirCarpeta) { if (enApp()) elegirCarpeta(); else location.hash = '#/cuadernos'; return; }
   if (!cuaderno() || b.dataset.ruta !== cuaderno().ruta) abrirCarpeta(b.dataset.ruta);
+});
+
+// El menú «…» de la nota (Roberto, 2026-10-13: lo que ya había, mudado de la miga): Mostrar en el Finder, Copiar la ruta, Ocultar y, al final y en
+// rojo, Mover a la papelera (no en una nota que regenera el profesor). Cada fila llama a la función que ya existía.
+const menuNota = enlazarMenu($('#btn-mas-nota'), $('#menu-nota'), { alAbrir: () => {
+  const fila = (accion, icon, texto, extra = '', clase = '') => `<button type="button" role="menuitem" tabindex="-1" data-accion="${accion}"${clase ? ` class="${clase}"` : ''}>${icono(icon)}<span class="texto">${texto}</span>${extra}</button>`;
+  $('#menu-nota').innerHTML = fila('mostrar', 'carpeta', `Mostrar en ${GESTOR}`) + fila('copiar', 'copiar', 'Copiar la ruta') + fila('ocultar', 'ojo-tachado', 'Ocultar', ' <span class="sub">solo en la app</span>')
+    + (menuNota.generado ? '' : `<hr>${fila('papelera', 'papelera', 'Mover a la papelera', '', 'borrar')}`);
+} });
+$('#menu-nota').addEventListener('click', e => {
+  const b = e.target.closest('[role="menuitem"]'); if (!b || !rutaActual) return;
+  const ruta = rutaActual;
+  menuNota.cerrar();
+  if (b.dataset.accion === 'mostrar') mostrarEnCarpeta(ruta);
+  else if (b.dataset.accion === 'copiar') copiarRuta(ruta);
+  else if (b.dataset.accion === 'ocultar') ocultar(ruta, true);
+  else if (b.dataset.accion === 'papelera') mandarAPapelera(ruta);
 });
 
 // ---------- guardar / traer / deshacer
@@ -1198,7 +1214,7 @@ async function cargarCuaderno() {
 // ---------- rutas
 function enrutar() {
   const h = location.hash;
-  soltarEdicion(); $('#btn-editar').hidden = true;   // abrirNota lo vuelve a enseñar si la pantalla es una nota
+  soltarEdicion(); $('#btn-editar').hidden = true; $('#btn-mas-nota').hidden = true; menuNota.cerrar(false);   // abrirNota los vuelve a enseñar si la pantalla es una nota
   if (!cuaderno() || h === '#/cuadernos') { abrirCuadernos(); marcarActiva(); return; }
   if (enTareas()) abrirTareas(); else if (h === '#/comentarios') abrirComentarios();
   else if (h.startsWith('#/n/')) { const [ruta, q] = h.slice(4).split('?'); const l = q && new URLSearchParams(q).get('l'); abrirNota(decodeURI(ruta), l != null ? +l : null); }

@@ -142,13 +142,8 @@ button.mostrar:focus-visible, button.ocultar:focus-visible, button.papelera:focu
 #arbol .fila .acciones-fila { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; }
 #arbol summary .acciones-fila { margin-left: auto; display: flex; gap: 6px; }
 #arbol .acciones-fila .papelera { margin-left: 4px; }   /* sin confirmar, la separación es lo que evita mandar a la papelera por un píxel */
-#arbol .fila:hover :is(.mostrar, .ocultar, .papelera), #arbol .fila:focus-within :is(.mostrar, .ocultar, .papelera), #arbol summary:hover :is(.mostrar, .ocultar), #arbol summary:focus-within :is(.mostrar, .ocultar), #miga :is(.mostrar, .papelera) { opacity: 1; }
+#arbol .fila:hover :is(.mostrar, .ocultar, .papelera), #arbol .fila:focus-within :is(.mostrar, .ocultar, .papelera), #arbol summary:hover :is(.mostrar, .ocultar), #arbol summary:focus-within :is(.mostrar, .ocultar) { opacity: 1; }
 @media (hover: none) { button.mostrar, button.ocultar, button.papelera { opacity: 1; } }
-#miga :is(.mostrar, .copiar, .papelera) { vertical-align: middle; margin-left: 4px; min-width: 28px; min-height: 28px; }
-button.copiar { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: none; background: none; color: var(--tinta-suave); border-radius: var(--radio); }
-button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
-#miga .papelera { margin-left: 18px; }   /* lejos de copiar: un clic de más no manda nada a la papelera */
-#miga :is(.mostrar, .copiar, .papelera) .icono { width: 15px; height: 15px; }
 /* ficheros que no son notas */
 #nota:focus-visible, #panel:focus-visible { outline: none; }   /* a donde lleva «Saltar al contenido» */
 #nota.ancha.todo { max-width: none; margin-left: 0; margin-right: 0; }
@@ -171,8 +166,17 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 .pie-lateral .icono { width: 17px; height: 17px; }
 
 #centro { position: relative; overflow: auto; min-height: 0; min-width: 0; padding: 0 0 40px; background: var(--mesa); --hoja-pad: 56px; --texto: 800px; }   /* la mesa: un poco más hundida que la hoja (Roberto, 2026-10-09, dirección A) */
-.miga-barra { position: sticky; top: 0; background: var(--mesa); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px max(calc(var(--hoja-pad) + 8px), calc((100% - var(--texto) - 2 * var(--hoja-pad)) / 2 + var(--hoja-pad))); }   /* empieza donde empieza el texto de la hoja */
-#miga { font-size: 13px; color: var(--tinta-suave); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.miga-barra { position: sticky; top: 0; background: var(--mesa); z-index: 2; display: flex; align-items: center; gap: 6px; min-height: 50px; padding: 9px 20px 9px max(calc(var(--hoja-pad) + 8px), calc((100% - var(--texto) - 2 * var(--hoja-pad)) / 2 + var(--hoja-pad))); }   /* empieza donde empieza el texto de la hoja */
+/* La miga encoge con «…»; a la derecha, Editar y «…» de la nota, que no encogen ni se mueven con el largo de la ruta */
+#miga { flex: 0 1 auto; font-size: 14px; color: var(--tinta-suave); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#miga strong { color: var(--tinta); font-weight: 650; }
+.miga-espacio { flex: 1 1 0; min-width: 0; }
+#btn-editar, #btn-mas-nota { flex: none; border: 0; background: none; min-height: 32px; color: var(--tinta); }
+#btn-editar { padding: 0 10px; font-weight: 500; }
+#btn-mas-nota { width: 32px; padding: 0; color: var(--tinta-suave); }
+#btn-mas-nota .icono { width: 20px; height: 20px; fill: currentColor; stroke: none; }
+#btn-editar:hover, #btn-mas-nota:hover, #btn-mas-nota[aria-expanded="true"] { background: rgba(127,127,127,.16); color: var(--tinta); }
+#menu-nota { right: 20px; top: 46px; left: auto; }
 #btn-menu { display: none; padding: 6px 8px; }
 /* La hoja (dirección A, Roberto 2026-10-09): el texto mide como mucho 800 px (decisión de Roberto, 2026-10-09: «sé que no es lo mejor, pero para mí sí») y la hoja, el texto más sus márgenes interiores
    (56 px a cada lado: 912 px). Letra de 16 px con la «Media»; en em para que el ajuste «Letra» siga mandando. */
@@ -435,16 +439,15 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 /* Barra lateral plegable en escritorio (Roberto, 2026-10-09): plegada, #centro gana su ancho; el botón para volver vive en la miga */
 .marca .plegar { position: absolute; top: 12px; right: 10px; padding: 4px 7px; min-height: 30px; background: none; border-color: transparent; color: var(--tinta-suave); }
 .marca .plegar:hover { color: var(--tinta); background: rgba(127,127,127,.12); }
-#btn-desplegar { display: none; position: absolute; left: 12px; top: 6px; padding: 6px 8px; z-index: 3; }
+#btn-desplegar { display: none; position: absolute; left: 12px; top: 9px; padding: 6px 8px; z-index: 3; }
 @media (min-width: 761px) {
   #app.lateral-plegado { grid-template-columns: 0 minmax(0, 1fr); }
   #app.lateral-plegado.cajon-abierto[data-panel="derecha"] { grid-template-columns: 0 minmax(0, 1fr) var(--panel-ancho); }
   #app.lateral-plegado #lateral { display: none; }
   #app.lateral-plegado #centro { grid-column: 2; grid-row: 1; }
   #app.lateral-plegado #btn-desplegar { display: inline-flex; }
-  #app.lateral-plegado .miga-barra { min-height: 44px; }
 }
-@media (max-width: 760px) { .marca .plegar { display: none; } }
+@media (max-width: 760px) { .marca .plegar { display: none; } #btn-editar .txt { display: none; } #btn-editar { padding: 0 8px; } }   /* a ≤ 760 px, Editar solo con el icono */
 
 /* ---------- editor de la nota entera (CodeMirror; public/live.js) */
 #edicion-cm { min-height: 40vh; }
@@ -542,3 +545,5 @@ button.comentado:focus-visible { outline: 2px solid var(--acento); outline-offse
 @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) button.comentado { text-decoration-color: var(--tinta); } }
 .acciones-comentario { display: flex; gap: 8px; margin: 6px 0 0; }
 .caja-titulo { margin: 0; font-weight: 650; }
+.menu .sub { margin-left: auto; font-size: 12px; color: var(--tinta-suave); }
+.menu [role^="menuitem"].borrar, .menu [role^="menuitem"].borrar .icono { color: var(--mal); }   /* la papelera, última y en rojo */

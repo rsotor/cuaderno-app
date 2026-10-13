@@ -26,6 +26,7 @@ nuevo entra en una nota o carpeta nueva, con su fila aquí y su test. Las rutas 
 | Adjuntos: audio con su reproductor, un fichero que la app no sabe enseñar (lleva al Finder), carpeta con solo un `.gitkeep` | `adjuntos/` | `tests/navegador/ficheros.test.js`, `tests/cuaderno.test.js` |
 | Tareas que mencionan una nota: por `[[enlace]]`, por `#Etiqueta` con el nombre de la nota, y por `#etiqueta` con el nombre de una carpeta (sale en su `brief.md`) | `personas/ana.md`, `iniciativas/mudanza/brief.md` (reciben), `iniciativas/mudanza/pendientes.md` (las tareas) | `tests/menciones.test.js`, `tests/navegador/menciones.test.js` |
 | Fragmento de la búsqueda sin sintaxis: viñeta con wikilink con alias y callout con negrita, con «zanahoria» en cada línea (sin casillas: el panel Tareas cuenta las del cuaderno; la casilla se prueba en `tests/busqueda.test.js`) | `render/fragmentos-de-busqueda.md` | `tests/busqueda.test.js`, `tests/navegador/busqueda.test.js` |
+| Barra superior con una ruta larguísima: la miga se corta con «…» y no empuja a «Editar» ni al menú «…» de la nota, que se quedan a la derecha (sin cifras: su nombre es lo que se prueba) | `navegacion/una-nota-con-un-nombre-muy-largo-para-la-barra-superior.md` | `tests/navegador/navegacion.test.js` |
 
 ## Casos de uso y su recorrido
 

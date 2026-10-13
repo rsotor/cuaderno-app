@@ -13,6 +13,8 @@ const sinHoja = () => e.pagina.evaluate(() => getComputedStyle(document.querySel
 const conHoja = () => e.pagina.evaluate(() => getComputedStyle(document.querySelector('#nota')).backgroundColor !== 'rgba(0, 0, 0, 0)' && !document.querySelector('#nota').classList.contains('ancha'));
 const hoja = nombre => e.pagina.locator('#arbol a.hoja', { hasText: nombre });
 // Columna de lectura: centro de #nota y x del primer título (Roberto, 2026-10-09: sin hoja, la misma columna centrada que una nota).
+// Las acciones de la nota abierta (antes botones de la miga) están en el menú «…» de la barra superior.
+const accionNota = async texto => { await e.pagina.locator('#btn-mas-nota').click(); await (await visible(e.pagina.locator('#menu-nota [role="menuitem"]', { hasText: texto }), 'menú de la nota', `la acción «${texto}»`)).click(); };
 const columna = () => e.pagina.evaluate(() => { const b = document.querySelector('#nota').getBoundingClientRect(), h = document.querySelector('#nota h1').getBoundingClientRect(), m = document.querySelector('#miga').getBoundingClientRect(); return { centro: b.x + b.width / 2, titulo: h.x, miga: m.x }; });
 const referencia = async () => { await e.ir('#/n/material/material.md'); return columna(); };   // una nota con hoja: la medida de la columna buena
 const abrirDelArbol = async nombre => {
@@ -107,8 +109,8 @@ test('mostrar en el Finder: el botón aparece al pasar el ratón por una fila y 
   await carpeta.locator('summary button.mostrar').click();
   await hasta(() => e.lanzado.length === antes + 2, 'árbol', 'el botón de la carpeta no lanza nada');
   assert.ok(await carpeta.evaluate(d => d.open), 'el botón ha plegado la carpeta');
-  // En la miga, siempre visible, para la nota abierta.
-  await e.pagina.locator('#miga button.mostrar').click();
+  // En el menú «…» de la barra superior, para la nota abierta.
+  await accionNota('Mostrar en');
   await hasta(() => e.lanzado.length === antes + 3, 'miga', 'el botón de la miga no lanza nada');
   assert.ok(e.lanzado.at(-1).args.some(a => a.endsWith('material.md')), 'la miga no señala la nota abierta');
 });
@@ -148,7 +150,7 @@ test('papelera: el botón de la fila manda el fichero a la papelera sin pregunta
   assert.equal(await e.pagina.locator('#arbol details', { has: e.pagina.locator('summary', { hasText: 'material' }) }).locator('summary button.papelera').count(), 0, 'una carpeta lleva botón de papelera');
   // Desde la miga: la nota abierta va a la papelera y la app vuelve a la portada.
   await e.ir('#/n/material/apuntes-de-clase.txt');
-  await e.pagina.locator('#miga button.papelera').click();
+  await accionNota('Mover a la papelera');
   await hasta(() => e.ejecutado.length === antes + 2, 'miga', 'el botón de la miga no manda nada a la papelera');
   await hasta(async () => !(await e.pagina.evaluate(() => location.hash)).includes('apuntes-de-clase'), 'miga', 'la app se queda en el fichero borrado');
 });
@@ -156,7 +158,7 @@ test('papelera: el botón de la fila manda el fichero a la papelera sin pregunta
 test('copiar la ruta: el botón de la miga copia la ruta completa del fichero abierto y lo dice', async () => {
   await e.pagina.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await e.ir('#/n/material/extracto-octubre.pdf');
-  await (await visible(e.pagina.locator('#miga button.copiar'), 'miga', 'el botón de copiar la ruta')).click();
+  await accionNota('Copiar la ruta');
   await visible(e.pagina.locator('.aviso-flotante', { hasText: 'Ruta copiada' }), 'miga', 'el aviso de ruta copiada');
   const copiado = await e.pagina.evaluate(() => navigator.clipboard.readText());
   assert.equal(copiado, path.join(e.c.base, 'material', 'extracto-octubre.pdf'), 'miga: no copia la ruta completa del fichero');
@@ -164,10 +166,13 @@ test('copiar la ruta: el botón de la miga copia la ruta completa del fichero ab
 
 test('la miga de una nota que regenera el profesor (inicio.md) no ofrece la papelera; la de una nota normal, sí', async () => {
   await e.ir('#/n/inicio.md');
-  await visible(e.pagina.locator('#miga button.copiar'), 'miga', 'el botón de copiar en inicio.md');
-  assert.equal(await e.pagina.locator('#miga button.papelera').count(), 0, 'miga: inicio.md (lo genera el profesor) ofrece la papelera');
+  await e.pagina.locator('#btn-mas-nota').click();
+  await visible(e.pagina.locator('#menu-nota [role="menuitem"]', { hasText: 'Copiar la ruta' }), 'miga', 'copiar la ruta en inicio.md');
+  assert.equal(await e.pagina.locator('#menu-nota [role="menuitem"]', { hasText: 'papelera' }).count(), 0, 'miga: inicio.md (lo genera el profesor) ofrece la papelera');
+  await e.pagina.keyboard.press('Escape');
   await e.ir('#/n/material/material.md');
-  await visible(e.pagina.locator('#miga button.papelera'), 'miga', 'la papelera en una nota normal');
+  await e.pagina.locator('#btn-mas-nota').click();
+  await visible(e.pagina.locator('#menu-nota [role="menuitem"]', { hasText: 'Mover a la papelera' }), 'miga', 'la papelera en una nota normal');
 });
 
 test('adjuntos: audio y vídeo con su reproductor; lo que la app no sabe enseñar lleva al Finder; una carpeta con solo un .gitkeep sale y dice que está vacía', async () => {
