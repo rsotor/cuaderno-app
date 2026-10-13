@@ -3,7 +3,7 @@
 // del cuaderno de ejemplo sin kit con un repositorio debajo (git init, como hacen los recorridos de uso): los elementos
 // del menú se «pulsan» desde el proceso principal (`Menu.getApplicationMenu().getMenuItemById(id).click()`, lo mismo que
 // hace el acelerador) y se mira lo que pasa en la pantalla y en el fichero: Guardar abre el diálogo de Guardar y el commit
-// se hace por /api/guardar; Abrir nota…, Buscar… y Nueva tarea van al buscador; Ajustes… abre Ajustes; Abrir carpeta… (el
+// se hace por /api/guardar; Abrir nota…, Buscar… y Nueva tarea abren la modal de búsqueda; Ajustes… abre Ajustes; Abrir carpeta… (el
 // diálogo del sistema, en pruebas CUADERNO_DIALOGO_PRUEBA) cambia de cuaderno y el menú se reconstruye con el reciente
 // nuevo; Cuadernos recientes vuelve al anterior; Ayuda → Diagnóstico queda en el registro sin el token, y Plan vivo y
 // Mostrar registro van fuera (anotados con CUADERNO_SIN_NAVEGADOR). Mismo paso que ventana.test.js (`npm run test:electron`).
@@ -68,7 +68,8 @@ test('el menú de la app de escritorio: en castellano, con los atajos de la tabl
   assert.deepEqual(aceleradores, ATAJOS.map(a => a.accelerator), 'cada atajo de la tabla está en el menú instalado');
   // Las pistas de la pantalla dicen lo que dice el menú (en Linux, Ctrl; en Mac dirían ⌘).
   const mod = process.platform === 'darwin' ? '⌘' : 'Ctrl ';
-  assert.equal(await pagina.getAttribute('#buscador', 'placeholder'), `Buscar… o + tarea  (${mod}F)`);
+  assert.equal(await pagina.textContent('#btn-buscar-pista'), `${mod}F`, 'el disparador de la búsqueda dice la tecla del menú');
+  assert.match(await pagina.getAttribute('#btn-buscar', 'title'), new RegExp(`\\(${mod}F\\)$`));
   assert.equal(await pagina.getAttribute('#btn-guardar', 'title'), `Guardar en el repositorio del cuaderno (${mod}S)`);
   assert.equal(await pagina.getAttribute('#btn-nueva-nota', 'title'), `Crear una nota nueva (${mod}N)`);
   assert.equal(await pagina.getAttribute('#btn-ajustes', 'title'), `Ajustes de la app (${mod},)`);
@@ -129,27 +130,35 @@ test('el menú de la app de escritorio: con el editor de la nota abierto, Guarda
   await esperarTitulo(c);
 });
 
-test('el menú de la app de escritorio: Abrir nota… y Buscar… enfocan el buscador con el texto seleccionado, Nueva tarea lo deja con «+» para añadirla con Enter, y Ajustes… abre Ajustes', async () => {
+test('el menú de la app de escritorio: Abrir nota… y Buscar… abren la modal de búsqueda con el texto seleccionado, Nueva tarea la deja con «+» para apuntarla con Enter, y Ajustes… abre Ajustes', async () => {
   await esperarTitulo(c);
-  await pagina.locator('#buscador').fill('capital');
   await pagina.locator('#link-inicio').focus();
   await pulsar('buscar');
-  await hasta(async () => (await enfocado()) === 'buscador', 'Buscar… no enfoca el buscador');
+  await pagina.locator('#busqueda').waitFor({ state: 'visible' });
+  await hasta(async () => (await enfocado()) === 'buscador', 'Buscar… no enfoca el campo de la modal');
+  await pagina.locator('#buscador').fill('capital');
+  await pulsar('buscar');   // con la modal abierta: no apila otra, solo enfoca y selecciona
+  await hasta(async () => (await enfocado()) === 'buscador', 'Buscar… con la modal abierta no enfoca el campo');
   assert.deepEqual(await pagina.evaluate(() => { const b = document.querySelector('#buscador'); return [b.selectionStart, b.selectionEnd, b.value]; }), [0, 7, 'capital'], 'el texto seleccionado: escribir lo sustituye');
-  await pagina.locator('#link-inicio').focus();
+  assert.equal(await pagina.locator('.modal:visible').count(), 1);
+  await pagina.keyboard.press('Escape');
+  await pagina.locator('#busqueda').waitFor({ state: 'hidden' });
+  assert.equal(await enfocado(), 'link-inicio', 'Esc no devuelve el foco a donde estaba');
   await pulsar('abrir-nota');
-  await hasta(async () => (await enfocado()) === 'buscador', 'Abrir nota… no enfoca el buscador');
-  // Enter abre el primer resultado: la nota «Capital» (por nombre de fichero y título), una vez pintados los resultados.
-  await pagina.locator('#arbol a.resultado').first().waitFor({ state: 'visible' });
+  await pagina.locator('#busqueda').waitFor({ state: 'visible' });
+  await hasta(async () => (await enfocado()) === 'buscador', 'Abrir nota… no enfoca el campo de la modal');
+  assert.deepEqual(await pagina.evaluate(() => { const b = document.querySelector('#buscador'); return [b.selectionStart, b.selectionEnd, b.value]; }), [0, 7, 'capital'], 'la última consulta, seleccionada');
+  // Enter abre la primera nota: «Capital» (por nombre de fichero y título), una vez pintados los resultados.
+  await pagina.locator('#busqueda-lista [role="option"]').first().waitFor({ state: 'visible' });
   await pagina.keyboard.press('Enter');
-  await hasta(async () => /conceptos\/capital\.md/.test(await pagina.evaluate(() => location.hash)), 'Enter en el buscador no ha abierto la nota');
-  await pagina.locator('#buscador').fill('');
+  await hasta(async () => /conceptos\/capital\.md/.test(await pagina.evaluate(() => location.hash)), 'Enter en la modal no ha abierto la nota');
   await pagina.locator('#link-inicio').focus();
   await pulsar('nueva-tarea');
-  await hasta(async () => (await enfocado()) === 'buscador' && (await pagina.inputValue('#buscador')) === '+ ', 'Nueva tarea no deja el buscador con «+»');
-  await pagina.locator('#arbol .comando').waitFor({ state: 'visible' });
-  assert.match(await pagina.locator('#arbol .comando').textContent(), /Escribe la tarea después del \+/);
-  await pagina.locator('#buscador').fill('');
+  await hasta(async () => (await enfocado()) === 'buscador' && (await pagina.inputValue('#buscador')) === '+ ', 'Nueva tarea no deja el campo de la modal con «+»');
+  await pagina.locator('#busqueda-nada').waitFor({ state: 'visible' });
+  assert.match(await pagina.locator('#busqueda-nada').textContent(), /Escribe la tarea después del \+/);
+  await pagina.keyboard.press('Escape');
+  await pagina.locator('#busqueda').waitFor({ state: 'hidden' });
   await pagina.locator('#link-inicio').click();
   await esperarTitulo(c);
   await pulsar('ajustes');
@@ -239,5 +248,5 @@ test('el menú de la app de escritorio: el preload pone un solo oyente de «acci
   await hasta(() => pagina.evaluate(() => window.__recibidas.length >= 1), 'la acción no ha llegado al callback nuevo');
   await dormir(300);
   assert.deepEqual(await pagina.evaluate(() => window.__recibidas), ['2:buscar'], 'ni al primero ni dos veces');
-  assert.equal(await enfocado(), 'link-inicio', 'ACCIONES_APP ya no la atiende: el buscador no se enfoca');
+  assert.equal(await enfocado(), 'link-inicio', 'ACCIONES_APP ya no la atiende: la modal no se abre');
 });

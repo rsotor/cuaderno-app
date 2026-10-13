@@ -41,6 +41,34 @@ test('portada: inicio.md si existe; si no, la primera nota de la raíz; si no, n
   assert.equal(cu.portada(), null);
 }));
 
+test('buscar con porNota: una línea por nota, hasta 50 notas, las excluidas no gastan tope y `cortado` avisa', con({}, (c, cu) => {
+  fs.mkdirSync(path.join(c.base, 'masa'), { recursive: true });
+  fs.writeFileSync(path.join(c.base, 'masa', 'larga.md'), `${'- calabaza otra vez\n'.repeat(80)}`);
+  fs.writeFileSync(path.join(c.base, 'masa', 'corta.md'), 'una calabaza\n');
+  fs.writeFileSync(path.join(c.base, 'masa', 'tercera.md'), 'otra calabaza\ny otra calabaza\n');
+  cu.invalidar();
+  const r = cu.buscar('calabaza', { porNota: true });
+  assert.deepEqual(r.lineas.map(l => l.ruta).sort(), ['masa/corta.md', 'masa/larga.md', 'masa/tercera.md'], 'una entrada por nota, no 60 de la larga');
+  assert.equal(r.lineas.find(l => l.ruta === 'masa/tercera.md').linea, 0, 'la primera línea que coincide');
+  assert.equal(r.cortado, false);
+  // Las excluidas no cuentan para el tope.
+  const sin = cu.buscar('calabaza', { porNota: true, excluir: ruta => ruta.startsWith('masa/l') });
+  assert.deepEqual(sin.lineas.map(l => l.ruta).sort(), ['masa/corta.md', 'masa/tercera.md']);
+  // 55 notas que coinciden: 50 y cortado.
+  for (let i = 0; i < 55; i++) fs.writeFileSync(path.join(c.base, 'masa', `n${String(i).padStart(2, '0')}.md`), 'rábano\n');
+  cu.invalidar();
+  const muchas = cu.buscar('rabano', { porNota: true });
+  assert.equal(muchas.lineas.length, 50);
+  assert.equal(muchas.cortado, true);
+  // Si las 5 sobrantes están excluidas, no se corta.
+  const justo = cu.buscar('rabano', { porNota: true, excluir: ruta => /n5[0-4]\.md$/.test(ruta) });
+  assert.equal(justo.lineas.length, 50);
+  assert.equal(justo.cortado, false);
+  // La firma de siempre sigue valiendo, también la posicional.
+  assert.equal(cu.buscar('rabano', 3).lineas.length, 3);
+  assert.equal(cu.buscar('rabano').cortado, undefined, 'sin porNota la respuesta es la de siempre');
+}));
+
 test('buscar sin acentos, por nombre y por línea', con({}, (c, cu) => {
   const r = cu.buscar('interes');
   assert.ok(r.ficheros.includes('conceptos/interes.md'));
@@ -214,7 +242,7 @@ test('títulos: el # de cada nota, sin wikilinks; las tareas llevan el Markdown 
 
 test('recorrido: cuenta notas, enlaces rotos y fallos', con({}, (c, cu) => {
   const r = cu.recorrido();
-  assert.equal(r.notas, 21);   // las 8 del curso demo, las 8 de cuaderno-ejemplo (render/, estructura/), las 3 de las menciones (personas/, iniciativas/mudanza/) y la nota larga de lectura/ (2026-10-09: una nota nueva en el ejemplo, no un valor arreglado); sus enlaces resuelven todos: el único roto sigue siendo el de interes.md
+  assert.equal(r.notas, 22);   // (2026-10-13: +1, render/fragmentos-de-busqueda.md, la nota de la modal de búsqueda) las 8 del curso demo, las 8 de cuaderno-ejemplo (render/, estructura/), las 3 de las menciones (personas/, iniciativas/mudanza/) y la nota larga de lectura/ (2026-10-09: una nota nueva en el ejemplo, no un valor arreglado); sus enlaces resuelven todos: el único roto sigue siendo el de interes.md
   assert.deepEqual(r.rotos, [{ ruta: 'conceptos/interes.md', destino: 'no-existe' }]);
   assert.deepEqual(r.fallos, []);
 }));

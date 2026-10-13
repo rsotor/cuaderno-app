@@ -23,7 +23,9 @@ function pintarTitulo() {
 const ponerVista = v => { vistaTitulo = v; pintarTitulo(); };
 // Lo que supone una terminal se dice de otra forma en la app: no hay terminal donde reiniciarla, se cierra y se vuelve a abrir.
 if (enApp()) { const a = $('#aviso-reinicio'); for (const n of [...a.childNodes]) if (n.id !== 'aviso-cerrar') n.remove(); a.prepend('La app se ha actualizado mientras estaba abierta. Cierra y vuelve a abrir la app para que todo funcione. '); }
-if (enApp()) { $('#buscador').placeholder = `Buscar… o + tarea  (${pista('Ctrl K', 'F')})`; $('#btn-nueva-nota').title = conAtajo('Crear una nota nueva', 'N'); $('#btn-ajustes').title = conAtajo('Ajustes de la app', ','); }
+// El disparador de la búsqueda: en la app, la pista del menú (⌘F / Ctrl F); en la web, la de la página (⌘K en Mac, Ctrl K en el resto).
+{ const tecla = pista(enMac ? '⌘K' : 'Ctrl K', 'F'); $('#btn-buscar-pista').textContent = tecla; $('#btn-buscar').title = `Buscar una nota o apuntar una tarea (${tecla})`; }
+if (enApp()) { $('#btn-nueva-nota').title = conAtajo('Crear una nota nueva', 'N'); $('#btn-ajustes').title = conAtajo('Ajustes de la app', ','); }
 // El aviso de «la app se ha actualizado» se cierra y no vuelve en esta pestaña (Roberto, 2026-10-09).
 let avisoCerrado = false;
 $('#aviso-cerrar').addEventListener('click', () => { avisoCerrado = true; $('#aviso-reinicio').hidden = true; });
@@ -96,7 +98,7 @@ function abrirNuevaNota(titulo = '') {
 }
 async function crearNota(titulo, carpeta) {
   let r; try { r = await api('/api/nota/nueva', { titulo, carpeta }); } catch (e) { avisarError('No se ha podido crear la nota.', e.message); return false; }
-  cerrarModal('#nueva-nota'); $('#buscador').value = ''; buscar('');
+  cerrarModal('#nueva-nota');
   location.hash = `#/n/${encodeURI(r.ruta)}`;
   return true;
 }
@@ -105,74 +107,139 @@ $('#nueva-nota-cancelar').onclick = () => cerrarModal('#nueva-nota');
 $('#nueva-nota-form').addEventListener('submit', e => { e.preventDefault(); crearNota($('#nueva-nota-nombre').value, $('#nueva-nota-carpeta').value); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#nueva-nota').hidden) cerrarModal('#nueva-nota'); });
 
-// ---------- buscador
-let tBusqueda;
-$('#buscador').addEventListener('input', e => { clearTimeout(tBusqueda); tBusqueda = setTimeout(() => buscar(e.target.value), 120); });
-// El buscador también es el comando: lo que empieza por «+» no busca, Enter lo añade como tarea a tareas.md.
+// ---------- búsqueda en modal (⌘K, ⌘F y ⌘O; Ctrl en Windows y en la web: un solo camino). El campo del lateral es solo el
+// disparador (#btn-buscar); el campo de verdad es #buscador, dentro de #busqueda. Combobox WAI-ARIA 1.2: el foco no sale del
+// campo, las flechas mueven aria-activedescendant. Las piezas puras (filas, fragmento, resaltado) están en busqueda.js.
+let tBusqueda, turnoBusqueda = 0, ultimaConsulta = '';
+// El buscador también es el comando: lo que empieza por «+» no busca, Enter lo apunta como tarea en tareas.md.
 // Si se está leyendo una nota, la tarea la enlaza al final ([[ruta/sin/extensión]]).
 const comandoTarea = q => (q.trimStart().startsWith('+') ? q.trimStart().slice(1).trim() : null);
 const notaParaTarea = () => (rutaActual && rutaActual.endsWith('.md') ? rutaActual.replace(/\.md$/, '') : null);
-function pintarComando(texto) {
-  const nota = notaParaTarea();
-  $('#arbol').innerHTML = `<div class="resultado comando" role="status">${texto ? `<kbd>Enter</kbd> añade la tarea: <b>${esc(texto)}</b>${nota ? `<small>enlazada a ${esc(tituloDe(rutaActual))}</small>` : ''}` : 'Escribe la tarea después del <b>+</b> y pulsa <kbd>Enter</kbd>.'}</div>`;
+const opcionesBusqueda = () => [...$('#busqueda-lista').querySelectorAll('[role="option"]')];
+const opcionElegida = () => opcionesBusqueda().findIndex(o => o.getAttribute('aria-selected') === 'true');
+function elegirOpcion(i) {
+  const ops = opcionesBusqueda();
+  ops.forEach((o, k) => o.setAttribute('aria-selected', String(k === i)));
+  $('#buscador').setAttribute('aria-activedescendant', ops[i] ? ops[i].id : '');
+  if (ops[i]) ops[i].scrollIntoView({ block: 'nearest' });
 }
-async function anadirTareaDesdeBuscador() {
-  const texto = comandoTarea($('#buscador').value);
+const htmlFila = (f, i, q) => `<div class="res" role="option" id="res-${i}" aria-selected="false" data-ruta="${esc(f.ruta)}"${f.linea != null && !f.porNombre ? ` data-linea="${f.linea}"` : ''} title="${esc(f.ruta)}">${icono('nota')}<span class="cuerpo"><span class="t">${Busqueda.resaltar(f.nombre, q)}</span>${f.fragmento ? `<span class="s">${Busqueda.resaltar(Busqueda.recortar(f.fragmento, q), q)}</span>` : ''}</span><span class="c">${esc(f.carpeta)}</span></div>`;
+// La fila fija «Apuntar tarea», al pie de la lista: última opción, nunca elegida sola (solo con flechas).
+const htmlFilaTarea = (texto, i) => `<div class="res tarea" role="option" id="res-${i}" aria-selected="false" data-tarea="1">${icono('mas')}<span class="cuerpo"><span class="t">Apuntar tarea: «${esc(texto)}»</span></span><span class="c">escribe + delante</span></div>`;
+// Lo que la modal enseña: { filas, hayMas, q } de una búsqueda, { comando } con «+», o nada con la consulta vacía.
+function pintarBusqueda({ filas = [], hayMas = false, q = '', comando = null } = {}, conservarRuta = null) {
+  const lista = $('#busqueda-lista'), nada = $('#busqueda-nada'), estado = $('#busqueda-estado');
+  const textoTarea = comando != null ? comando : q;
+  lista.innerHTML = filas.map((f, i) => htmlFila(f, i, q)).join('') + (textoTarea ? htmlFilaTarea(textoTarea, filas.length) : '');
+  $('#busqueda-mas').hidden = !hayMas;
+  $('#buscador').setAttribute('aria-expanded', String(filas.length > 0));
+  nada.hidden = true; nada.textContent = '';
+  if (comando != null) {
+    const nota = notaParaTarea();
+    nada.hidden = false;
+    nada.innerHTML = comando ? `<kbd>Enter</kbd> añade la tarea: <b>${esc(comando)}</b>${nota ? `<small>enlazada a ${esc(tituloDe(rutaActual))}</small>` : ''}` : 'Escribe la tarea después del <b>+</b> y pulsa <kbd>Enter</kbd>.';
+    estado.textContent = comando ? `Enter añade la tarea: ${comando}${nota ? `, enlazada a ${tituloDe(rutaActual)}` : ''}` : 'Escribe la tarea después del +';
+  } else if (q && !filas.length) {
+    nada.hidden = false; nada.innerHTML = `Nada con «${esc(q)}».`;   // corto: la fila «Apuntar tarea» de debajo ya dice cómo apuntarla (crítica 2026-10-13, 1)
+    estado.textContent = `nada con «${q}»`;
+  } else estado.textContent = q ? `${filas.length} ${filas.length === 1 ? 'nota' : 'notas'}${hayMas ? ', hay más' : ''}` : '';
+  const i = conservarRuta ? filas.findIndex(f => f.ruta === conservarRuta) : -1;
+  elegirOpcion(filas.length ? Math.max(i, 0) : -1);   // la primera nota queda elegida
+}
+async function consultarBusqueda(texto, { conservarRuta = null } = {}) {
+  const turno = ++turnoBusqueda, q = texto.trim();
+  if (comandoTarea(texto) != null) return pintarBusqueda({ comando: comandoTarea(texto) });
+  if (!q) return pintarBusqueda();
+  let r; try { r = await api(`/api/buscar?q=${encodeURIComponent(q)}&por-nota=1`); } catch { return; }
+  if (turno !== turnoBusqueda || $('#busqueda').hidden) return;   // una respuesta que llega tarde no pisa a la última
+  pintarBusqueda({ ...Busqueda.filas(r, q, titulos), q }, conservarRuta);
+}
+// Abrir es idempotente: con la modal abierta (el atajo llega por la página y por el menú) no vuelve a abrirla, para no
+// pisar el foco guardado; solo enfoca el campo. Sin texto, abre con la última consulta de la sesión, seleccionada.
+function abrirBusqueda(texto = null) {
+  if (!cuaderno()) return;
+  const campo = $('#buscador');
+  if ($('#busqueda').hidden) { abrirModal('#busqueda', '#buscador'); campo.value = texto ?? ultimaConsulta; consultarBusqueda(campo.value); }
+  else if (texto != null) { campo.value = texto; consultarBusqueda(texto); }
+  campo.focus();
+  if (texto != null) campo.setSelectionRange(campo.value.length, campo.value.length); else campo.select();
+}
+// Con la modal abierta, repite la consulta (el disco, lo oculto o la papelera cambiaron) conservando texto, fila elegida y foco.
+function refrescarBusqueda() {
+  if ($('#busqueda').hidden) return;
+  const o = opcionesBusqueda()[opcionElegida()];
+  consultarBusqueda($('#buscador').value, { conservarRuta: o ? o.dataset.ruta : null });
+}
+function cerrarBusqueda() {
+  if ($('#busqueda').hidden) return;
+  clearTimeout(tBusqueda); turnoBusqueda++;
+  cerrarModal('#busqueda');
+}
+function abrirOpcion(o) {
+  if (!o) return;
+  if (o.dataset.tarea) { const v = $('#buscador').value; return apuntarTarea(comandoTarea(v) ?? v); }
+  const ruta = o.dataset.ruta, l = o.dataset.linea;
+  cerrarBusqueda();
+  location.hash = `#/n/${encodeURI(ruta)}${l != null ? `?l=${l}` : ''}`;
+}
+// Apuntar una tarea: lo que hacía el «+» del lateral, sin cambiar dónde ni cómo se escribe en tareas.md.
+async function apuntarTarea(texto) {
+  texto = (texto || '').trim();
   if (!texto) return;
   const nota = notaParaTarea();
   try { await api('/api/tarea', { texto: nota ? `${texto} [[${nota}]]` : texto }); } catch (e) { if (e.status !== 409) avisarError('No se ha podido añadir la tarea.', e.message); return; }
   avisar('Tarea añadida');
-  $('#buscador').value = ''; buscar('');   // vacía y sale del estado «buscando»: vuelven Inicio/Tareas/Comentarios y el árbol
+  ultimaConsulta = ''; $('#buscador').value = '';   // tras apuntar, la consulta se olvida: un Enter no repite la tarea
+  cerrarBusqueda();
   refrescarContadores();
   if (enTareas()) abrirTareas();
 }
-$('#buscador').addEventListener('keydown', e => { if (e.key === 'Enter' && comandoTarea(e.target.value) != null) { e.preventDefault(); clearTimeout(tBusqueda); anadirTareaDesdeBuscador(); } });
-const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
-async function buscar(q) {
-  $('#lateral').classList.toggle('buscando', !!q.trim());   // con algo escrito, Inicio/Tareas/Comentarios dejan sitio a los resultados
-  if (!q.trim()) return pintarArbol(arbol);
-  if (comandoTarea(q) != null) return pintarComando(comandoTarea(q));
-  const r = await api(`/api/buscar?q=${encodeURIComponent(q)}`);
-  const re = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig');
-  const marcar = s => esc(s).replace(re, m => `<mark>${m}</mark>`);
-  // Primero las notas (por título o nombre de fichero: para abrir una, no hace falta leer todo el texto); después las líneas.
-  const notas = r.ficheros.map(p => `<a class="resultado" href="#/n/${encodeURI(p)}">${marcar(tituloDe(p))}<small>${marcar(p)}</small></a>`).join('');
-  const porNota = new Map(); for (const l of r.lineas) { if (!porNota.has(l.ruta)) porNota.set(l.ruta, []); porNota.get(l.ruta).push(l); }
-  const lineas = [...porNota].map(([ruta, ls]) => `<div class="grupo"><a class="resultado" href="#/n/${encodeURI(ruta)}">${esc(tituloDe(ruta))}<small>${esc(ruta)}</small></a>${ls.map(l => `<a class="resultado linea" href="#/n/${encodeURI(l.ruta)}?l=${l.linea}">${marcar(l.texto)}</a>`).join('')}</div>`).join('');
-  const nada = !r.ficheros.length && !r.lineas.length;
-  $('#arbol').innerHTML = `<div class="oculto" role="status">${nada ? `nada con «${esc(q.trim())}»` : `${plural(r.ficheros.length, 'nota', 'notas')} y ${plural(r.lineas.length, 'línea', 'líneas')}`}</div>`
-    + (nada ? `<p class="vacio">Nada con «${esc(q.trim())}». Con <b>+</b> delante sería una tarea; «Nueva nota» crea una nota.</p>` : '')
-    + (r.ficheros.length ? `<h3 class="tramo">${plural(r.ficheros.length, 'nota', 'notas')}</h3>${notas}` : '')
-    + (r.lineas.length ? `<h3 class="tramo">En el texto <small>${plural(r.lineas.length, 'línea', 'líneas')} en ${plural(porNota.size, 'nota', 'notas')}</small></h3>${lineas}` : '');
-}
-// Teclado en el buscador: flecha abajo o Enter van al primer resultado (Enter lo abre); Escape vacía y vuelve al árbol.
-$('#buscador').addEventListener('keydown', e => {
-  if (comandoTarea(e.target.value) != null || !e.target.value.trim()) return;
-  const primero = $('#arbol a.resultado');
-  if (e.key === 'ArrowDown' && primero) { e.preventDefault(); primero.focus(); }
-  if (e.key === 'Enter' && primero) { e.preventDefault(); primero.click(); }
-  if (e.key === 'Escape') { e.preventDefault(); e.target.value = ''; buscar(''); }
+$('#btn-buscar').onclick = () => abrirBusqueda();
+$('#busqueda-pie-tarea').textContent = enMac ? '⌘' : 'Ctrl';
+$('#buscador').addEventListener('input', e => {
+  const v = e.target.value;
+  if (comandoTarea(v) == null) ultimaConsulta = v;
+  clearTimeout(tBusqueda);
+  if (comandoTarea(v) != null || !v.trim()) consultarBusqueda(v); else tBusqueda = setTimeout(() => consultarBusqueda(v), 120);
 });
+$('#buscador').addEventListener('keydown', e => {
+  if (e.isComposing) return;
+  const ops = opcionesBusqueda(), v = e.target.value;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!ops.length) return;
+    const i = opcionElegida();
+    elegirOpcion(e.key === 'ArrowDown' ? (i + 1) % ops.length : (i <= 0 ? ops.length - 1 : i - 1));
+  } else if (e.key === 'Enter') {
+    e.preventDefault(); clearTimeout(tBusqueda);
+    if (e.ctrlKey || e.metaKey) apuntarTarea(comandoTarea(v) ?? v);   // ⌘↵ o Ctrl ↵ apunta la tarea desde cualquier fila
+    else if (comandoTarea(v) != null) apuntarTarea(comandoTarea(v));
+    else abrirOpcion(ops[opcionElegida()]);
+  }
+});
+$('#busqueda-lista').addEventListener('click', e => abrirOpcion(e.target.closest('[role="option"]')));
+$('#busqueda').addEventListener('click', e => { if (e.target === $('#busqueda')) cerrarBusqueda(); });   // el velo
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#busqueda').hidden) { e.preventDefault(); cerrarBusqueda(); } });
+// Los atajos: Ctrl o ⌘ con K, F u O. En la terminal no: Ctrl K es del shell (en la app, ⌘F y ⌘O llegan por el menú); sin cuaderno
+// (pantalla de Cuadernos) no hay nada que buscar; con otro diálogo abierto, nada.
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && ['k', 'f', 'o'].includes(e.key.toLowerCase())) {
+    if (e.target.closest && e.target.closest('#cajon')) return;
+    const d = dialogoAbierto(); if ((d && d.id !== 'busqueda') || !cuaderno()) return;
+    e.preventDefault(); abrirBusqueda();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); alternarTerminal(); }
+});
+// Flechas entre los botones de una fila del árbol (y la izquierda del primero vuelve a la fila).
 $('#arbol').addEventListener('keydown', e => {
   const t = e.target;
-  if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && t.matches('button[tabindex="-1"]')) {   // entre los botones de una fila; la izquierda del primero vuelve a la fila
+  if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && t.matches('button[tabindex="-1"]')) {
     const hermanos = [...t.parentElement.querySelectorAll('button')], i = hermanos.indexOf(t);
     e.preventDefault();
     if (e.key === 'ArrowRight') { if (hermanos[i + 1]) hermanos[i + 1].focus(); } else if (i > 0) hermanos[i - 1].focus(); else (t.closest('.fila') ? t.closest('.fila').querySelector('a.hoja') : t.closest('summary')).focus();
     return;
   }
-  if (e.key === 'ArrowRight' && t.matches('a.hoja, summary')) { const b = (t.closest('.fila') || t).querySelector('.acciones-fila button'); if (b) { e.preventDefault(); b.focus(); } return; }
-  const a = e.target.closest('a.resultado'); if (!a || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
-  e.preventDefault();
-  const todos = [...$('#arbol').querySelectorAll('a.resultado')], i = todos.indexOf(a);
-  if (e.key === 'ArrowDown' && todos[i + 1]) todos[i + 1].focus();
-  else if (e.key === 'ArrowUp') (todos[i - 1] || $('#buscador')).focus();
-});
-// Ctrl K (y Buscar… en el menú de la app de escritorio): el buscador, desplegando la barra lateral si estaba plegada.
-function enfocarBuscador() { if (lateralPlegado() && window.innerWidth > 760) plegarLateral(false, { enfocar: false }); const b = $('#buscador'); b.focus(); b.select(); return b; }
-document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); enfocarBuscador(); }
-  if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); alternarTerminal(); }
+  if (e.key === 'ArrowRight' && t.matches('a.hoja, summary')) { const b = (t.closest('.fila') || t).querySelector('.acciones-fila button'); if (b) { e.preventDefault(); b.focus(); } }
 });
 
 // ---------- mostrar en el gestor de archivos del sistema (Finder, Explorador…)
@@ -187,7 +254,7 @@ const botonesFila = (ruta, nombre, esFichero = false) => `<span class="acciones-
 async function ocultar(ruta, si) {
   try { await api('/api/ocultar', { ruta, ocultar: si }); } catch (e) { return avisarError(si ? 'No se ha podido ocultar.' : 'No se ha podido volver a mostrar.', e.message); }
   arbol = await api('/api/arbol');
-  if (!$('#buscador').value.trim()) pintarArbol(arbol); else buscar($('#buscador').value);
+  pintarArbol(arbol); refrescarBusqueda();
   if (si) avisar(`«${ruta.split('/').pop()}» oculto aquí. Para verlo otra vez: Ajustes.`);
   if (!$('#ajustes').hidden) pintarOcultas();
 }
@@ -230,7 +297,7 @@ async function mandarAPapelera(ruta) {
   try { await api('/api/papelera', { ruta }); } catch (e) { avisarError(`No se ha podido mandar a ${PAPELERA}.`, e.message); return; }
   avisar(`«${ruta.split('/').pop()}» está en ${PAPELERA}`);
   [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]);
-  if (!$('#buscador').value.trim()) pintarArbol(arbol);
+  pintarArbol(arbol); refrescarBusqueda();
   if (rutaActual === ruta) { rutaActual = null; location.hash = cuaderno().portada && cuaderno().portada !== ruta ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; }
   refrescarContadores();
 }
@@ -642,7 +709,7 @@ document.addEventListener('keydown', e => {
 let foco = null;
 // «Guardar» es solo del repositorio (revisión de diseño 2026-10-09, hallazgo 3): la edición de la nota escribe en ella y lo dice con otro verbo («Aplicar»).
 // Con un diálogo abierto, lo de detrás queda `inert` y el Tab da la vuelta dentro (hallazgo 8, WCAG 2.4.3): aria-modal no basta.
-const DIALOGOS = ['#nueva-nota', '#guardar', '#resultado', '#ajustes', '#descartar'];
+const DIALOGOS = ['#busqueda', '#nueva-nota', '#guardar', '#resultado', '#ajustes', '#descartar'];
 const dialogoAbierto = () => DIALOGOS.map($).find(d => d && !d.hidden) || null;
 function sincronizarInerte() { const hay = !!dialogoAbierto(); for (const el of [$('#app'), $('.saltar'), $('#aviso-reinicio')]) el.inert = hay; }
 document.addEventListener('keydown', e => {
@@ -1014,7 +1081,7 @@ document.addEventListener('keydown', e => {
 try { if (localStorage.getItem(CLAVE_LATERAL) === '1') { $('#app').classList.add('lateral-plegado'); $('#btn-plegar').setAttribute('aria-expanded', 'false'); } } catch { /* sin almacenamiento */ }   // el cajón y el índice se acotan solos al arrancar (aplicarCajon)
 function menuLateral(abrir) { const l = $('#lateral'); l.classList.toggle('abierto', abrir); $('#btn-menu').setAttribute('aria-expanded', String(abrir)); if (!abrir && window.innerWidth <= 760) $('#btn-menu').focus(); }
 $('#btn-menu').onclick = () => menuLateral(!$('#lateral').classList.contains('abierto'));
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#lateral').classList.contains('abierto')) menuLateral(false); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !e.defaultPrevented && !dialogoAbierto() && $('#lateral').classList.contains('abierto')) menuLateral(false); });
 $('#lateral').addEventListener('click', e => { if (e.target.closest('a') && window.innerWidth <= 760) menuLateral(false); });
 $('#ajustes-cerrar').onclick = cerrarAjustes;
 $('#ajustes form').addEventListener('change', async () => {
@@ -1036,15 +1103,13 @@ const ACCIONES_APP = {
   'abrir-carpeta': elegirCarpeta,
   // Abrir nota… y Buscar… hoy son lo mismo (el buscador busca por nombre de nota y de carpeta y por el texto; Enter abre);
   // son dos acciones porque divergirán (menu.js lo explica).
-  buscar: () => { if (cuaderno()) enfocarBuscador(); },
-  'abrir-nota': () => { if (cuaderno()) enfocarBuscador(); },
+  buscar: () => abrirBusqueda(),
+  'abrir-nota': () => abrirBusqueda(),
   'nueva-tarea': () => {
     if (!cuaderno()) return;
     const campo = $('#tarea-nueva');
     if (campo && !$('#panel').hidden) return campo.focus();
-    const b = enfocarBuscador();
-    if (comandoTarea(b.value) == null) { b.value = '+ '; b.dispatchEvent(new Event('input', { bubbles: true })); }
-    b.setSelectionRange(b.value.length, b.value.length);
+    abrirBusqueda('+ ');
   },
   // Los de la crítica del 2026-10-10 (8): Nueva nota es el botón de la barra lateral; Barra lateral y Terminal, lo que ya
   // hacen Ctrl \ y Ctrl ` en la página (en Mac el menú se queda esas teclas antes que la página; con el foco en la
@@ -1053,7 +1118,9 @@ const ACCIONES_APP = {
   'barra-lateral': () => { if (window.innerWidth <= 760 || (document.activeElement && document.activeElement.closest('#cajon'))) return; plegarLateral(!lateralPlegado()); },
   terminal: () => { if (cuaderno()) alternarTerminal(); },
 };
-if (enApp()) window.cuadernoApp.alAccion(nombre => { if (dialogoAbierto()) return; const fn = ACCIONES_APP[nombre]; if (fn) fn(); });
+// Con un diálogo abierto la acción se ignora, salvo con la modal de búsqueda: ahí buscar, abrir nota y nueva tarea solo enfocan el campo (abrirBusqueda es idempotente).
+const ACCIONES_CON_BUSQUEDA = ['buscar', 'abrir-nota', 'nueva-tarea'];
+if (enApp()) window.cuadernoApp.alAccion(nombre => { const d = dialogoAbierto(); if (d && !(d.id === 'busqueda' && ACCIONES_CON_BUSQUEDA.includes(nombre))) return; const fn = ACCIONES_APP[nombre]; if (fn) fn(); });
 
 function pintarEstado() {
   $('#aviso-reinicio').hidden = !info.desactualizada || avisoCerrado;
@@ -1100,7 +1167,7 @@ window.addEventListener('hashchange', () => {
 // El socket de cambios se reabre solo si se cae (el Mac se duerme, el servidor de Electron se relanza): espera creciente
 // de 0,5 s hasta 10 s, un solo socket y un solo temporizador a la vez; al volver a abrir resincroniza como si hubiera
 // llegado un cambio, para recoger lo que cambió mientras estaba caído.
-async function alCambiarDisco() { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (escribiendo) { /* lo está escribiendo la propia app: aplicarEdicion repinta al acabar */ } else if (rutaActual && !Comentar.ocupado() && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual, null, { desdeCambios: true }); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }
+async function alCambiarDisco() { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); pintarArbol(arbol); refrescarBusqueda(); if (escribiendo) { /* lo está escribiendo la propia app: aplicarEdicion repinta al acabar */ } else if (rutaActual && !Comentar.ocupado() && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual, null, { desdeCambios: true }); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }
 let cambiosWs = null, cambiosEspera = 500, cambiosTemporizador = null, cambiosAbierto = false;
 function conectarCambios() {
   cambiosTemporizador = null;
