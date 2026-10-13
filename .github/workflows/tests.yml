@@ -1,9 +1,13 @@
 # Tests del repo en GitHub Actions.
 #   push (solo main)    → Linux: npm test + recorridos de navegador + recorridos de Electron (xvfb-run). En una rama, la
 #                         lanza su pull request (no dos veces el mismo commit).
-#   pull_request        → Linux, macOS y Windows: lo mismo en los tres (el run de Windows compila node-pty con Node 24),
-#                         salvo los recorridos de Electron, que en Mac y Windows solo corren a mano (coste: R5 del plan).
+#   pull_request        → Linux y Windows (el run de Windows compila node-pty con Node 24); macOS solo si el PR lleva la
+#                         etiqueta `macos`: añadirla lanza la CI y quitarla no hace nada. Otra etiqueta no relanza nada.
+#                         Los recorridos de Electron, en Linux; en Mac y Windows solo a mano (coste: R5 del plan).
 #   workflow_dispatch   → los tres sistemas, a mano, desde la pestaña Actions, con los recorridos de Electron en los tres.
+# Por qué macOS no corre por defecto (Roberto, 2026-10-13): cuenta ×10 en la cuota del repo privado y duplica la prueba
+# local, que ya se hace en su Mac real (`npm test` antes de subir). La etiqueta `macos` es para cambios propios del Mac
+# (menús, empaquetado).
 # Los recorridos de Electron (`tests/electron/`, Playwright `_electron`, experimental) van en un paso propio con su tiempo
 # máximo: si fallan por su cuenta se pueden pasar a manual sin tocar el resto (R9). El binario de Electron (~100 MB) no lo
 # baja `npm ci` (Electron 44 no tiene postinstall): lo baja `node node_modules/electron/install.js` en un paso explícito,
@@ -30,6 +34,7 @@ on:
       - ".github/workflows/tests.yml"
       - ".github/workflows/empaquetar.yml"
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - "*.js"
       - "public/**"
@@ -44,13 +49,15 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: tests-${{ github.ref }}
+  # Un `labeled` con otra etiqueta que `macos` va a un grupo aparte: sus jobs se saltan y no cancelan el run en curso.
+  group: tests-${{ github.ref }}-${{ github.event.action == 'labeled' && github.event.label.name != 'macos' && 'otra' || 'ci' }}
   cancel-in-progress: true
 
 jobs:
   sistemas:
     # Decide en qué sistemas se corre según el disparador (ver cabecera).
     runs-on: ubuntu-latest
+    if: github.event.action != 'labeled' || github.event.label.name == 'macos'
     outputs:
       lista: ${{ steps.elegir.outputs.lista }}
     steps:
@@ -58,6 +65,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
             echo 'lista=["ubuntu-latest"]' >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ contains(github.event.pull_request.labels.*.name, 'macos') }}" = "false" ]; then
+            echo 'lista=["ubuntu-latest","windows-latest"]' >> "$GITHUB_OUTPUT"
           else
             echo 'lista=["ubuntu-latest","macos-latest","windows-latest"]' >> "$GITHUB_OUTPUT"
           fi
