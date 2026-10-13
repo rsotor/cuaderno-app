@@ -57,14 +57,14 @@ enlaces rotos.
 ## Teclado
 
 Los atajos de la app de escritorio (⌘ en Mac; Ctrl en Windows y Linux, salvo donde se dice Ctrl, que es Ctrl en los tres).
-En la web, los de la página siguen igual (Ctrl K buscador, Ctrl \ barra lateral, Ctrl ` terminal, E editar, C comentar).
+La búsqueda es una modal: ⌘K, ⌘F y ⌘O la abren, en la app y en la web (Ctrl en Windows y en la web; con el foco en la terminal, Ctrl K es del shell y no la abre). Dentro: ↑ ↓ eligen, Enter abre la nota, ⌘↵ (Ctrl ↵) apunta lo escrito como tarea y Esc cierra. En la web, los demás atajos de la página siguen igual (Ctrl \ barra lateral, Ctrl ` terminal, E editar, C comentar).
 
 | Atajo | Menú | Qué hace |
 |---|---|---|
 | ⌘N | Archivo → Nueva nota | el diálogo de nueva nota |
-| ⌘T | Archivo → Nueva tarea | la casilla «Nueva tarea» si estás en Tareas; si no, el buscador con «+ » (Enter la añade) |
-| ⌘O | Archivo → Abrir nota… | el buscador con el texto seleccionado: nombre de nota o carpeta, Enter abre |
-| ⌘F | Archivo → Buscar… | el buscador (hoy, lo mismo que ⌘O) |
+| ⌘T | Archivo → Nueva tarea | la casilla «Nueva tarea» si estás en Tareas; si no, la modal de búsqueda con «+ » (Enter la apunta) |
+| ⌘O | Archivo → Abrir nota… | la modal de búsqueda con la última consulta seleccionada: nombre de nota o carpeta, Enter abre |
+| ⌘F | Archivo → Buscar… | la modal de búsqueda (hoy, lo mismo que ⌘O) |
 | ⌘S | Archivo → Guardar | guardar en el repositorio del cuaderno |
 | ⇧⌘O | Archivo → Abrir carpeta… | cambiar de cuaderno con el diálogo del sistema |
 | — | Archivo → Cuadernos recientes | los últimos cuadernos abiertos |

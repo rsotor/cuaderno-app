@@ -140,7 +140,7 @@ function pintarBusqueda({ filas = [], hayMas = false, q = '', comando = null } =
     nada.innerHTML = comando ? `<kbd>Enter</kbd> añade la tarea: <b>${esc(comando)}</b>${nota ? `<small>enlazada a ${esc(tituloDe(rutaActual))}</small>` : ''}` : 'Escribe la tarea después del <b>+</b> y pulsa <kbd>Enter</kbd>.';
     estado.textContent = comando ? `Enter añade la tarea: ${comando}${nota ? `, enlazada a ${tituloDe(rutaActual)}` : ''}` : 'Escribe la tarea después del +';
   } else if (q && !filas.length) {
-    nada.hidden = false; nada.innerHTML = `Nada con «${esc(q)}». Con <b>+</b> delante sería una tarea; «Nueva nota» crea una nota.`;
+    nada.hidden = false; nada.innerHTML = `Nada con «${esc(q)}».`;   // corto: la fila «Apuntar tarea» de debajo ya dice cómo apuntarla (crítica 2026-10-13, 1)
     estado.textContent = `nada con «${q}»`;
   } else estado.textContent = q ? `${filas.length} ${filas.length === 1 ? 'nota' : 'notas'}${hayMas ? ', hay más' : ''}` : '';
   const i = conservarRuta ? filas.findIndex(f => f.ruta === conservarRuta) : -1;
