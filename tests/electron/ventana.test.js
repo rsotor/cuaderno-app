@@ -65,7 +65,7 @@ test.before(async () => {
   registro = () => { try { return fs.readFileSync(path.join(configDir, 'registro.log'), 'utf8'); } catch { return ''; } };
   // Chromium crea el socket del singleton bajo TMPDIR y el sistema limita su ruta a ~108 caracteres (lo vio el spike).
   const tmp = unix && os.tmpdir().length > 40 ? '/tmp' : os.tmpdir();
-  app = await _electron.launch({ args: ['.'], cwd: RAIZ, timeout: 60_000, env: { ...process.env, TMPDIR: tmp, CUADERNO_CONFIG_DIR: configDir, CUADERNO_USERDATA: userData, CUADERNO_SIN_DIALOGO: '1', CUADERNO_SIN_NAVEGADOR: '1' } });
+  app = await _electron.launch({ args: ['.'], cwd: RAIZ, timeout: 60_000, env: { ...process.env, TMPDIR: tmp, CUADERNO_CONFIG_DIR: configDir, CUADERNO_USERDATA: userData, CUADERNO_SIN_DIALOGO: '1', CUADERNO_SIN_NAVEGADOR: '1', CUADERNO_OCULTA: '1' } });
   pagina = await app.firstWindow();
   pagina.setDefaultTimeout(ESPERA);
   // El beforeunload de la pantalla lo atiende Electron (will-prevent-unload, en electron/ventana.js), no un diálogo de

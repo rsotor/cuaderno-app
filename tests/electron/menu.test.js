@@ -50,7 +50,7 @@ test.before(async () => {
   fs.writeFileSync(path.join(configDir, 'config.json'), JSON.stringify({ tema: 'claro', recientes: [{ ruta: c.raiz, nombre: path.basename(c.raiz), abierto: new Date().toISOString() }] }));
   registro = () => { try { return fs.readFileSync(path.join(configDir, 'registro.log'), 'utf8'); } catch { return ''; } };
   const tmp = process.platform !== 'win32' && os.tmpdir().length > 40 ? '/tmp' : os.tmpdir();
-  app = await _electron.launch({ args: ['.'], cwd: RAIZ, timeout: 60_000, env: { ...process.env, TMPDIR: tmp, CUADERNO_CONFIG_DIR: configDir, CUADERNO_USERDATA: userData, CUADERNO_SIN_DIALOGO: '1', CUADERNO_SIN_NAVEGADOR: '1', CUADERNO_DIALOGO_PRUEBA: otro.raiz } });
+  app = await _electron.launch({ args: ['.'], cwd: RAIZ, timeout: 60_000, env: { ...process.env, TMPDIR: tmp, CUADERNO_CONFIG_DIR: configDir, CUADERNO_USERDATA: userData, CUADERNO_SIN_DIALOGO: '1', CUADERNO_SIN_NAVEGADOR: '1', CUADERNO_DIALOGO_PRUEBA: otro.raiz, CUADERNO_OCULTA: '1' } });
   pagina = await app.firstWindow();
   pagina.setDefaultTimeout(ESPERA);
   pagina.on('dialog', d => d.dismiss().catch(() => {}));

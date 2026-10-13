@@ -39,7 +39,7 @@ test.before(async () => {
   fs.writeFileSync(path.join(configDir, 'config.json'), JSON.stringify({ tema: 'claro', recientes: [{ ruta: reciente.raiz, nombre: path.basename(reciente.raiz), abierto: new Date().toISOString() }] }));
   registro = () => { try { return fs.readFileSync(path.join(configDir, 'registro.log'), 'utf8'); } catch { return ''; } };
   const tmp = process.platform !== 'win32' && os.tmpdir().length > 40 ? '/tmp' : os.tmpdir();
-  entorno = { ...process.env, TMPDIR: tmp, CUADERNO_CONFIG_DIR: configDir, CUADERNO_USERDATA: userData, CUADERNO_SIN_DIALOGO: '1', CUADERNO_DIALOGO_PRUEBA: elegida.raiz };
+  entorno = { ...process.env, TMPDIR: tmp, CUADERNO_CONFIG_DIR: configDir, CUADERNO_USERDATA: userData, CUADERNO_SIN_DIALOGO: '1', CUADERNO_DIALOGO_PRUEBA: elegida.raiz, CUADERNO_OCULTA: '1' };
   app = await _electron.launch({ args: ['.', porArgv.raiz], cwd: RAIZ, timeout: 60_000, env: entorno });
   pagina = await app.firstWindow();
   pagina.setDefaultTimeout(ESPERA);

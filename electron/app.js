@@ -130,7 +130,9 @@ function arrancar({ electron, config, env = process.env, entorno = entornoDeLaSh
   estado.listo = app.whenReady().then(async () => {
     const { color } = ventanaApp.aplicarTema({ nativeTheme: electron.nativeTheme, config });   // themeSource según config.tema antes del primer píxel: sin flash blanco en oscuro
     const { origen: origenLimites, ...limites } = ventanaApp.limitesDeVentana({ screen: electron.screen, guardado: config.leer().ventana });
-    const ventana = new BrowserWindow({ ...PANTALLA, ...limites, backgroundColor: color });
+    const oculta = !!env.CUADERNO_OCULTA;   // solo los tests: la ventana existe pero no se ve ni toma el foco (no se llama nunca a show/focus), y en Mac sin icono en el Dock
+    if (oculta && app.dock) app.dock.hide();
+    const ventana = new BrowserWindow({ ...PANTALLA, ...limites, backgroundColor: color, ...(oculta ? { show: false } : {}) });
     estado.ventana = ventana;
     anotar(`ventana ${limites.width} × ${limites.height}${'x' in limites ? ` en (${limites.x}, ${limites.y})` : ''}: ${origenLimites === 'guardado' ? 'la última posición' : origenLimites === 'area' ? 'el 90 % del área de trabajo' : 'el tamaño por defecto'}`);
     // Al cerrar, dónde y cuánto medía, para abrir igual la próxima vez (minimizada no: sus límites no son de verdad).
