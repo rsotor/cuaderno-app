@@ -383,7 +383,8 @@ test('barra superior: la miga es una navegación con la nota actual marcada; Edi
   await visible(e.pagina.locator('#menu-nota'), 'barra', 'el menú de la nota');
   assert.equal(await e.pagina.getAttribute('#menu-nota', 'role'), 'menu');
   const filas = await e.pagina.locator('#menu-nota [role="menuitem"]').evaluateAll(l => l.map(x => x.textContent.trim().replace(/\s+/g, ' ')));
-  assert.deepEqual(filas, ['Mostrar en el Finder', 'Copiar la ruta', 'Ocultar solo en la app', 'Mover a la papelera'], 'barra: el menú no tiene esas cuatro acciones en ese orden');
+  const gestor = /^Mostrar en (el Finder|el Explorador|la carpeta)$/;   // según el sistema donde corre el navegador
+  assert.match(filas[0], gestor); assert.deepEqual(filas.slice(1), ['Copiar la ruta', 'Ocultar solo en la app', 'Mover a la papelera'], 'barra: el menú no tiene esas cuatro acciones en ese orden');
   assert.equal(await e.pagina.locator('#menu-nota hr').count(), 1, 'barra: falta el separador antes de la papelera');
   const color = await e.pagina.evaluate(() => { const p = document.createElement('span'); p.style.color = 'var(--mal)'; document.body.append(p); const mal = getComputedStyle(p).color; p.remove(); return { mal, ultimo: getComputedStyle([...document.querySelectorAll('#menu-nota [role="menuitem"]')].at(-1)).color }; });
   assert.equal(color.ultimo, color.mal, 'barra: «Mover a la papelera» no va en el color de peligro');
@@ -394,7 +395,7 @@ test('barra superior: la miga es una navegación con la nota actual marcada; Edi
   await e.ir('#/n/inicio.md');
   await e.pagina.locator('#btn-mas-nota').click();
   await visible(e.pagina.locator('#menu-nota'), 'barra', 'el menú de inicio.md');
-  assert.deepEqual(await e.pagina.locator('#menu-nota [role="menuitem"]').evaluateAll(l => l.map(x => x.textContent.trim().replace(/\s+/g, ' '))), ['Mostrar en el Finder', 'Copiar la ruta', 'Ocultar solo en la app'], 'barra: inicio.md (lo genera el profesor) ofrece la papelera');
+  assert.deepEqual((await e.pagina.locator('#menu-nota [role="menuitem"]').evaluateAll(l => l.map(x => x.textContent.trim().replace(/\s+/g, ' ')))).slice(1), ['Copiar la ruta', 'Ocultar solo en la app'], 'barra: inicio.md (lo genera el profesor) ofrece la papelera');
   await e.pagina.keyboard.press('Escape');
 });
 
