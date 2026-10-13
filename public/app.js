@@ -1097,7 +1097,28 @@ window.addEventListener('hashchange', () => {
 });
 
 // ---------- recarga en vivo
-try { const c = new WebSocket(wsUrl('/cambios')); c.onmessage = async () => { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (escribiendo) { /* lo está escribiendo la propia app: aplicarEdicion repinta al acabar */ } else if (rutaActual && !Comentar.ocupado() && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual, null, { desdeCambios: true }); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }; } catch { /* sin recarga */ }
+// El socket de cambios se reabre solo si se cae (el Mac se duerme, el servidor de Electron se relanza): espera creciente
+// de 0,5 s hasta 10 s, un solo socket y un solo temporizador a la vez; al volver a abrir resincroniza como si hubiera
+// llegado un cambio, para recoger lo que cambió mientras estaba caído.
+async function alCambiarDisco() { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); if (!$('#buscador').value.trim()) pintarArbol(arbol); if (escribiendo) { /* lo está escribiendo la propia app: aplicarEdicion repinta al acabar */ } else if (rutaActual && !Comentar.ocupado() && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual, null, { desdeCambios: true }); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }
+let cambiosWs = null, cambiosEspera = 500, cambiosTemporizador = null, cambiosAbierto = false;
+function conectarCambios() {
+  cambiosTemporizador = null;
+  if (cambiosWs) return;
+  let c;
+  try { c = new WebSocket(wsUrl('/cambios')); } catch { return; /* sin recarga */ }
+  cambiosWs = c;
+  c.onopen = () => { cambiosEspera = 500; if (cambiosAbierto) alCambiarDisco(); cambiosAbierto = true; };
+  c.onmessage = alCambiarDisco;
+  c.onclose = () => {
+    if (cambiosWs !== c) return;
+    cambiosWs = null;
+    if (cambiosTemporizador) return;
+    cambiosTemporizador = setTimeout(conectarCambios, cambiosEspera);
+    cambiosEspera = Math.min(cambiosEspera * 2, 10000);
+  };
+}
+conectarCambios();
 
 (async () => {
   info = await api('/api/info');
