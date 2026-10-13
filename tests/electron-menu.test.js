@@ -11,7 +11,7 @@ const todos = (plantilla, acc = []) => { for (const e of plantilla) { acc.push(e
 const etiquetas = plantilla => plantilla.map(e => e.label);
 const roles = plantilla => todos(plantilla).map(e => e.role).filter(Boolean);
 const recientes = [{ ruta: '/cuadernos/finanzas', nombre: 'Finanzas', abierto: '2026-10-10' }, { ruta: '/cuadernos/historia', nombre: 'Historia', abierto: '2026-10-01' }];
-const anotador = () => { const l = []; const a = { lineas: l, acciones: { accion: n => l.push(`accion ${n}`), abrirCarpeta: r => l.push(`abrir ${r}`), atras: () => l.push('atras'), adelante: () => l.push('adelante'), comoSeUsa: () => l.push('uso'), atajos: () => l.push('atajos'), planVivo: () => l.push('plan'), mostrarRegistro: () => l.push('registro'), diagnostico: () => l.push('diagnostico'), acercaDe: () => l.push('acerca') } }; return a; };
+const anotador = () => { const l = []; const a = { lineas: l, acciones: { accion: n => l.push(`accion ${n}`), abrirCarpeta: r => l.push(`abrir ${r}`), comoSeUsa: () => l.push('uso'), atajos: () => l.push('atajos'), planVivo: () => l.push('plan'), mostrarRegistro: () => l.push('registro'), diagnostico: () => l.push('diagnostico'), acercaDe: () => l.push('acerca') } }; return a; };
 
 test('en Windows y Linux: Archivo, Edición, Ver, Ventana y Ayuda, en castellano; Ajustes y Salir en Archivo; Acerca de en Ayuda', () => {
   for (const plataforma of ['win32', 'linux']) {
@@ -42,7 +42,7 @@ test('los aceleradores: ⌘N nueva nota, ⌘T nueva tarea, ⌘O abrir nota, ⌘F
     ['guardar', 'CmdOrCtrl+S', 'guardar', 'archivo'], ['abrir-carpeta', 'CmdOrCtrl+Shift+O', 'abrir-carpeta', 'archivo'], ['ajustes', 'CmdOrCtrl+,', 'ajustes', 'archivo'],
     ['barra-lateral', 'Ctrl+\\', 'barra-lateral', 'ver'], ['terminal', 'Ctrl+`', 'terminal', 'ver'],
   ]);
-  assert.deepEqual(NAVEGACION.map(n => [n.id, n.accelerator, n.hacer]), [['atras', 'CmdOrCtrl+[', 'atras'], ['adelante', 'CmdOrCtrl+]', 'adelante']]);
+  assert.deepEqual(NAVEGACION.map(n => [n.id, n.accelerator, n.accion]), [['atras', 'CmdOrCtrl+[', 'atras'], ['adelante', 'CmdOrCtrl+]', 'adelante']]);   // P17: mandan su acción a la pantalla, como los demás
   for (const plataforma of ['darwin', 'win32', 'linux']) {
     const ver = elemento(plantillaMenu({ plataforma }), 'ver');
     assert.deepEqual(etiquetas(ver.submenu).filter(Boolean), ['Recargar', 'Atrás', 'Adelante', 'Barra lateral', 'Terminal', 'Acercar', 'Alejar', 'Tamaño real', 'Pantalla completa'], plataforma);
@@ -70,7 +70,7 @@ test('cada acción propia manda su nombre por `accion`, los recientes abren su c
   for (const id of ['atras', 'adelante']) elemento(p, id).click();
   elemento(p, 'reciente:/cuadernos/historia').click();
   for (const id of ['como-se-usa', 'atajos', 'plan-vivo', 'mostrar-registro', 'diagnostico', 'acerca-de']) elemento(p, id).click();
-  assert.deepEqual(a.lineas, ['accion nueva-nota', 'accion nueva-tarea', 'accion abrir-nota', 'accion buscar', 'accion guardar', 'accion abrir-carpeta', 'accion ajustes', 'accion barra-lateral', 'accion terminal', 'atras', 'adelante', 'abrir /cuadernos/historia', 'uso', 'atajos', 'plan', 'registro', 'diagnostico', 'acerca']);
+  assert.deepEqual(a.lineas, ['accion nueva-nota', 'accion nueva-tarea', 'accion abrir-nota', 'accion buscar', 'accion guardar', 'accion abrir-carpeta', 'accion ajustes', 'accion barra-lateral', 'accion terminal', 'accion atras', 'accion adelante', 'abrir /cuadernos/historia', 'uso', 'atajos', 'plan', 'registro', 'diagnostico', 'acerca']);
   assert.equal(CANAL, 'accion', 'el canal que escucha el preload');
   // Sin acciones (pintar el menú sin app detrás), pulsar no falla.
   const sola = plantillaMenu({ plataforma: 'darwin', recientes });

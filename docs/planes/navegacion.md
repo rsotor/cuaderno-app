@@ -518,7 +518,7 @@ Un test va a Electron solo si lo que comprueba no existe en la web.
 
 ## 10. Prueba en el Mac (la rellena T2.8)
 
-Sin hacer.
+**Sin hacer; la hace Roberto con la app instalada** (`npm run instalar` tras mergear). Qué mirar: (1) los botones laterales del ratón (atrás y adelante recorren el historial de uno en uno y no salen de la primera nota); (2) el gesto con «Deslizar entre páginas» en «con dos o tres dedos» (izquierda = Atrás, derecha = Adelante); (3) ⌘[ en la primera nota al abrir la app (no vuelve a «Arrancando…»); (4) las flechas ‹ › apagadas al abrir un cuaderno y tras cambiar de cuaderno con el selector; (5) la línea del estado con muchos cambios y con el lateral estrecho.
 
 ## 11. Abogado del diablo (2026-10-13)
 
@@ -561,3 +561,16 @@ T1.0 a T1.6 hechas en la rama `navegacion/modal-busqueda`. Diferencias con lo es
 - **Apertura en la línea:** `?l=` solo en las filas de coincidencia por texto (no en las que coinciden por nombre o título).
 - **Título gana a la línea:** si coincide por título y no por nombre, el fragmento es el título aunque haya una línea (p. ej. el frontmatter).
 - Con la crítica de diseño: ver `docs/diseno/critica-2026-10-13-modal.md`.
+
+## 13. Seguimiento del PR 2 (2026-10-13)
+
+T2.1 a T2.7 hechas en la rama `navegacion/a2`, un commit por tarea; T2.8 (cierre) con la crítica de diseño y este seguimiento. Diferencias con lo escrito arriba, y por qué:
+
+- **T2.1:** Guardar sin icono (solo el texto: gana sitio a 260 px). `#estado-git` lleva `role="status" aria-live="off"` para que su `aria-label` (la frase entera) sea legítimo. Sin ningún guardado y nada pendiente: «sin cambios» (**decidido por Roberto, 2026-10-13**; el plan no decía qué texto). La fecha larga sale como la da el navegador en castellano («12 sept»).
+- **T2.2:** el test de `?sin-git=1` está en `tests/servidor.test.js` (`rutas.test.js` es el que vigila que cada ruta salga en algún test). La lista trae también `abierto` (la fecha) además de `ruta`, `nombre`, `existe` y `abiertoAhora`; lo que se comprueba es que no trae `git`.
+- **T2.3:** la lupa pierde el atajo del texto (ya no hay texto): la pista vive en el `title` («Buscar (⌘F)» en la app, «Buscar (⌘K)» en la web). `tests/navegador/ocultar.test.js` (no listado en §6) leía el texto «Ajustes» del botón del pie; ahora comprueba su `aria-label`.
+- **T2.5:** la barra superior pasa a `padding: 9px 20px 9px` con `min-height: 50px` (antes 10/6 y 44 en el lateral plegado): con el relleno simétrico, el botón de desplegar y la miga quedan en el mismo eje (rev-13 #11). Parada de Tab hasta la nota: **30** (techo 34), con la carpeta nueva `navegacion/` incluida; los contadores de notas de `cuaderno.test.js` y `servidor.test.js` pasan de 22 a 23.
+- **T2.6:** como P17. El Atrás del navegador, en la web, ya no rebota a la portada (la redirección de «/» no deja entrada). En la app, una acción `atras`/`adelante` con un diálogo abierto se ignora, como las demás.
+- **T2.7 (parada y desbloqueada):** primero solo los botones del ratón; el gesto del trackpad se dejó como TODO porque el hook de commits bloqueaba el nombre en inglés del evento (falso positivo; Roberto lo quitó de su lista privada) y se hizo después: `electron/ventana.js` engancha `swipe` (`left` → Atrás, `right` → Adelante, `up`/`down` nada), probado con Electron falso (`tests/electron-ventana.test.js`) y con el real, emitiendo el evento a mano (`tests/electron/menu.test.js`). **Sigue sin probarse el gesto físico** ni el ratón real en el Mac de Roberto y en el Windows de su padre (§10). En macOS el gesto exige Trackpad › Más gestos › «Deslizar entre páginas» en «con dos o tres dedos»; con la opción por defecto no llega evento y no se atiende (al Inbox del plan vivo). En Windows, si los botones laterales no navegan, falta `app-command` en `ventana.js` (tarea propia).
+- **Casos del ejemplo:** las filas 31-34 entraron con sus tareas (no al final), y la nota `navegacion/una-nota-con-un-nombre-muy-largo-para-la-barra-superior.md` sin enlaces (para no mover los backlinks de `capital.md`).
+- **Crítica de diseño:** ver `docs/diseno/critica-2026-10-13-a2.md`.

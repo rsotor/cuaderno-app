@@ -42,7 +42,9 @@ test('«+» en el buscador: la pista, Enter añade a tareas.md y el panel se rep
   assert.equal(await e.pagina.locator('#buscador').inputValue(), '', 'buscador: la consulta no se vació tras añadir');
   await visible(e.pagina.locator('.paginas'), 'buscador', 'el lateral sigue como estaba (la búsqueda ya no vive en él)');
   await visible(item('Pedir apuntes').locator('.etiqueta', { hasText: '#clase' }), 'tareas', 'la tarea nueva con su etiqueta en el panel');
-  await conTexto(e.pagina.locator('#n-tareas'), /^\(8\)$/, 'lateral', 'el contador de pendientes');
+  // Maqueta A2: el contador va sin paréntesis y el nombre accesible dice lo que el número solo no dice.
+  await conTexto(e.pagina.locator('#n-tareas'), /^8$/, 'lateral', 'el contador de pendientes');
+  assert.equal(await e.pagina.getAttribute('#link-tareas', 'aria-label'), 'Tareas, 8 pendientes', 'lateral: el enlace Tareas no dice cuántas pendientes');
 });
 
 test('«+» con una nota abierta: la tarea lleva [[la nota]] al final', async () => {

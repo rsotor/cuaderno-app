@@ -165,6 +165,12 @@ test('sin cuaderno abierto: la API lo dice; abrir una carpeta cambia el cuaderno
     assert.ok((await (await pedir('/api/arbol')).json()).includes('inicio.md'));
     const lista = await (await pedir('/api/cuadernos')).json();
     assert.deepEqual(lista.map(c => [c.nombre, c.existe, c.abiertoAhora]), [['Mi otro curso', true, true]]);
+    assert.ok('git' in lista[0], '/api/cuadernos sin parámetro: falta la clave git');
+    // El selector de cuaderno pide la lista sin el estado de git (uno síncrono por reciente pararía el servidor): ?sin-git=1.
+    const sinGit = await (await pedir('/api/cuadernos?sin-git=1')).json();
+    assert.deepEqual(sinGit.map(c => [c.nombre, c.existe, c.abiertoAhora]), [['Mi otro curso', true, true]]);
+    for (const k of ['ruta', 'nombre', 'existe', 'abiertoAhora']) assert.ok(k in sinGit[0], `?sin-git=1 no trae ${k}`);
+    assert.ok(!('git' in sinGit[0]), '?sin-git=1 trae la clave git');
     // la configuración se guarda y vuelve en /api/info
     assert.deepEqual(await (await post('/api/configuracion', { tema: 'oscuro', letra: 'grande' })).json(), { tema: 'oscuro', letra: 'grande', fuente: 'sistema', comando_agente: '', editor: 'vista', panel: 'derecha', panel_ancho: 420, panel_alto: 320 });
     // el panel: un tamaño fuera de rango no da error ni se guarda; vuelve el valor que había
@@ -415,7 +421,7 @@ test('rutas de lectura y de nota nueva: títulos, recorrido y crear una nota', a
     const t = await (await s.pedir('/api/titulos')).json();
     assert.equal(t['conceptos/capital.md'], 'Capital'); assert.equal(t['material/calculadora-50-30-20.html'], 'Calculadora 50/30/20');
     const r = await (await s.pedir('/api/recorrido')).json();
-    assert.equal(r.notas, 22); assert.deepEqual(r.fallos, []);   // 22 (2026-10-13: +render/fragmentos-de-busqueda.md): con la nota larga de lectura/ (2026-10-09) y comentarios/nota-comentada.md
+    assert.equal(r.notas, 23); assert.deepEqual(r.fallos, []);   // 23 (2026-10-13: +navegacion/una-nota-con-un-nombre-muy-largo-para-la-barra-superior.md, y antes +render/fragmentos-de-busqueda.md): con la nota larga de lectura/ (2026-10-09) y comentarios/nota-comentada.md
     const n = await (await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).json();
     assert.equal(n.ruta, 'conceptos/Idea nueva.md'); assert.equal(s.c.leer('conceptos/Idea nueva.md'), '# Idea nueva\n\n');   // el título y una línea en blanco para escribir debajo
     assert.equal((await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).status, 400, 'una nota repetida no da error');

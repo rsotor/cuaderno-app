@@ -68,11 +68,12 @@ test('el menú de la app de escritorio: en castellano, con los atajos de la tabl
   assert.deepEqual(aceleradores, ATAJOS.map(a => a.accelerator), 'cada atajo de la tabla está en el menú instalado');
   // Las pistas de la pantalla dicen lo que dice el menú (en Linux, Ctrl; en Mac dirían ⌘).
   const mod = process.platform === 'darwin' ? '⌘' : 'Ctrl ';
-  assert.equal(await pagina.textContent('#btn-buscar-pista'), `${mod}F`, 'el disparador de la búsqueda dice la tecla del menú');
-  assert.match(await pagina.getAttribute('#btn-buscar', 'title'), new RegExp(`\\(${mod}F\\)$`));
+  // La lupa de la fila de accesos ya no lleva texto (decisión de Roberto, 2026-10-13): la tecla del menú está en su title.
+  assert.match(await pagina.getAttribute('#btn-buscar', 'title'), new RegExp(`^Buscar \\(${mod}F\\)$`), 'la lupa dice la tecla del menú');
   assert.equal(await pagina.getAttribute('#btn-guardar', 'title'), `Guardar en el repositorio del cuaderno (${mod}S)`);
   assert.equal(await pagina.getAttribute('#btn-nueva-nota', 'title'), `Crear una nota nueva (${mod}N)`);
-  assert.equal(await pagina.getAttribute('#btn-ajustes', 'title'), `Ajustes de la app (${mod},)`);
+  // Ajustes sale del lateral en la app (decisión de Roberto, 2026-10-13): vive en el menú, y «⌘,» lo abre (más abajo, `pulsar('ajustes')`).
+  assert.equal(await pagina.locator('#btn-ajustes').isVisible(), false, 'en la app, Ajustes no se pinta en el lateral');
   assert.equal(await pagina.getAttribute('#btn-terminal', 'title'), 'Abrir la terminal (Ctrl `)', 'el menú también usa Ctrl para la terminal');
   // Un cambio en una nota (en el disco, como lo haría el editor) y Guardar desde el menú: el diálogo de la pantalla, con el cambio contado.
   fs.appendFileSync(path.join(c.base, 'conceptos', 'capital.md'), '\nUna línea más desde la app.\n');
@@ -193,6 +194,17 @@ test('el menú de la app de escritorio: Nueva nota abre su diálogo; Ver → Bar
   await hasta(() => pagina.evaluate(() => location.hash === '#/n/inicio.md' || location.hash === '' || location.hash === '#/'), 'Atrás no vuelve a la portada');
   await pulsar('adelante');
   await hasta(() => pagina.evaluate(() => location.hash === '#/n/conceptos/capital.md'), 'Adelante no vuelve a la nota');
+  // El gesto del trackpad (el evento `swipe` de BrowserWindow, solo macOS y con «Deslizar entre páginas»; aquí emitido a mano): left es Atrás y right Adelante.
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].emit('swipe', {}, 'left'));
+  await hasta(() => pagina.evaluate(() => location.hash !== '#/n/conceptos/capital.md'), 'el gesto left no vuelve atrás');
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].emit('swipe', {}, 'right'));
+  await hasta(() => pagina.evaluate(() => location.hash === '#/n/conceptos/capital.md'), 'el gesto right no avanza');
+  // Atrás de más no sale de la app (P17): ni a «Arrancando…» (otro origen) ni a otra pantalla; el menú y el botón ‹ comparten criterio.
+  for (let i = 0; i < 6; i++) await pulsar('atras');
+  await pagina.waitForTimeout(400);
+  assert.match(pagina.url(), /^http:\/\/localhost:\d+\//, 'Atrás ha salido de la app (¿vuelve a «Arrancando…»?)');
+  await pulsar('adelante');
+  await pagina.locator('#btn-adelante').waitFor();
   await pagina.locator('#link-inicio').click();
   await esperarTitulo(c);
 });

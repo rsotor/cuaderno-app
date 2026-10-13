@@ -323,3 +323,18 @@ test('limitesDeVentana con límites guardados: si caen en la pantalla que más l
   assert.deepEqual(ventana.limitesDeVentana({ screen, guardado: { x: 0, y: 25, width: 800 } }), { width: 1456, height: 900, origen: 'defecto' }, 'incompletos: el defecto');
   assert.deepEqual(ventana.limitesDeVentana({ screen, guardado: null }), { width: 1456, height: 900, origen: 'defecto' });
 });
+
+test('gesto del trackpad (macOS, «Deslizar entre páginas» de Trackpad › Más gestos): swipe left manda «atras» a la pantalla, right «adelante»; up y down, nada; preparar lo engancha a la ventana principal', () => {
+  const r = registroFalso();
+  const v = Object.assign(new EventEmitter(), { webContents: Object.assign(new EventEmitter(), { enviados: [], setWindowOpenHandler() {}, send(canal, ...a) { this.enviados.push([canal, ...a]); } }), setBackgroundColor() {} });
+  ventana.gestoAtrasAdelante({ ventana: v, anotar: r.anotar });
+  v.emit('swipe', {}, 'left'); v.emit('swipe', {}, 'right'); v.emit('swipe', {}, 'up'); v.emit('swipe', {}, 'down');
+  assert.deepEqual(v.webContents.enviados, [['accion', 'atras'], ['accion', 'adelante']], 'solo left y right navegan, por el canal «accion» como el menú');
+  assert.ok(r.lineas.some(l => /gesto.*atras/.test(l)) && r.lineas.some(l => /gesto.*adelante/.test(l)), 'el gesto queda en el registro');
+  // preparar lo engancha (la ventana de los demás tests no tiene .on: no falla).
+  const f = electronFalso(), v2 = Object.assign(new EventEmitter(), { webContents: Object.assign(new EventEmitter(), { enviados: [], setWindowOpenHandler() {}, send(canal, ...a) { this.enviados.push([canal, ...a]); } }), setBackgroundColor() {} });
+  ventana.preparar({ ventana: v2, electron: f.electron, config: configFalsa({ valor: 'claro', carpeta: os.tmpdir() }), env: {}, particion: 'cuaderno', puerto: () => 7331, anotar: r.anotar, vigilar: () => ({ on() {}, close() {} }) });
+  v2.emit('swipe', {}, 'left');
+  assert.deepEqual(v2.webContents.enviados, [['accion', 'atras']]);
+  f.eventosApp.emit('will-quit');
+});

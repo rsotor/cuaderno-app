@@ -57,29 +57,36 @@
   <symbol id="i-lupa" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
   <symbol id="i-nota" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5"/></symbol>
   <symbol id="i-mas" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-puntos" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+  <symbol id="i-izq" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+  <symbol id="i-der" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-abajo" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-cuaderno" viewBox="0 0 24 24"><path d="M6 3h12v18H6zM6 7h12M9 3v18"/></symbol>
 </svg>
 <a class="saltar" href="#nota">Saltar al contenido</a>
 <div id="aviso-reinicio" role="alert" hidden>La app se ha actualizado mientras estaba abierta. Reiníciala para que todo funcione: <kbd>Ctrl C</kbd> en su terminal y <code>run-cuaderno-app</code>. <button id="aviso-cerrar" type="button" aria-label="Cerrar el aviso">×</button></div>
 <div id="app">
   <aside id="lateral" aria-label="Cuaderno">
-    <header class="marca"><a href="#/cuadernos" title="Todos los cuadernos"><svg class="icono" aria-hidden="true"><use href="#i-cuaderno"/></svg><span id="nombre-curso">Cuaderno</span></a><button type="button" id="btn-plegar" class="secundario plegar" aria-label="Plegar la barra lateral" aria-expanded="true" aria-controls="lateral" title="Plegar la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button><small id="estado-git"></small>
-      <div class="guardar-barra"><button type="button" id="btn-guardar" class="primario" title="Guardar en el repositorio del cuaderno"><svg class="icono" aria-hidden="true"><use href="#i-guardar"/></svg>Guardar</button><button type="button" id="btn-traer" class="secundario" title="Traer lo que cambió en otro sitio" aria-label="Traer"><svg class="icono" aria-hidden="true"><use href="#i-traer"/></svg></button><button type="button" id="btn-deshacer" class="secundario" title="Deshacer el último guardado" aria-label="Deshacer"><svg class="icono" aria-hidden="true"><use href="#i-deshacer"/></svg></button></div></header>
-    <button type="button" id="btn-buscar" class="buscar-disparador" aria-haspopup="dialog" title="Buscar una nota o apuntar una tarea"><svg class="icono" aria-hidden="true"><use href="#i-lupa"/></svg><span class="texto">Buscar…</span><span class="pista-tecla" id="btn-buscar-pista"></span></button>
+    <header class="marca">
+      <button type="button" id="btn-cuaderno" class="nombre-cuaderno" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-cuaderno" title="Cambiar de cuaderno"><svg class="icono" aria-hidden="true"><use href="#i-cuaderno"/></svg><span id="nombre-curso">Cuaderno</span><svg class="icono chevron" aria-hidden="true"><use href="#i-abajo"/></svg></button><button type="button" id="btn-plegar" class="secundario plegar" aria-label="Plegar la barra lateral" aria-expanded="true" aria-controls="lateral" title="Plegar la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button>
+      <div id="menu-cuaderno" class="menu" role="menu" aria-label="Cuadernos" hidden></div>
+      <div class="estado-linea"><span id="estado-git" role="status" aria-live="off"></span><button type="button" id="btn-guardar" class="secundario" title="Guardar en el repositorio del cuaderno">Guardar</button><button type="button" id="btn-traer" class="secundario icono-solo" title="Traer lo que cambió en otro sitio" aria-label="Traer"><svg class="icono" aria-hidden="true"><use href="#i-traer"/></svg></button><button type="button" id="btn-deshacer" class="secundario icono-solo" title="Deshacer el último guardado" aria-label="Deshacer"><svg class="icono" aria-hidden="true"><use href="#i-deshacer"/></svg></button></div></header>
     <nav class="paginas" aria-label="Páginas">
-      <a id="link-inicio" href="#/" data-pagina="inicio"><svg class="icono" aria-hidden="true"><use href="#i-casa"/></svg>Inicio</a>
-      <a href="#/tareas" data-pagina="tareas"><svg class="icono" aria-hidden="true"><use href="#i-casillas"/></svg>Tareas <span class="contador" id="n-tareas"></span></a>
-      <a href="#/comentarios" data-pagina="comentarios"><svg class="icono" aria-hidden="true"><use href="#i-bocadillo"/></svg>Comentarios <span class="contador" id="n-comentarios"></span></a>
-      <button type="button" id="btn-nueva-nota" title="Crear una nota nueva"><svg class="icono" aria-hidden="true"><use href="#i-lapiz"/></svg>Nueva nota</button>
+      <a id="link-inicio" class="solo" href="#/" data-pagina="inicio" aria-label="Inicio" title="Inicio"><svg class="icono" aria-hidden="true"><use href="#i-casa"/></svg></a>
+      <button type="button" id="btn-buscar" class="solo" aria-haspopup="dialog" aria-label="Buscar" title="Buscar"><svg class="icono" aria-hidden="true"><use href="#i-lupa"/></svg></button>
+      <a id="link-tareas" href="#/tareas" data-pagina="tareas" aria-label="Tareas" title="Tareas"><span class="etiqueta-acceso">Tareas</span><span class="contador" id="n-tareas"></span></a>
+      <a id="link-comentarios" href="#/comentarios" data-pagina="comentarios" aria-label="Comentarios" title="Comentarios"><span class="etiqueta-acceso">Comentarios</span><span class="contador" id="n-comentarios"></span></a>
+      <button type="button" id="btn-nueva-nota" class="solo mas" aria-label="Nueva nota" title="Crear una nota nueva"><svg class="icono" aria-hidden="true"><use href="#i-mas"/></svg></button>
     </nav>
     <nav id="arbol" aria-label="Notas"></nav>
     <footer class="pie-lateral">
-      <button type="button" id="btn-terminal" title="Abrir la terminal (Ctrl `)"><svg class="icono" aria-hidden="true"><use href="#i-terminal"/></svg>Terminal</button>
-      <button type="button" id="btn-ajustes" title="Ajustes de la app"><svg class="icono" aria-hidden="true"><use href="#i-engranaje"/></svg>Ajustes</button>
+      <button type="button" id="btn-terminal" aria-label="Terminal" title="Abrir la terminal (Ctrl `)"><svg class="icono" aria-hidden="true"><use href="#i-terminal"/></svg></button>
+      <button type="button" id="btn-ajustes" aria-label="Ajustes" title="Ajustes de la app"><svg class="icono" aria-hidden="true"><use href="#i-engranaje"/></svg></button>
     </footer>
   </aside>
   <main id="centro">
-    <div class="miga-barra"><button type="button" id="btn-desplegar" class="secundario" aria-label="Abrir la barra lateral" aria-expanded="false" aria-controls="lateral" title="Abrir la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button><button type="button" id="btn-menu" class="secundario" aria-label="Abrir el menú" aria-controls="lateral" aria-expanded="false"><svg class="icono" aria-hidden="true"><use href="#i-menu"/></svg></button><div id="miga" aria-label="Ruta de la nota"></div><span id="editando" class="editando" hidden>Editando</span><span id="editando-aviso" class="oculto" role="status"></span><button type="button" id="btn-editar" class="secundario" title="Editar la nota (E)" hidden><svg class="icono" aria-hidden="true"><use href="#i-lapiz"/></svg>Editar</button></div>
+    <div class="miga-barra"><button type="button" id="btn-desplegar" class="secundario" aria-label="Abrir la barra lateral" aria-expanded="false" aria-controls="lateral" title="Abrir la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button><button type="button" id="btn-menu" class="secundario" aria-label="Abrir el menú" aria-controls="lateral" aria-expanded="false"><svg class="icono" aria-hidden="true"><use href="#i-menu"/></svg></button><div class="flechas" hidden><button type="button" id="btn-atras" class="flecha" aria-label="Atrás" title="Atrás" disabled><svg class="icono" aria-hidden="true"><use href="#i-izq"/></svg></button><button type="button" id="btn-adelante" class="flecha" aria-label="Adelante" title="Adelante" disabled><svg class="icono" aria-hidden="true"><use href="#i-der"/></svg></button></div><nav id="miga" aria-label="Ruta de la nota"></nav><span class="miga-espacio"></span><span id="editando" class="editando" hidden>Editando</span><span id="editando-aviso" class="oculto" role="status"></span><button type="button" id="btn-editar" title="Editar la nota (E)" hidden><svg class="icono" aria-hidden="true"><use href="#i-lapiz"/></svg><span class="txt">Editar</span></button><button type="button" id="btn-mas-nota" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-nota" aria-label="Más acciones de la nota" title="Más acciones de la nota" hidden><svg class="icono puntos" aria-hidden="true"><use href="#i-puntos"/></svg></button><div id="menu-nota" class="menu" role="menu" aria-label="Más acciones de la nota" hidden></div></div>
     <article id="nota" tabindex="-1"></article>
     <section id="panel" hidden></section>
     <nav id="indice" aria-label="Índice de la nota" hidden></nav>

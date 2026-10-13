@@ -2,7 +2,7 @@
 :root {
   --papel: #fbfbfc; --fondo: #f2f3f5; --mesa: #e6e8ec; --lateral: #e6e8ec; --tinta: #1b1b1f; --tinta-suave: #5a5e66; --linea: #dcdfe4;
   --acento: #1e5a96; --acento-suave: #e3ecfa; --sobre-acento: #ffffff; --ok: #15803d; --aviso: #7a4a00; --mal: #b91c1c;
-  --terminal-fondo: #1b1d23; --marca: #fff3a8;
+  --terminal-fondo: #1b1d23; --marca: #fff3a8; --borde-arbol: rgba(27,27,31,.4);
   --rotulador: #ffe45c;   /* lo comentado; en claro, contra --tinta (#1b1b1f) 13,5:1 y contra --acento (#1e5a96) 5,6:1 */
   --c-info: var(--acento); --c-question: #6d28d9; --c-warning: var(--aviso); --c-danger: var(--mal); --c-success: var(--ok);
   --c-quote: #4b5563; --c-example: #0e7490; --c-tip: #0f766e; --c-comment: #9a3412;
@@ -17,7 +17,7 @@
 @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) {
   --papel: #1c1e23; --fondo: #141518; --mesa: #0e0f12; --lateral: #0e0f12; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
   --acento: #8cc8f0; --acento-suave: #22303c; --sobre-acento: #141518; --ok: #86efac; --aviso: #e0a040; --mal: #fca5a5;
-  --terminal-fondo: #0f1014; --marca: #5a4d12;
+  --terminal-fondo: #0f1014; --marca: #5a4d12; --borde-arbol: rgba(230,230,230,.30);
   --rotulador: #5a4a00;   /* ocre oscuro: contra --tinta (#e6e6e6) 7,0:1 y contra --acento (#8cc8f0) 4,8:1 (el #6b5a00 no pasa: enlace 3,8:1); contra --papel (#1c1e23) 1,9:1, por eso lleva además subrayado */
   --c-question: #c4b5fd; --c-quote: #9ca3af; --c-example: #67e8f9; --c-tip: #5eead4; --c-comment: #fb923c;
   --sombra: 0 10px 30px rgba(0, 0, 0, .45); --borde-cajon: #2c2f36;   /* la mesa y el cajón son casi del mismo negro: la línea los separa (crítica 2026-10-09, 2) */
@@ -26,7 +26,7 @@
 :root[data-tema="oscuro"] {
   --papel: #1c1e23; --fondo: #141518; --mesa: #0e0f12; --lateral: #0e0f12; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
   --acento: #8cc8f0; --acento-suave: #22303c; --sobre-acento: #141518; --ok: #86efac; --aviso: #e0a040; --mal: #fca5a5;
-  --terminal-fondo: #0f1014; --marca: #5a4d12;
+  --terminal-fondo: #0f1014; --marca: #5a4d12; --borde-arbol: rgba(230,230,230,.30);
   --rotulador: #5a4a00;   /* ocre oscuro: contra --tinta (#e6e6e6) 7,0:1 y contra --acento (#8cc8f0) 4,8:1 (el #6b5a00 no pasa: enlace 3,8:1); contra --papel (#1c1e23) 1,9:1, por eso lleva además subrayado */
   --c-question: #c4b5fd; --c-quote: #9ca3af; --c-example: #67e8f9; --c-tip: #5eead4; --c-comment: #fb923c;
   --sombra: 0 10px 30px rgba(0, 0, 0, .45); --borde-cajon: #2c2f36;   /* la mesa y el cajón son casi del mismo negro: la línea los separa (crítica 2026-10-09, 2) */
@@ -76,25 +76,46 @@ body:has(#aviso-reinicio:not([hidden])) #app { flex: 1; min-height: 0; height: a
 /* ---------- disposición */
 #app { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-rows: 1fr auto; height: 100vh; }
 #lateral { grid-row: 1 / 3; background: var(--lateral); border-right: 1px solid var(--linea); display: flex; flex-direction: column; min-height: 0; }
-.marca { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 14px 16px 8px; }
-.marca a { display: flex; gap: 8px; align-items: center; font-weight: 650; color: inherit; text-decoration: none; border-radius: var(--radio); min-height: 26px; }
-.marca small { font-size: 12.5px; color: var(--tinta-suave); }
-.guardar-barra { display: flex; gap: 6px; margin-top: 8px; }
-.guardar-barra #btn-guardar { flex: 1; }
-.guardar-barra .secundario { padding: 6px 9px; }
-#lateral.sin-cuaderno #btn-buscar, #lateral.sin-cuaderno .paginas, #lateral.sin-cuaderno #btn-terminal, #lateral.sin-cuaderno .guardar-barra, #lateral.sin-repo .guardar-barra { display: none; }
-/* el disparador de la búsqueda: parece un campo pero es un botón (la búsqueda es una modal; el texto y la tecla en tinta suave, ≥ 4,5:1: rev-13 #2) */
-.buscar-disparador { width: calc(100% - 24px); margin: 8px 12px; padding: 8px 10px; justify-content: flex-start; text-align: left; color: var(--tinta-suave); }
-.buscar-disparador .texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.buscar-disparador .pista-tecla { flex: none; font-size: 12px; }
-.buscar-disparador:hover { color: var(--tinta); }
-.paginas { display: flex; flex-direction: column; padding: 4px 8px; }
-.paginas a, .paginas button, #arbol a { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radio); color: var(--tinta-suave); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* barra apagada (dirección C): el texto en tinta suave, ≥ 4,5:1 sobre la mesa */
-.paginas a:hover, .paginas button:hover, #arbol a:hover, #arbol summary:hover { background: rgba(127,127,127,.12); color: var(--tinta); }
+.marca { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 12px 12px 6px; }
+/* El nombre del cuaderno es el botón que abre el selector (Notion, Linear); a la derecha, el sitio del botón de plegar */
+.nombre-cuaderno { align-self: flex-start; max-width: calc(100% - 36px); justify-content: flex-start; gap: 8px; border: 0; background: none; padding: 3px 6px; min-height: 28px; font-weight: 650; color: var(--tinta); }
+.nombre-cuaderno:hover, .nombre-cuaderno[aria-expanded="true"] { background: rgba(127,127,127,.16); }
+.nombre-cuaderno #nombre-curso { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nombre-cuaderno .chevron { width: 15px; height: 15px; stroke-width: 2; color: var(--tinta-suave); }
+/* Menús desplegables (selector de cuaderno y «…» de la nota): papel, línea, sombra; las filas se llegan con las flechas */
+.menu { position: absolute; z-index: 30; min-width: 236px; max-width: calc(100% - 24px); background: var(--papel); border: 1px solid var(--linea); border-radius: 8px; box-shadow: var(--sombra); padding: 4px; }
+.menu [role^="menuitem"] { display: flex; width: 100%; justify-content: flex-start; align-items: center; border: 0; background: none; padding: 7px 10px; gap: 10px; color: var(--tinta); font-weight: 400; text-align: left; border-radius: var(--radio); }
+.menu [role^="menuitem"]:hover, .menu [role^="menuitem"]:focus-visible { background: rgba(127,127,127,.16); }
+.menu [role^="menuitem"][aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+.menu [role^="menuitem"] .texto { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu [role^="menuitem"] .icono { color: var(--tinta-suave); }
+.menu [role^="menuitem"] .marcado { margin-left: auto; color: var(--acento); }
+.menu hr { border: 0; border-top: 1px solid var(--linea); margin: 4px 2px; }
+.menu .menu-titulo { padding: 6px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--tinta-suave); }
+#menu-cuaderno { left: 12px; top: 44px; }
+/* La línea del estado (Roberto, 2026-10-13): texto corto que encoge y se corta con «…» (el entero, en el title), y los botones, que no encogen nunca.
+   El texto de la cabecera va en em sobre la letra del cuerpo (el ajuste «Letra» y el 200 % lo agrandan); los iconos y su caja, en px. */
+.estado-linea { display: flex; align-items: center; gap: 6px; font-size: .8667em; }
+#estado-git { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 6px; color: var(--tinta-suave); font-weight: 500; }
+#estado-git.con-cambios { color: var(--tinta); font-weight: 600; }
+.estado-linea button { flex: none; }
+#btn-guardar { padding: 2px 10px; min-height: 28px; }
+.estado-linea .icono-solo { width: 28px; height: 28px; min-height: 28px; padding: 0; }
+#lateral.sin-cuaderno #btn-buscar, #lateral.sin-cuaderno .paginas, #lateral.sin-cuaderno #btn-terminal, #lateral.sin-cuaderno .estado-linea, #lateral.sin-repo .estado-linea { display: none; }
+/* La fila de accesos (maqueta A2): casa, lupa, Tareas N, Comentarios N y «+» al final. Los iconos, en cajas de 28 px; el texto, en em */
+.paginas { display: flex; flex-direction: row; align-items: center; padding: 6px 6px 8px; font-size: .8333em; }
+.paginas a, .paginas button { display: flex; align-items: center; gap: 4px; min-height: 30px; padding: 0 5px; border-radius: var(--radio); color: var(--tinta-suave); text-decoration: none; white-space: nowrap; min-width: 0; background: none; border: 0; font: inherit; cursor: pointer; margin: 0; }   /* barra apagada (dirección C): el texto en tinta suave, ≥ 4,5:1 sobre la mesa */
+#arbol a { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radio); color: var(--tinta-suave); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.paginas .solo { flex: none; width: 28px; padding: 0; justify-content: center; }
+.paginas .mas { margin-left: auto; color: var(--acento); }
+.paginas .etiqueta-acceso { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.paginas a:hover, .paginas button:hover, #arbol a:hover, #arbol summary:hover { background: rgba(127,127,127,.16); color: var(--tinta); }
 .paginas a.activa, #arbol a.activa { background: var(--acento-suave); color: var(--acento); }
-.paginas .icono { color: var(--tinta-suave); } .paginas a.activa .icono { color: var(--acento); }
-.contador { font-size: 12px; color: var(--tinta-suave); margin-left: auto; }
-#arbol { flex: 1; overflow: auto; padding: 4px 8px 12px; font-size: 14px; }
+.paginas .icono { width: 17px; height: 17px; } .paginas a.activa .icono { color: var(--acento); }
+.contador { flex: none; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--tinta); }
+.paginas a.activa .contador { color: inherit; }
+/* El árbol: un borde superior algo más grueso en lugar del rótulo «NOTAS» (Roberto, 2026-10-13) */
+#arbol { flex: 1; overflow: auto; margin: 0 8px; padding: 6px 0 12px; border-top: 2px solid var(--borde-arbol); font-size: 14px; }
 /* Árbol: la carpeta lleva un chevron que gira al abrirse; la página, nada (la sangría ya la coloca bajo su carpeta).
    Mismo color para las dos; la carpeta, algo más de peso. Cada nivel entra 16 px. */
 #arbol details details, #arbol details .hoja { margin-left: 16px; }
@@ -121,13 +142,8 @@ button.mostrar:focus-visible, button.ocultar:focus-visible, button.papelera:focu
 #arbol .fila .acciones-fila { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; }
 #arbol summary .acciones-fila { margin-left: auto; display: flex; gap: 6px; }
 #arbol .acciones-fila .papelera { margin-left: 4px; }   /* sin confirmar, la separación es lo que evita mandar a la papelera por un píxel */
-#arbol .fila:hover :is(.mostrar, .ocultar, .papelera), #arbol .fila:focus-within :is(.mostrar, .ocultar, .papelera), #arbol summary:hover :is(.mostrar, .ocultar), #arbol summary:focus-within :is(.mostrar, .ocultar), #miga :is(.mostrar, .papelera) { opacity: 1; }
+#arbol .fila:hover :is(.mostrar, .ocultar, .papelera), #arbol .fila:focus-within :is(.mostrar, .ocultar, .papelera), #arbol summary:hover :is(.mostrar, .ocultar), #arbol summary:focus-within :is(.mostrar, .ocultar) { opacity: 1; }
 @media (hover: none) { button.mostrar, button.ocultar, button.papelera { opacity: 1; } }
-#miga :is(.mostrar, .copiar, .papelera) { vertical-align: middle; margin-left: 4px; min-width: 28px; min-height: 28px; }
-button.copiar { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: none; background: none; color: var(--tinta-suave); border-radius: var(--radio); }
-button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
-#miga .papelera { margin-left: 18px; }   /* lejos de copiar: un clic de más no manda nada a la papelera */
-#miga :is(.mostrar, .copiar, .papelera) .icono { width: 15px; height: 15px; }
 /* ficheros que no son notas */
 #nota:focus-visible, #panel:focus-visible { outline: none; }   /* a donde lleva «Saltar al contenido» */
 #nota.ancha.todo { max-width: none; margin-left: 0; margin-right: 0; }
@@ -141,16 +157,26 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 #nota .visor-imagen { display: block; margin: 0 auto; max-width: 100%; height: auto; border: 1px solid var(--linea); border-radius: 2px; background: repeating-conic-gradient(rgba(127,127,127,.12) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }   /* el damero deja ver la transparencia */
 #nota .fichero-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: rgba(127,127,127,.08); border: 1px solid var(--linea); border-radius: var(--radio-bloque); padding: 14px 16px; margin: 0; }
 #arbol .hoja small { color: var(--tinta-suave); font-size: 12px; margin-left: auto; padding-left: 8px; }   /* dos notas con el mismo título: el fichero las distingue */
-.paginas button { background: none; border: 0; font: inherit; cursor: pointer; width: 100%; justify-content: flex-start; text-align: left; margin: 0; color: var(--tinta-suave); }   /* como los enlaces de encima: alineado a la izquierda, sin borde */
 #arbol .vacio b { color: var(--tinta); }
 #nueva-nota input, #nueva-nota select { width: 100%; }
-.pie-lateral { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--linea); }
-.pie-lateral button { flex: 1; white-space: nowrap; }
-.pie-lateral #btn-ajustes { flex: 0 0 auto; }
+/* El pie (maqueta A2): Terminal y Ajustes en iconos de 30 px, sin recuadro, a la izquierda */
+.pie-lateral { display: flex; justify-content: flex-start; gap: 2px; padding: 6px 8px; border-top: 1px solid var(--linea); }
+.pie-lateral button { flex: none; width: 30px; min-height: 30px; padding: 0; border: 0; background: none; color: var(--tinta-suave); }
+.pie-lateral button:hover { background: rgba(127,127,127,.16); color: var(--tinta); }
+.pie-lateral .icono { width: 17px; height: 17px; }
 
 #centro { position: relative; overflow: auto; min-height: 0; min-width: 0; padding: 0 0 40px; background: var(--mesa); --hoja-pad: 56px; --texto: 800px; }   /* la mesa: un poco más hundida que la hoja (Roberto, 2026-10-09, dirección A) */
-.miga-barra { position: sticky; top: 0; background: var(--mesa); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px max(calc(var(--hoja-pad) + 8px), calc((100% - var(--texto) - 2 * var(--hoja-pad)) / 2 + var(--hoja-pad))); }   /* empieza donde empieza el texto de la hoja */
-#miga { font-size: 13px; color: var(--tinta-suave); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.miga-barra { position: sticky; top: 0; background: var(--mesa); z-index: 2; display: flex; align-items: center; gap: 6px; min-height: 50px; padding: 9px 20px 9px max(calc(var(--hoja-pad) + 8px), calc((100% - var(--texto) - 2 * var(--hoja-pad)) / 2 + var(--hoja-pad))); }   /* empieza donde empieza el texto de la hoja */
+/* La miga encoge con «…»; a la derecha, Editar y «…» de la nota, que no encogen ni se mueven con el largo de la ruta */
+#miga { flex: 0 1 auto; font-size: 14px; color: var(--tinta-suave); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#miga strong { color: var(--tinta); font-weight: 650; }
+.miga-espacio { flex: 1 1 0; min-width: 0; }
+#btn-editar, #btn-mas-nota { flex: none; border: 0; background: none; min-height: 32px; color: var(--tinta); }
+#btn-editar { padding: 0 10px; font-weight: 500; }
+#btn-mas-nota { width: 32px; padding: 0; color: var(--tinta-suave); }
+#btn-mas-nota .icono { width: 20px; height: 20px; fill: currentColor; stroke: none; }
+#btn-editar:hover, #btn-mas-nota:hover, #btn-mas-nota[aria-expanded="true"] { background: rgba(127,127,127,.16); color: var(--tinta); }
+#menu-nota { right: 20px; top: 46px; left: auto; }
 #btn-menu { display: none; padding: 6px 8px; }
 /* La hoja (dirección A, Roberto 2026-10-09): el texto mide como mucho 800 px (decisión de Roberto, 2026-10-09: «sé que no es lo mejor, pero para mí sí») y la hoja, el texto más sus márgenes interiores
    (56 px a cada lado: 912 px). Letra de 16 px con la «Media»; en em para que el ajuste «Letra» siga mandando. */
@@ -383,7 +409,7 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 /* estrecho: la barra lateral se despliega sobre el contenido con un botón; nada se corta */
 @media (max-width: 760px) {
   #app { grid-template-columns: 1fr; }
-  #lateral { position: fixed; inset: 0 20% 0 0; z-index: 10; transform: translateX(-100%); visibility: hidden; box-shadow: var(--sombra); }
+  #lateral { position: fixed; inset: 0 auto 0 0; width: max(80vw, 260px); z-index: 10; transform: translateX(-100%); visibility: hidden; box-shadow: var(--sombra); }
   #lateral.abierto { transform: none; visibility: visible; }
   @media (prefers-reduced-motion: no-preference) { #lateral { transition: transform .2s ease, visibility .2s; } }
   #btn-menu { display: inline-flex; }
@@ -413,16 +439,15 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 /* Barra lateral plegable en escritorio (Roberto, 2026-10-09): plegada, #centro gana su ancho; el botón para volver vive en la miga */
 .marca .plegar { position: absolute; top: 12px; right: 10px; padding: 4px 7px; min-height: 30px; background: none; border-color: transparent; color: var(--tinta-suave); }
 .marca .plegar:hover { color: var(--tinta); background: rgba(127,127,127,.12); }
-#btn-desplegar { display: none; position: absolute; left: 12px; top: 6px; padding: 6px 8px; z-index: 3; }
+#btn-desplegar { display: none; position: absolute; left: 12px; top: 9px; padding: 6px 8px; z-index: 3; }
 @media (min-width: 761px) {
   #app.lateral-plegado { grid-template-columns: 0 minmax(0, 1fr); }
   #app.lateral-plegado.cajon-abierto[data-panel="derecha"] { grid-template-columns: 0 minmax(0, 1fr) var(--panel-ancho); }
   #app.lateral-plegado #lateral { display: none; }
   #app.lateral-plegado #centro { grid-column: 2; grid-row: 1; }
   #app.lateral-plegado #btn-desplegar { display: inline-flex; }
-  #app.lateral-plegado .miga-barra { min-height: 44px; }
 }
-@media (max-width: 760px) { .marca .plegar { display: none; } }
+@media (max-width: 760px) { .marca .plegar { display: none; } #btn-editar .txt { display: none; } #btn-editar { padding: 0 8px; } }   /* a ≤ 760 px, Editar solo con el icono */
 
 /* ---------- editor de la nota entera (CodeMirror; public/live.js) */
 #edicion-cm { min-height: 40vh; }
@@ -520,3 +545,14 @@ button.comentado:focus-visible { outline: 2px solid var(--acento); outline-offse
 @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) button.comentado { text-decoration-color: var(--tinta); } }
 .acciones-comentario { display: flex; gap: 8px; margin: 6px 0 0; }
 .caja-titulo { margin: 0; font-weight: 650; }
+.menu .sub { margin-left: auto; font-size: 12px; color: var(--tinta-suave); }
+.menu [role^="menuitem"].borrar, .menu [role^="menuitem"].borrar .icono { color: var(--mal); }   /* la papelera, última y en rojo */
+/* ‹ › Atrás y Adelante (solo en la app), antes de la ruta: apagadas sin historial */
+.flechas { display: flex; flex: none; margin-right: 4px; }
+.flecha { width: 30px; min-height: 30px; padding: 0; border: 0; background: none; color: var(--tinta); }
+.flecha:hover:not(:disabled) { background: rgba(127,127,127,.16); }
+.flecha:disabled { opacity: 1; color: var(--apagado, var(--tinta-suave)); cursor: default; }
+.flecha .icono { width: 19px; height: 19px; stroke-width: 2; }
+@media (max-width: 760px) { .flechas { display: none; } }
+/* En táctil, objetivos más grandes en la cabecera y la fila de accesos (crítica 2026-10-13 A2, 4 y 5) */
+@media (pointer: coarse) { .estado-linea .icono-solo { width: 36px; height: 36px; min-height: 36px; } .paginas .solo { width: 36px; min-height: 36px; } .paginas a, .paginas button { min-height: 36px; } #btn-deshacer { margin-left: 4px; } }
