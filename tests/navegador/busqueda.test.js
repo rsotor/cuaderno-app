@@ -6,7 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { arrancar, ptyFalso, hasta, visible, oculto, conTexto, hashCumple } = require('./ayuda');
+const { arrancar, ptyFalso, hasta, visible, oculto, conTexto, hashCumple, ficheroCumple } = require('./ayuda');
 const { crearServidor } = require('../../servidor');
 
 let e, pty;
@@ -198,5 +198,65 @@ test('búsqueda en modal: sigue al disco con la modal abierta (recarga en vivo, 
   await hasta(async () => (await e.pagina.locator('#busqueda-lista [data-ruta="capital-nueva.md"]').count()) === 0, 'búsqueda', 'la fila de la nota a la papelera sigue en la modal');
   assert.equal(await activo(), 'buscador');
   await e.pagina.evaluate(() => ocultar('conceptos', false));
+  await e.pagina.keyboard.press('Escape');
+});
+
+// ---------- apuntar una tarea desde la modal: escribe lo de siempre en tareas.md (la línea y el [[enlace]] de la nota abierta)
+const tareasMd = () => e.c.leer('tareas.md');
+const aviso = texto => visible(e.pagina.locator('.aviso-flotante', { hasText: texto }), 'búsqueda', `el aviso «${texto}»`);
+
+test('búsqueda en modal: leyendo una nota, «Releer esto» + Ctrl Enter apunta la tarea enlazada a la nota; la modal se cierra', async () => {
+  await e.ir('#/n/conceptos/interes.md');
+  await conTexto(e.pagina.locator('#nota h1'), /^Interés$/, 'nota', 'el título');
+  await e.pagina.keyboard.press('Control+k');
+  await escribir('Releer esto');
+  const fila = await visible(e.pagina.locator('#busqueda-lista [role="option"]').last(), 'búsqueda', 'la fila «Apuntar tarea»');
+  assert.match(await fila.textContent(), /Apuntar tarea: «Releer esto»/);
+  assert.equal(await fila.getAttribute('aria-selected'), 'false', 'búsqueda: la fila de tarea se elige sola');
+  await e.pagina.keyboard.press('Control+Enter');
+  await ficheroCumple(e.c, 'tareas.md', /- \[ \] Releer esto \[\[conceptos\/interes\]\]\r?\n$/, 'búsqueda');
+  await aviso('Tarea añadida');
+  await oculto(e.pagina.locator('#busqueda'), 'búsqueda', 'la modal tras apuntar');
+});
+
+test('búsqueda en modal: desde Tareas, «+ Comprar pan» + Enter apunta la tarea sin enlace; y tras apuntar la consulta se olvida (Ctrl K abre vacía y Enter no escribe)', async () => {
+  await e.ir('#/tareas');
+  await e.pagina.keyboard.press('Control+k');
+  await escribir('+ Comprar pan');
+  await e.pagina.keyboard.press('Enter');
+  await ficheroCumple(e.c, 'tareas.md', /- \[ \] Comprar pan\r?\n$/, 'búsqueda');
+  await oculto(e.pagina.locator('#busqueda'), 'búsqueda', 'la modal tras apuntar');
+  const igual = tareasMd();
+  await e.pagina.keyboard.press('Control+k');
+  assert.equal(await e.pagina.inputValue('#buscador'), '', 'búsqueda: tras apuntar la tarea la consulta se recuerda');
+  await e.pagina.keyboard.press('Enter');
+  await e.pagina.waitForTimeout(300);
+  assert.equal(tareasMd(), igual, 'búsqueda: Enter con el campo vacío ha escrito algo en tareas.md');
+  await e.pagina.keyboard.press('Escape');
+});
+
+test('búsqueda en modal: con flechas hasta la fila «Apuntar tarea», Enter la apunta', async () => {
+  await e.ir('#/tareas');
+  await e.pagina.keyboard.press('Control+k');
+  await escribir('zanahoria');
+  const filaTarea = e.pagina.locator('#busqueda-lista [role="option"]').last();
+  await visible(filaTarea, 'búsqueda', 'la fila «Apuntar tarea»');
+  await e.pagina.keyboard.press('ArrowUp');   // desde la primera nota, con vuelta: la última, la de tarea
+  await hasta(async () => (await filaTarea.getAttribute('aria-selected')) === 'true', 'búsqueda', 'las flechas no llegan a la fila de tarea');
+  await e.pagina.keyboard.press('Enter');
+  await ficheroCumple(e.c, 'tareas.md', /- \[ \] zanahoria\r?\n$/, 'búsqueda');
+});
+
+test('búsqueda en modal: sin resultados, Enter no apunta nada (la fila de tarea nunca se elige sola)', async () => {
+  await e.ir('#/tareas');
+  const igual = tareasMd();
+  await e.pagina.keyboard.press('Control+k');
+  await escribir('Pendientes de hoy');
+  await conTexto(e.pagina.locator('#busqueda-nada'), /Nada con «Pendientes de hoy»/, 'búsqueda', 'el aviso de que no hay resultados');
+  assert.equal(await e.pagina.locator('#busqueda-lista [role="option"]').last().getAttribute('aria-selected'), 'false');
+  await e.pagina.keyboard.press('Enter');
+  await e.pagina.waitForTimeout(400);
+  assert.equal(tareasMd(), igual, 'búsqueda: Enter sin resultados ha escrito en tareas.md');
+  assert.equal(await abierta(), true, 'búsqueda: Enter sin resultados ha cerrado la modal');
   await e.pagina.keyboard.press('Escape');
 });

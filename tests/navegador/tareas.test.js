@@ -34,7 +34,7 @@ test('«+» en el buscador: la pista, Enter añade a tareas.md y el panel se rep
   await conTexto(e.pagina.locator('#busqueda-nada'), /Escribe la tarea después del \+/, 'buscador', 'la pista con el «+» solo');
   await e.pagina.keyboard.type('Pedir apuntes #clase');
   await conTexto(e.pagina.locator('#busqueda-nada'), /Enter añade la tarea: Pedir apuntes #clase/, 'buscador', 'la pista de la tarea que se va a añadir');
-  assert.equal(await e.pagina.locator('#busqueda-lista [role="option"]').count(), 0, 'buscador: con «+» delante no debería buscar');
+  assert.equal(await e.pagina.locator('#busqueda-lista [role="option"]:not(.tarea)').count(), 0, 'buscador: con «+» delante no debería buscar (solo la fila de tarea)');
   await e.pagina.keyboard.press('Enter');
   await visible(e.pagina.locator('.aviso-flotante', { hasText: 'Tarea añadida' }), 'buscador', 'el aviso «Tarea añadida»');
   await ficheroCumple(e.c, 'tareas.md', /- \[x\] Comprar cuaderno\n- \[ \] Pedir apuntes #clase\n$/, 'buscador');

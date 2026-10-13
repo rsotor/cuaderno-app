@@ -124,10 +124,13 @@ function elegirOpcion(i) {
   if (ops[i]) ops[i].scrollIntoView({ block: 'nearest' });
 }
 const htmlFila = (f, i, q) => `<div class="res" role="option" id="res-${i}" aria-selected="false" data-ruta="${esc(f.ruta)}"${f.linea != null && !f.porNombre ? ` data-linea="${f.linea}"` : ''} title="${esc(f.ruta)}">${icono('nota')}<span class="cuerpo"><span class="t">${Busqueda.resaltar(f.nombre, q)}</span>${f.fragmento ? `<span class="s">${Busqueda.resaltar(Busqueda.recortar(f.fragmento, q), q)}</span>` : ''}</span><span class="c">${esc(f.carpeta)}</span></div>`;
+// La fila fija «Apuntar tarea», al pie de la lista: última opción, nunca elegida sola (solo con flechas).
+const htmlFilaTarea = (texto, i) => `<div class="res tarea" role="option" id="res-${i}" aria-selected="false" data-tarea="1">${icono('mas')}<span class="cuerpo"><span class="t">Apuntar tarea: «${esc(texto)}»</span></span><span class="c">escribe + delante</span></div>`;
 // Lo que la modal enseña: { filas, hayMas, q } de una búsqueda, { comando } con «+», o nada con la consulta vacía.
 function pintarBusqueda({ filas = [], hayMas = false, q = '', comando = null } = {}, conservarRuta = null) {
   const lista = $('#busqueda-lista'), nada = $('#busqueda-nada'), estado = $('#busqueda-estado');
-  lista.innerHTML = filas.map((f, i) => htmlFila(f, i, q)).join('');
+  const textoTarea = comando != null ? comando : q;
+  lista.innerHTML = filas.map((f, i) => htmlFila(f, i, q)).join('') + (textoTarea ? htmlFilaTarea(textoTarea, filas.length) : '');
   $('#busqueda-mas').hidden = !hayMas;
   $('#buscador').setAttribute('aria-expanded', String(filas.length > 0));
   nada.hidden = true; nada.textContent = '';
@@ -174,6 +177,7 @@ function cerrarBusqueda() {
 }
 function abrirOpcion(o) {
   if (!o) return;
+  if (o.dataset.tarea) { const v = $('#buscador').value; return apuntarTarea(comandoTarea(v) ?? v); }
   const ruta = o.dataset.ruta, l = o.dataset.linea;
   cerrarBusqueda();
   location.hash = `#/n/${encodeURI(ruta)}${l != null ? `?l=${l}` : ''}`;
@@ -191,6 +195,7 @@ async function apuntarTarea(texto) {
   if (enTareas()) abrirTareas();
 }
 $('#btn-buscar').onclick = () => abrirBusqueda();
+$('#busqueda-pie-tarea').textContent = enMac ? '⌘' : 'Ctrl';
 $('#buscador').addEventListener('input', e => {
   const v = e.target.value;
   if (comandoTarea(v) == null) ultimaConsulta = v;
@@ -207,7 +212,9 @@ $('#buscador').addEventListener('keydown', e => {
     elegirOpcion(e.key === 'ArrowDown' ? (i + 1) % ops.length : (i <= 0 ? ops.length - 1 : i - 1));
   } else if (e.key === 'Enter') {
     e.preventDefault(); clearTimeout(tBusqueda);
-    if (comandoTarea(v) != null) apuntarTarea(comandoTarea(v)); else abrirOpcion(ops[opcionElegida()]);
+    if (e.ctrlKey || e.metaKey) apuntarTarea(comandoTarea(v) ?? v);   // ⌘↵ o Ctrl ↵ apunta la tarea desde cualquier fila
+    else if (comandoTarea(v) != null) apuntarTarea(comandoTarea(v));
+    else abrirOpcion(ops[opcionElegida()]);
   }
 });
 $('#busqueda-lista').addEventListener('click', e => abrirOpcion(e.target.closest('[role="option"]')));
