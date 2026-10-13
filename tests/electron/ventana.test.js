@@ -115,6 +115,35 @@ test('la app de escritorio: un enlace a otra web va al navegador del sistema y l
   assert.equal(await pagina.evaluate(() => navigator.clipboard.writeText('hola').then(() => 'ok', e => `${e.name}: ${e.message}`)), 'ok');
 });
 
+test('la app de escritorio: navegando con clics reales en el árbol, ‹ se enciende, ‹ › y ⌘[ recorren el historial, y el deslizamiento de dos dedos (rueda horizontal) da un paso por gesto', async () => {
+  const hashDe = () => pagina.evaluate(() => location.hash);
+  const atrasApagada = () => pagina.locator('#btn-atras').isDisabled();
+  await ir('#/n/inicio.md');   // los tests anteriores ya han dejado entradas: aquí se cuenta desde esta
+  await pagina.evaluate(() => document.querySelectorAll('#arbol details').forEach(d => { d.open = true; }));
+  await pagina.locator('#arbol a[href="#/n/conceptos/capital.md"]').click();
+  await hasta(async () => (await hashDe()) === '#/n/conceptos/capital.md' && !(await atrasApagada()), '‹ no se enciende tras abrir una nota desde el árbol');
+  await pagina.locator('#arbol a[href="#/n/conceptos/interes.md"]').click();
+  await hasta(async () => (await hashDe()) === '#/n/conceptos/interes.md', 'el árbol no abre la tercera nota');
+  const estados = await pagina.evaluate(() => navigation.entries().map(e => (e.getState() || {}).cuaderno || null));
+  assert.ok(estados.length >= 3 && estados.every(s => s && s === estados[0]), `entradas sin cuaderno: ${JSON.stringify(estados)}`);
+  await pagina.locator('#btn-atras').click();
+  await hasta(async () => (await hashDe()) === '#/n/conceptos/capital.md', '‹ no vuelve a la segunda nota');
+  await pagina.locator('#btn-adelante').click();
+  await hasta(async () => (await hashDe()) === '#/n/conceptos/interes.md', '› no avanza');
+  await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('atras').click());   // ⌘[ (la acción del menú)
+  await hasta(async () => (await hashDe()) === '#/n/conceptos/capital.md', 'la acción Atrás del menú no vuelve');
+  // El gesto por defecto de macOS llega como rueda horizontal: un gesto largo con su inercia da un solo paso.
+  await pagina.mouse.move(700, 400);
+  for (let i = 0; i < 30; i++) { await pagina.mouse.wheel(20, 0); await dormir(16); }
+  await hasta(async () => (await hashDe()) === '#/n/conceptos/interes.md', 'el deslizamiento a la izquierda no avanza');
+  await dormir(700);
+  assert.equal(await hashDe(), '#/n/conceptos/interes.md', 'un gesto ha dado más de un paso');
+  for (let i = 0; i < 30; i++) { await pagina.mouse.wheel(-20, 0); await dormir(16); }
+  await hasta(async () => (await hashDe()) === '#/n/conceptos/capital.md', 'el deslizamiento a la derecha no vuelve');
+  await dormir(700);
+  assert.equal(await hashDe(), '#/n/conceptos/capital.md', 'un gesto ha dado más de un paso atrás');
+});
+
 test('la app de escritorio: recargar con el editor sucio pregunta «¿Descartar lo escrito?»; con «seguir editando» la ventana se queda como estaba', async () => {
   await ir('#/n/conceptos/capital.md');
   await pagina.locator('#btn-editar').click();

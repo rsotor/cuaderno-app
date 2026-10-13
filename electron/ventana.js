@@ -128,8 +128,8 @@ function preguntarDescartar({ dialog, ventana, env, anotar }) {
 // El gesto de deslizar del trackpad (evento `swipe` de BrowserWindow, solo macOS): izquierda es Atrás y derecha Adelante (como el
 // deltaX de NSEvent), y mandan la acción a la pantalla, que decide con su historial (irHistorial). Solo llega si en Preferencias del
 // Sistema › Trackpad › Más gestos «Deslizar entre páginas» está en «con dos o tres dedos»; con la opción por defecto (con dos dedos
-// en un desplazamiento horizontal) macOS no emite el evento y el gesto llega como rueda horizontal: eso no se atiende (distinguirlo
-// del desplazamiento de una tabla exigiría una heurística que dispararía sin querer; plan de navegación, T2.7).
+// en un desplazamiento horizontal) macOS no emite el evento y el gesto llega a la pantalla como rueda horizontal: lo atiende
+// public/app.js (gestoDeslizar: umbral, un paso por gesto, sin romper el desplazamiento de una tabla).
 function gestoAtrasAdelante({ ventana, anotar }) {
   if (!ventana || typeof ventana.on !== 'function') return;
   ventana.on('swipe', (_evento, direccion) => {
