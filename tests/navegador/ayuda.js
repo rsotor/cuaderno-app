@@ -64,7 +64,16 @@ async function arrancar({ pty = null, ...opciones } = { kit: false }) {   // por
   pagina.on('pageerror', e => { console.error('[error en la página]', e.message); });
   await pagina.goto(server.urlEntrada());
   // Va a una ruta de la app (#/tareas, #/n/…) con la página recién cargada: nada de la pantalla anterior se queda.
-  const ir = async hash => { await pagina.goto(`${base}/${hash}`); await pagina.reload(); await pagina.locator('#miga strong').waitFor(); };   // la miga se rellena al pintar cualquier pantalla
+  // Pasa por about:blank para que la ruta se cargue como documento nuevo. Antes era goto(hash) + reload(): un goto que
+  // solo cambia el hash no recarga, y si el reload salía con la URL anterior (visto en Windows, 2 de 2 en el PR #29)
+  // la app abría la portada, la miga se rellenaba igual y el recorrido esperaba 8 s a una nota que no iba a llegar.
+  const ir = async hash => {
+    await pagina.goto('about:blank'); await pagina.goto(`${base}/${hash}`);
+    await pagina.locator('#miga strong').waitFor();   // la miga se rellena al pintar cualquier pantalla
+    // Solo se comprueba en las notas: la app reescribe a propósito «#/» (portada) y «#/tareas» (filtros recordados).
+    const llegada = new URL(pagina.url()).hash;
+    if (hash.startsWith('#/n/') && decodeURI(llegada) !== decodeURI(hash)) throw fallo('ir', `la app no se quedó en ${hash}`, `el hash es «${llegada}»`);
+  };
   const cerrar = async () => {
     if (cobertura) { const c = (await pagina.coverage.stopJSCoverage()).filter(x => x.url.endsWith('/public/app.js')); fs.mkdirSync(cobertura, { recursive: true }); fs.writeFileSync(path.join(cobertura, `${process.pid}-${Date.now()}.json`), JSON.stringify(c)); }
     await navegador.close();
