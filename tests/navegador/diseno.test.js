@@ -36,8 +36,10 @@ test('«Guardar» es solo del repositorio: el editor de la nota dice «Aplicar»
   await e.pagina.locator('#edicion-aplicar').click();
   await visible(e.pagina.locator('.aviso-flotante', { hasText: 'Nota escrita' }), 'editar', 'el aviso «Nota escrita»');
   await ficheroCumple(e.c, 'conceptos/capital.md', /Una frase más\./, 'editar');
-  await conTexto(e.pagina.locator('#estado-git'), /\d+ cambios? por guardar/, 'estado', 'la línea de estado del repositorio');
-  assert.doesNotMatch(await e.pagina.locator('#estado-git').textContent(), /sin guardar/, 'estado: queda «sin guardar»');
+  // Decisión de Roberto (2026-10-13): el texto visible es corto («1 cambio») y la frase entera, en el title.
+  await conTexto(e.pagina.locator('#estado-git'), /^\d+ cambios?$/, 'estado', 'la línea de estado del repositorio');
+  assert.match(await e.pagina.locator('#estado-git').getAttribute('title'), /\d+ cambios? por guardar/, 'estado: el title no dice «N cambios por guardar»');
+  assert.doesNotMatch(await e.pagina.locator('#estado-git').getAttribute('title'), /sin guardar/, 'estado: queda «sin guardar»');
   // Comentar usa su propia caja (popover junto al texto), con sus palabras.
   await bloque.focus();
   await e.pagina.keyboard.press('c');

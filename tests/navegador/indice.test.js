@@ -116,7 +116,7 @@ for (const tema of ['claro', 'oscuro']) {
       const nav = [...document.querySelectorAll('.paginas a:not(.activa), #arbol a:not(.activa), #arbol summary')].map(x => css === null ? null : getComputedStyle(x).color);
       return { hoja: css('#nota').backgroundColor, mesa: css('#centro').backgroundColor, texto: css('#nota p').color, lateral: css('#lateral').backgroundColor, enlaces: [...new Set(nav)],
         activo: getComputedStyle(document.querySelector('.paginas a.activa, #arbol a.activa') || document.querySelector('.paginas a')).color,
-        pequeno: css('.marca small').color, miga: css('#miga').color, mesaMiga: css('.miga-barra').backgroundColor }; });
+        pequeno: css('#estado-git').color, miga: css('#miga').color, mesaMiga: css('.miga-barra').backgroundColor }; });
     assert.notEqual(m.hoja, m.mesa, `${tema}: la hoja y la mesa son del mismo color (${m.hoja})`);
     assert.ok(luz(m.hoja) > luz(m.mesa), `${tema}: la hoja (${m.hoja}) no es más clara que la mesa (${m.mesa})`);
     assert.ok(contraste(m.texto, m.hoja) >= 4.5, `${tema}: el texto ${m.texto} sobre la hoja ${m.hoja} da ${contraste(m.texto, m.hoja).toFixed(2)}:1`);

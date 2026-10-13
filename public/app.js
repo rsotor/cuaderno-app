@@ -961,6 +961,10 @@ $('#btn-nueva-sesion').onclick = () => abrirTerminal('nueva');
 
 // ---------- cuadernos (pantalla de inicio)
 const hace = iso => { if (!iso) return 'nunca'; const d = (Date.now() - new Date(iso)) / 864e5; if (d < 1 / 24) return 'hace un momento'; if (d < 1) return `hace ${Math.round(d * 24)} h`; if (d < 30) return `hace ${Math.round(d)} día${Math.round(d) === 1 ? '' : 's'}`; return `el ${new Date(iso).toLocaleDateString('es')}`; };
+// El estado corto de la línea bajo el nombre (Roberto, 2026-10-13): con cambios «N cambios»; sin cambios y con commits sin subir «N sin subir»;
+// si no, «guardado · 3 h». Sin repositorio, nada. La frase entera (textoGit) va en el title y el aria-label.
+const haceCorto = iso => { if (!iso) return null; const d = (Date.now() - new Date(iso)) / 864e5; if (d < 1 / 24) return 'ahora'; if (d < 1) return `${Math.round(d * 24)} h`; if (d < 30) return `${Math.round(d)} ${Math.round(d) === 1 ? 'día' : 'días'}`; return new Date(iso).toLocaleDateString('es', { day: 'numeric', month: 'short' }); };
+const textoEstado = g => !g ? '' : g.cambios ? `${g.cambios} ${g.cambios === 1 ? 'cambio' : 'cambios'}` : g.sinSubir ? `${g.sinSubir} sin subir` : haceCorto(g.ultimo) ? `guardado · ${haceCorto(g.ultimo)}` : 'sin guardados';
 const textoGit = g => !g ? 'sin repositorio' : `guardado ${hace(g.ultimo)}${g.cambios ? `, ${g.cambios} ${g.cambios === 1 ? 'cambio' : 'cambios'} por guardar` : ''}${g.sinSubir ? `, ${g.sinSubir} sin subir` : ''}`;
 async function abrirCuadernos() {
   rutaActual = null; $('#nota').hidden = true; $('#panel').hidden = false;
@@ -1128,7 +1132,10 @@ function pintarEstado() {
   $('#lateral').classList.toggle('sin-cuaderno', !c);
   $('#nombre-curso').textContent = c ? c.nombre : 'Cuaderno';
   pintarTitulo();
-  $('#estado-git').textContent = c ? textoGit(c.git) : '';
+  const estado = $('#estado-git'), completo = c ? textoGit(c.git) : '';
+  estado.textContent = c ? textoEstado(c.git) : ''; estado.title = completo; estado.setAttribute('aria-label', completo);
+  estado.classList.toggle('con-cambios', !!(c && c.git && c.git.cambios));
+  $('#btn-guardar').classList.toggle('primario', !!(c && c.git && c.git.cambios)); $('#btn-guardar').classList.toggle('secundario', !(c && c.git && c.git.cambios));   // a 0 cambios, neutro; con cambios, relleno (P15)
   $('#lateral').classList.toggle('sin-repo', !!c && !c.git && c.kit !== 'kit');
   $('#btn-guardar').disabled = $('#btn-traer').disabled = $('#btn-deshacer').disabled = !!c && c.kit === 'salida-sin-motor';
   $('#btn-guardar').title = c && c.kit === 'salida-sin-motor' ? 'Este cuaderno es una salida del kit sin motor: no se puede guardar desde aquí' : conAtajo('Guardar en el repositorio del cuaderno', 'S');
