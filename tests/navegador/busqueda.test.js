@@ -4,6 +4,8 @@
 // (mismo código que la app); lo que solo existe en la app (el menú) está en tests/electron/menu.test.js.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { arrancar, ptyFalso, hasta, visible, oculto, conTexto, hashCumple } = require('./ayuda');
 const { crearServidor } = require('../../servidor');
 
@@ -169,5 +171,32 @@ test('búsqueda en modal: la caja mide 620 px a 1280 de ancho', async () => {
   await visible(e.pagina.locator('#busqueda .busqueda-caja'), 'búsqueda', 'la caja');
   const caja = await e.pagina.locator('#busqueda .busqueda-caja').boundingBox();
   assert.equal(Math.round(caja.width), 620);
+  await e.pagina.keyboard.press('Escape');
+});
+
+test('búsqueda en modal: sigue al disco con la modal abierta (recarga en vivo, ocultar y papelera) sin perder texto, fila elegida ni foco', async () => {
+  await e.ir('#/');
+  await e.pagina.keyboard.press('Control+k');
+  await escribir('capital');
+  const elegida = () => e.pagina.evaluate(() => { const o = document.querySelector('#busqueda-lista [aria-selected="true"]'); return o && o.dataset.ruta; });
+  await hasta(async () => (await filas().count()) >= 2, 'búsqueda', 'resultados de «capital»');
+  await e.pagina.keyboard.press('ArrowDown');
+  const antes = await elegida();
+  // Una nota nueva con «capital» en el disco: su fila aparece sola.
+  fs.writeFileSync(path.join(e.c.base, 'capital-nueva.md'), '# Nueva\n\nOtra nota que habla del capital.\n');
+  await visible(e.pagina.locator('#busqueda-lista [data-ruta="capital-nueva.md"]'), 'búsqueda', 'la fila de la nota nueva, sin cerrar la modal');
+  assert.equal(await e.pagina.inputValue('#buscador'), 'capital', 'búsqueda: la recarga ha cambiado el texto');
+  assert.equal(await activo(), 'buscador', 'búsqueda: la recarga ha quitado el foco del campo');
+  assert.equal(await elegida(), antes, 'búsqueda: la recarga ha cambiado la fila elegida');
+  // Ocultar la carpeta: su fila se va y el árbol se repinta con la modal abierta.
+  await e.pagina.evaluate(() => ocultar('conceptos', true));
+  await hasta(async () => (await e.pagina.locator('#busqueda-lista [data-ruta^="conceptos/"]').count()) === 0, 'búsqueda', 'la fila de lo oculto sigue en la modal');
+  assert.equal(await e.pagina.locator('#arbol summary', { hasText: 'conceptos' }).count(), 0, 'búsqueda: el árbol no se ha repintado sin la carpeta oculta');
+  assert.equal(await e.pagina.inputValue('#buscador'), 'capital');
+  // La papelera (simulada por el servidor de pruebas): la nota se va de la modal.
+  await e.pagina.evaluate(() => mandarAPapelera('capital-nueva.md'));
+  await hasta(async () => (await e.pagina.locator('#busqueda-lista [data-ruta="capital-nueva.md"]').count()) === 0, 'búsqueda', 'la fila de la nota a la papelera sigue en la modal');
+  assert.equal(await activo(), 'buscador');
+  await e.pagina.evaluate(() => ocultar('conceptos', false));
   await e.pagina.keyboard.press('Escape');
 });

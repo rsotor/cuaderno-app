@@ -161,6 +161,12 @@ function abrirBusqueda(texto = null) {
   campo.focus();
   if (texto != null) campo.setSelectionRange(campo.value.length, campo.value.length); else campo.select();
 }
+// Con la modal abierta, repite la consulta (el disco, lo oculto o la papelera cambiaron) conservando texto, fila elegida y foco.
+function refrescarBusqueda() {
+  if ($('#busqueda').hidden) return;
+  const o = opcionesBusqueda()[opcionElegida()];
+  consultarBusqueda($('#buscador').value, { conservarRuta: o ? o.dataset.ruta : null });
+}
 function cerrarBusqueda() {
   if ($('#busqueda').hidden) return;
   clearTimeout(tBusqueda); turnoBusqueda++;
@@ -241,7 +247,7 @@ const botonesFila = (ruta, nombre, esFichero = false) => `<span class="acciones-
 async function ocultar(ruta, si) {
   try { await api('/api/ocultar', { ruta, ocultar: si }); } catch (e) { return avisarError(si ? 'No se ha podido ocultar.' : 'No se ha podido volver a mostrar.', e.message); }
   arbol = await api('/api/arbol');
-  pintarArbol(arbol);
+  pintarArbol(arbol); refrescarBusqueda();
   if (si) avisar(`«${ruta.split('/').pop()}» oculto aquí. Para verlo otra vez: Ajustes.`);
   if (!$('#ajustes').hidden) pintarOcultas();
 }
@@ -284,7 +290,7 @@ async function mandarAPapelera(ruta) {
   try { await api('/api/papelera', { ruta }); } catch (e) { avisarError(`No se ha podido mandar a ${PAPELERA}.`, e.message); return; }
   avisar(`«${ruta.split('/').pop()}» está en ${PAPELERA}`);
   [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]);
-  pintarArbol(arbol);
+  pintarArbol(arbol); refrescarBusqueda();
   if (rutaActual === ruta) { rutaActual = null; location.hash = cuaderno().portada && cuaderno().portada !== ruta ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; }
   refrescarContadores();
 }
@@ -1154,7 +1160,7 @@ window.addEventListener('hashchange', () => {
 // El socket de cambios se reabre solo si se cae (el Mac se duerme, el servidor de Electron se relanza): espera creciente
 // de 0,5 s hasta 10 s, un solo socket y un solo temporizador a la vez; al volver a abrir resincroniza como si hubiera
 // llegado un cambio, para recoger lo que cambió mientras estaba caído.
-async function alCambiarDisco() { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); pintarArbol(arbol); if (escribiendo) { /* lo está escribiendo la propia app: aplicarEdicion repinta al acabar */ } else if (rutaActual && !Comentar.ocupado() && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual, null, { desdeCambios: true }); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }
+async function alCambiarDisco() { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.hash = cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'; enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); pintarArbol(arbol); refrescarBusqueda(); if (escribiendo) { /* lo está escribiendo la propia app: aplicarEdicion repinta al acabar */ } else if (rutaActual && !Comentar.ocupado() && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual, null, { desdeCambios: true }); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }
 let cambiosWs = null, cambiosEspera = 500, cambiosTemporizador = null, cambiosAbierto = false;
 function conectarCambios() {
   cambiosTemporizador = null;
