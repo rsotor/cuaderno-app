@@ -17,9 +17,11 @@
 # empaquetado), tests, dependencias o este fichero (el filtro `*.js` no cruza directorios: electron/** va aparte).
 # Un commit que solo toca docs/, capturas o Markdown no gasta nada.
 # `tests-ok` es el único check obligatorio de la regla de `main`: resume los jobs (`needs`) y falla si alguno acabó en
-# failure o cancelled. «skipped» NO es fallo (macOS se salta a propósito sin la etiqueta); así, añadir o quitar un sistema
-# de la matriz no obliga a tocar la regla. Un solo `if: always()` a secas saldría verde aunque todo fallase: por eso mira
-# los resultados.
+# failure, cancelled o skipped. macOS no cuenta como saltado: sin la etiqueta ni entra en la matriz, así que `tests` corre;
+# lo que queda saltado es el run entero de un `labeled` con otra etiqueta, y ahí `tests-ok` sale en rojo A PROPÓSITO (un
+# verde de un run que no probó nada podría dejar mergear un PR en rojo). Se arregla relanzando el run real del PR
+# (Re-run all jobs) o con el siguiente push. Añadir o quitar un sistema de la matriz no obliga a tocar la regla. Un
+# `if: always()` a secas saldría verde aunque todo fallase: por eso mira los resultados.
 # El coste en repo privado: macOS cuenta ×10 y Windows ×2 contra la cuota; en repo público, cero.
 name: Tests
 
@@ -162,8 +164,8 @@ jobs:
     needs: [sistemas, tests]
     runs-on: ubuntu-latest
     steps:
-      - name: Todos los jobs en verde (o saltados a propósito)
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+      - name: Ningún job falló, se canceló o se saltó
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
         run: |
-          echo "Algún job de la CI falló o se canceló"
+          echo "Algún job de la CI falló, se canceló o se saltó"
           exit 1
