@@ -734,6 +734,8 @@ test('Ayuda → Cómo se usa, Atajos de teclado y Plan vivo abren páginas del r
 test('CUADERNO_OCULTA (solo tests): la ventana nace con show:false y el Dock se oculta; sin la variable, la ventana es la de siempre; empaquetada, la variable se ignora', async () => {
   const oculta = montar({ env: { CUADERNO_OCULTA: '1' } }); await tic();
   assert.equal(oculta.ventanas[0].opciones.show, false);
+  assert.equal(oculta.ventanas[0].opciones.webPreferences.backgroundThrottling, false, 'una ventana oculta no ahoga sus temporizadores');
+  assert.equal(oculta.ventanas[0].opciones.webPreferences.partition, 'cuaderno', 'el resto de webPreferences sigue');
   assert.equal(oculta.electron.app.docOculto, 1);
   const normal = montar({}); await tic();
   assert.equal('show' in normal.ventanas[0].opciones, false);

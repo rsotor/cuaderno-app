@@ -132,15 +132,16 @@ test('la app de escritorio: navegando con clics reales en el árbol, ‹ se enci
   await hasta(async () => (await hashDe()) === '#/n/conceptos/interes.md', '› no avanza');
   await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('atras').click());   // ⌘[ (la acción del menú)
   await hasta(async () => (await hashDe()) === '#/n/conceptos/capital.md', 'la acción Atrás del menú no vuelve');
-  // El gesto por defecto de macOS llega como rueda horizontal: un gesto largo con su inercia da un solo paso.
-  await pagina.mouse.move(700, 400);
-  await pagina.evaluate(() => { window.__ruedas = []; window.addEventListener('wheel', e => window.__ruedas.push([Math.round(performance.now()), e.deltaX, e.deltaY, e.deltaMode, e.ctrlKey, e.target.tagName + '#' + e.target.id + '.' + e.target.className]), { passive: true }); });
-  for (let i = 0; i < 30; i++) { await pagina.mouse.wheel(20, 0); await dormir(16); }
-  const diag = async () => JSON.stringify({ ruedas: await pagina.evaluate(() => window.__ruedas.length + ' ' + JSON.stringify(window.__ruedas.slice(0, 4)) + ' ... ' + JSON.stringify(window.__ruedas.slice(-2))), hash: await hashDe(), vent: await pagina.evaluate(() => [innerWidth, innerHeight, navigation.currentEntry.index, navigation.entries().length, document.querySelector('#btn-adelante').disabled]) });
-  try { await hasta(async () => (await hashDe()) === '#/n/conceptos/interes.md', 'el deslizamiento a la izquierda no avanza'); } catch (e) { throw new Error(`${e.message}: ${await diag()}`); }
+  // El gesto por defecto de macOS llega como rueda horizontal: un gesto largo con su inercia da un solo paso. Los eventos se
+  // mandan desde la propia página, uno cada 16 ms como un trackpad: con `mouse.wheel` de Playwright cada evento tarda ~1 s en la
+  // ventana oculta de Linux (xvfb; lo midió la CI: 30 eventos, uno por segundo), y con tanta pausa la rueda «calla» entre uno y otro
+  // y no hay gesto. El manejador y el resto del camino (irHistorial, la API de navegación) son los de la app de verdad.
+  const deslizar = (dx, n) => pagina.evaluate(async ([dx, n]) => { for (let i = 0; i < n; i++) { document.elementFromPoint(700, 400).dispatchEvent(new WheelEvent('wheel', { deltaX: dx, deltaY: 0, bubbles: true, cancelable: true })); await new Promise(r => setTimeout(r, 16)); } }, [dx, n]);
+  await deslizar(20, 30);
+  await hasta(async () => (await hashDe()) === '#/n/conceptos/interes.md', 'el deslizamiento a la izquierda no avanza');
   await dormir(700);
   assert.equal(await hashDe(), '#/n/conceptos/interes.md', 'un gesto ha dado más de un paso');
-  for (let i = 0; i < 30; i++) { await pagina.mouse.wheel(-20, 0); await dormir(16); }
+  await deslizar(-20, 30);
   await hasta(async () => (await hashDe()) === '#/n/conceptos/capital.md', 'el deslizamiento a la derecha no vuelve');
   await dormir(700);
   assert.equal(await hashDe(), '#/n/conceptos/capital.md', 'un gesto ha dado más de un paso atrás');
