@@ -86,10 +86,11 @@ test('editar: el botón solo está en las notas; E no hace nada fuera de ellas n
   assert.equal(await e.pagina.locator('#edicion-cm').count(), 0, 'tareas: E ha abierto un editor');
   await e.ir('#/n/conceptos/capital.md');
   await visible(e.pagina.locator('#btn-editar'), 'nota', 'el botón «Editar» en una nota');
-  await e.pagina.locator('#buscador').focus();
+  await e.pagina.keyboard.press('Control+k');   // la modal de búsqueda: la «e» que se escribe ahí no abre el editor
   await e.pagina.keyboard.type('e');
   assert.equal(await e.pagina.locator('#edicion-cm').count(), 0, 'buscador: teclear una «e» ha abierto el editor');
   assert.equal(await e.pagina.locator('#buscador').inputValue(), 'e');
+  await e.pagina.keyboard.press('Escape');
 });
 
 test('ajuste «Editor»: con vista o Markdown plano se guarda con los demás ajustes y el editor abre igual', async () => {

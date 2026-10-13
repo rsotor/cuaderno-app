@@ -92,7 +92,7 @@ test('buscador sin resultados: no crea nada con Enter (buscar, «+» tarea y not
   await e.ir('#/n/larga.md');
   await e.pagina.keyboard.press('Control+k');
   await e.pagina.keyboard.type('Pendientes de hoy');
-  await conTexto(e.pagina.locator('#arbol .vacio'), /Nada con «Pendientes de hoy»/, 'buscador', 'el aviso de que no hay resultados');
+  await conTexto(e.pagina.locator('#busqueda-nada'), /Nada con «Pendientes de hoy»/, 'buscador', 'el aviso de que no hay resultados');
   await e.pagina.keyboard.press('Enter');
   await e.pagina.waitForTimeout(500);
   assert.equal(await e.pagina.locator('#nueva-nota').isVisible(), false, 'buscador: Enter sin resultados no debe abrir «Nueva nota»');

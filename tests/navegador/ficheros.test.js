@@ -5,7 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { arrancar, hasta, visible, conTexto } = require('./ayuda');
+const { arrancar, hasta, visible, oculto, conTexto } = require('./ayuda');
 
 let e;
 // Hoja de lectura (texto) o sin ella (PDF, HTML, imagen, vídeo, audio y lo que no se sabe enseñar), Roberto, 2026-10-09.
@@ -81,10 +81,11 @@ test('los enlaces de una nota abren el visor del fichero; el buscador encuentra 
   await e.ir('#/n/material/material.md');
   await e.pagina.locator('#nota a.wiki', { hasText: 'extracto-octubre.pdf' }).click();
   await visible(e.pagina.locator('#nota iframe.visor-pdf'), 'enlace', 'el visor tras pulsar [[extracto-octubre.pdf]]');
+  await e.pagina.keyboard.press('Control+k');
   await e.pagina.fill('#buscador', 'extracto');
-  await (await visible(e.pagina.locator('#arbol a.resultado', { hasText: 'extracto-octubre.pdf' }), 'buscador', 'el PDF entre los resultados')).click();
+  await (await visible(e.pagina.locator('#busqueda-lista [role="option"]', { hasText: 'extracto-octubre.pdf' }), 'buscador', 'el PDF entre los resultados')).click();
   await visible(e.pagina.locator('#nota iframe.visor-pdf'), 'buscador', 'el visor tras abrir el resultado');
-  await e.pagina.fill('#buscador', ''); await e.pagina.press('#buscador', 'Escape');
+  await oculto(e.pagina.locator('#busqueda'), 'buscador', 'la modal tras abrir el resultado');
 });
 
 test('mostrar en el Finder: el botón aparece al pasar el ratón por una fila y lanza el gestor de archivos; el de la miga, también', async () => {

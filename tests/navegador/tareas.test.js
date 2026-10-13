@@ -31,16 +31,16 @@ test('«+» en el buscador: la pista, Enter añade a tareas.md y el panel se rep
   await e.ir('#/tareas');
   await e.pagina.keyboard.press('Control+k');
   await e.pagina.keyboard.type('+');
-  await conTexto(e.pagina.locator('#arbol [role="status"]'), /Escribe la tarea después del \+/, 'buscador', 'la pista con el «+» solo');
+  await conTexto(e.pagina.locator('#busqueda-nada'), /Escribe la tarea después del \+/, 'buscador', 'la pista con el «+» solo');
   await e.pagina.keyboard.type('Pedir apuntes #clase');
-  await conTexto(e.pagina.locator('#arbol [role="status"]'), /Enter añade la tarea: Pedir apuntes #clase/, 'buscador', 'la pista de la tarea que se va a añadir');
-  assert.equal(await e.pagina.locator('#arbol a.resultado').count(), 0, 'buscador: con «+» delante no debería buscar');
+  await conTexto(e.pagina.locator('#busqueda-nada'), /Enter añade la tarea: Pedir apuntes #clase/, 'buscador', 'la pista de la tarea que se va a añadir');
+  assert.equal(await e.pagina.locator('#busqueda-lista [role="option"]').count(), 0, 'buscador: con «+» delante no debería buscar');
   await e.pagina.keyboard.press('Enter');
   await visible(e.pagina.locator('.aviso-flotante', { hasText: 'Tarea añadida' }), 'buscador', 'el aviso «Tarea añadida»');
   await ficheroCumple(e.c, 'tareas.md', /- \[x\] Comprar cuaderno\n- \[ \] Pedir apuntes #clase\n$/, 'buscador');
-  await visible(e.pagina.locator('.paginas'), 'buscador', 'Inicio/Tareas/Comentarios de vuelta tras añadir la tarea (el buscador se vacía y sale del estado «buscando»)');
-  await hasta(async () => (await e.pagina.locator('#buscador').inputValue()) === '', 'buscador', 'el buscador no se vació tras añadir');
-  await visible(e.pagina.locator('#arbol > .fila a.hoja'), 'buscador', 'el árbol de notas de vuelta en el lateral');   // las de la raíz: las carpetas salen plegadas
+  await oculto(e.pagina.locator('#busqueda'), 'buscador', 'la modal de búsqueda tras añadir la tarea');
+  assert.equal(await e.pagina.locator('#buscador').inputValue(), '', 'buscador: la consulta no se vació tras añadir');
+  await visible(e.pagina.locator('.paginas'), 'buscador', 'el lateral sigue como estaba (la búsqueda ya no vive en él)');
   await visible(item('Pedir apuntes').locator('.etiqueta', { hasText: '#clase' }), 'tareas', 'la tarea nueva con su etiqueta en el panel');
   await conTexto(e.pagina.locator('#n-tareas'), /^\(8\)$/, 'lateral', 'el contador de pendientes');
 });
@@ -50,7 +50,7 @@ test('«+» con una nota abierta: la tarea lleva [[la nota]] al final', async ()
   await conTexto(e.pagina.locator('#nota h1'), /^Interés$/, 'nota', 'el título');
   await e.pagina.keyboard.press('Control+k');
   await e.pagina.keyboard.type('+Releer esto');
-  await conTexto(e.pagina.locator('#arbol [role="status"]'), /enlazada a Interés/, 'buscador', 'la pista de que la tarea irá enlazada a la nota');
+  await conTexto(e.pagina.locator('#busqueda-nada'), /enlazada a Interés/, 'buscador', 'la pista de que la tarea irá enlazada a la nota');
   await e.pagina.keyboard.press('Enter');
   await ficheroCumple(e.c, 'tareas.md', /- \[ \] Pedir apuntes #clase\n- \[ \] Releer esto \[\[conceptos\/interes\]\]\n$/, 'buscador');
   await conTexto(e.pagina.locator('#nota h1'), /^Interés$/, 'nota', 'la nota sigue abierta tras añadir');

@@ -30,6 +30,8 @@ test('filas: solo por título, el título hace de fragmento; solo por carpeta, �
   const { filas } = Busqueda.filas({ ficheros: ['examenes/01-examen.md', 'conceptos/otra.md'], lineas: [] }, 'módulo', { 'examenes/01-examen.md': 'Examen del módulo 1' });
   assert.equal(filas[0].fragmento, 'Examen del módulo 1');
   assert.equal(filas[0].porNombre, true);
+  const conLinea = Busqueda.filas({ ficheros: ['examenes/01-examen.md'], lineas: [{ ruta: 'examenes/01-examen.md', linea: 1, texto: 'tipo_examen: modulo' }] }, 'módulo', { 'examenes/01-examen.md': 'Examen del módulo 1' }).filas[0];
+  assert.equal(conLinea.fragmento, 'Examen del módulo 1', 'el título gana a una línea suelta cuando la coincidencia es por título');
   const c = Busqueda.filas({ ficheros: ['conceptos/otra.md'], lineas: [] }, 'concep', {}).filas[0];
   assert.equal(c.fragmento, 'en la carpeta conceptos');
   assert.equal(c.porNombre, true);
@@ -49,4 +51,12 @@ test('un <script> sale escapado', () => {
   assert.ok(!h.includes('<script>'));
   assert.match(h, /&lt;script&gt;/);
   assert.match(h, /<mark>x<\/mark>/);
+});
+
+test('recortar: un fragmento corto queda igual; uno largo se centra en la coincidencia con «…»', () => {
+  assert.equal(Busqueda.recortar('corto', 'x'), 'corto');
+  const largo = `${'a '.repeat(60)}ZANAHORIA ${'b '.repeat(60)}`;
+  const r = Busqueda.recortar(largo, 'zanahoria');
+  assert.ok(r.startsWith('…') && r.endsWith('…') && r.includes('ZANAHORIA'), r);
+  assert.ok(r.length <= 95);
 });

@@ -37,8 +37,8 @@
       const tituloCoincide = !!titulo && quitarAcentos(titulo).includes(nq);
       let fragmento = '', linea = null;
       if (l) { fragmento = limpiarFragmento(l.texto); linea = l.linea; }
-      // Coincide por título y no por nombre: el título es lo que explica por qué sale, si la línea no lo dice.
-      if (porNombre && !nombreCoincide && tituloCoincide && !(l && quitarAcentos(fragmento).includes(nq))) fragmento = titulo;
+      // Coincide por título y no por nombre: el título es lo que explica por qué sale (la línea, si la hay, sería otra cosa, p. ej. el frontmatter).
+      if (porNombre && !nombreCoincide && tituloCoincide) fragmento = titulo;
       else if (porNombre && !nombreCoincide && !tituloCoincide && !l) fragmento = `en la carpeta ${carpeta}`;
       return { ruta, nombre, carpeta, fragmento, linea, porNombre };
     };
@@ -68,7 +68,16 @@
     return salida + esc(chars.slice(pos).join(''));
   }
 
-  const Busqueda = { filas, limpiarFragmento, resaltar, quitarAcentos };
+  // Un fragmento largo, recortado alrededor de la primera coincidencia, con «…» donde falta texto.
+  function recortar(texto, q, max = 90) {
+    texto = String(texto);
+    if (texto.length <= max) return texto;
+    const i = quitarAcentos(texto).indexOf(quitarAcentos(String(q || '').trim()));
+    const ini = Math.max(0, (i < 0 ? 0 : i) - 30);
+    return `${ini > 0 ? '…' : ''}${texto.slice(ini, ini + max).trim()}${ini + max < texto.length ? '…' : ''}`;
+  }
+
+  const Busqueda = { filas, limpiarFragmento, resaltar, recortar, quitarAcentos };
   if (typeof window !== 'undefined') window.Busqueda = Busqueda;
   if (typeof module !== 'undefined' && module.exports) module.exports = Busqueda;
 })();

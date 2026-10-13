@@ -48,11 +48,15 @@ test('barra lateral: se recuerda tras recargar y Ctrl+\\ la pliega y la abre', a
   await visible(e.pagina.locator('#lateral'), 'barra lateral', 'la barra tras el segundo Ctrl+\\');
   await e.pagina.reload(); await e.pagina.locator('#miga strong').waitFor();
   await visible(e.pagina.locator('#lateral'), 'barra lateral', 'la barra tras recargar abierta (ya no se recuerda plegada)');
-  // Ctrl K con la barra plegada la abre para escribir en el buscador.
+  // Ctrl K con la barra plegada abre la modal de búsqueda y la barra sigue plegada (la búsqueda ya no vive en ella).
   await e.pagina.keyboard.press('Control+\\');
   await e.pagina.keyboard.press('Control+k');
-  await visible(e.pagina.locator('#buscador'), 'barra lateral', 'el buscador con Ctrl K y la barra plegada');
-  assert.equal(await e.pagina.evaluate(() => document.activeElement.id), 'buscador', 'barra lateral: Ctrl K no enfoca el buscador');
+  await visible(e.pagina.locator('#busqueda'), 'barra lateral', 'la modal de búsqueda con Ctrl K y la barra plegada');
+  assert.equal(await e.pagina.evaluate(() => document.activeElement.id), 'buscador', 'barra lateral: Ctrl K no enfoca el campo de la modal');
+  await oculto(e.pagina.locator('#lateral'), 'barra lateral', 'la barra, que sigue plegada con la modal abierta');
+  await e.pagina.keyboard.press('Escape');
+  await oculto(e.pagina.locator('#busqueda'), 'barra lateral', 'la modal tras Esc');
+  await e.pagina.keyboard.press('Control+\\');
   await e.pagina.evaluate(() => localStorage.clear());
 });
 
