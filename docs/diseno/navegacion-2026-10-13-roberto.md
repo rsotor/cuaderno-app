@@ -30,3 +30,31 @@ reorganización → skill `plan` + ronda de abogado del diablo antes de tocar c�
   flechas ‹ › al principio de la barra superior, antes de la ruta (sitio de Obsidian, Notion, VS Code), apagadas sin
   historial y solo con `window.cuadernoApp` (principio 3). TODO: comprobar si funcionan los botones laterales del
   ratón y el gesto de dos dedos del trackpad.
+
+## Tras ver las maquetas (Roberto, 2026-10-13)
+
+- **A, no B** (B mezcla lo del cuaderno con lo de la nota en la barra superior).
+- **Fuera el rótulo «NOTAS»**: en su lugar, un borde superior algo más grueso entre los accesos y el árbol.
+- **Inicio con icono de casa** en la fila de accesos (el nombre del cuaderno abre el selector, como en Notion/Linear).
+- **«…» de la nota = lo que ya hay**: Mostrar en el Finder, Copiar la ruta, Ocultar (sí, Roberto), Mover a la papelera (al final, en rojo).
+  La maqueta añadió «Mover», que no existe: fuera.
+- **Buscar: icono que abre una modal tipo Obsidian** (Roberto: la búsqueda en modal es más funcional, así que en la
+  barra pierde peso). Objeción de Claude retirada: el campo pasa a ser solo un disparador. Para que se descubra:
+  tooltip con el atajo y una pista en la portada. La modal (buscar notas + «+ tarea») se diseña en el análisis de
+  Buscar y Abrir.
+- **Inbox:** favoritos u ordenar carpetas (función nueva; dónde se guarda, sin romper el principio 1).
+
+## Orden (Roberto, 2026-10-13)
+
+1. PR 1 — reorganización A2 (selector, línea de Guardar, accesos, barra superior con ‹ › y «…», Ajustes/Terminal),
+   con el buscador aún como campo. Antes: skill `plan` + ronda de abogado del diablo, cuando Roberto dé A2 por buena.
+2. Análisis de Buscar y Abrir, con maqueta de la modal (parte del boceto de A2).
+3. PR 2 — la modal; el campo pasa a lupa.
+Aparte, ya en marcha: PR de reconexión de la recarga en vivo.
+
+## Orden revisado (Roberto, 2026-10-13, más tarde)
+
+La modal ya tiene diseño validado (a2-busqueda-modal-*): **PR 1 = modal** (⌘F, ⌘O y ⌘K la abren; el campo actual
+solo la abre), **PR 2 = reorganización A2** (el campo pasa a lupa). Dos PR seguidos, no uno (Roberto propuso uno; se
+quedan dos para que cada uno se revise y se revierta solo). Ambos empiezan tras mergear #27. Plan:
+`docs/planes/navegacion.md`.
