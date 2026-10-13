@@ -2,7 +2,7 @@
 :root {
   --papel: #fbfbfc; --fondo: #f2f3f5; --mesa: #e6e8ec; --lateral: #e6e8ec; --tinta: #1b1b1f; --tinta-suave: #5a5e66; --linea: #dcdfe4;
   --acento: #1e5a96; --acento-suave: #e3ecfa; --sobre-acento: #ffffff; --ok: #15803d; --aviso: #7a4a00; --mal: #b91c1c;
-  --terminal-fondo: #1b1d23; --marca: #fff3a8;
+  --terminal-fondo: #1b1d23; --marca: #fff3a8; --borde-arbol: rgba(27,27,31,.28);
   --rotulador: #ffe45c;   /* lo comentado; en claro, contra --tinta (#1b1b1f) 13,5:1 y contra --acento (#1e5a96) 5,6:1 */
   --c-info: var(--acento); --c-question: #6d28d9; --c-warning: var(--aviso); --c-danger: var(--mal); --c-success: var(--ok);
   --c-quote: #4b5563; --c-example: #0e7490; --c-tip: #0f766e; --c-comment: #9a3412;
@@ -17,7 +17,7 @@
 @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) {
   --papel: #1c1e23; --fondo: #141518; --mesa: #0e0f12; --lateral: #0e0f12; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
   --acento: #8cc8f0; --acento-suave: #22303c; --sobre-acento: #141518; --ok: #86efac; --aviso: #e0a040; --mal: #fca5a5;
-  --terminal-fondo: #0f1014; --marca: #5a4d12;
+  --terminal-fondo: #0f1014; --marca: #5a4d12; --borde-arbol: rgba(230,230,230,.30);
   --rotulador: #5a4a00;   /* ocre oscuro: contra --tinta (#e6e6e6) 7,0:1 y contra --acento (#8cc8f0) 4,8:1 (el #6b5a00 no pasa: enlace 3,8:1); contra --papel (#1c1e23) 1,9:1, por eso lleva además subrayado */
   --c-question: #c4b5fd; --c-quote: #9ca3af; --c-example: #67e8f9; --c-tip: #5eead4; --c-comment: #fb923c;
   --sombra: 0 10px 30px rgba(0, 0, 0, .45); --borde-cajon: #2c2f36;   /* la mesa y el cajón son casi del mismo negro: la línea los separa (crítica 2026-10-09, 2) */
@@ -26,7 +26,7 @@
 :root[data-tema="oscuro"] {
   --papel: #1c1e23; --fondo: #141518; --mesa: #0e0f12; --lateral: #0e0f12; --tinta: #e6e6e6; --tinta-suave: #a0a4ab; --linea: #2c2f36;
   --acento: #8cc8f0; --acento-suave: #22303c; --sobre-acento: #141518; --ok: #86efac; --aviso: #e0a040; --mal: #fca5a5;
-  --terminal-fondo: #0f1014; --marca: #5a4d12;
+  --terminal-fondo: #0f1014; --marca: #5a4d12; --borde-arbol: rgba(230,230,230,.30);
   --rotulador: #5a4a00;   /* ocre oscuro: contra --tinta (#e6e6e6) 7,0:1 y contra --acento (#8cc8f0) 4,8:1 (el #6b5a00 no pasa: enlace 3,8:1); contra --papel (#1c1e23) 1,9:1, por eso lleva además subrayado */
   --c-question: #c4b5fd; --c-quote: #9ca3af; --c-example: #67e8f9; --c-tip: #5eead4; --c-comment: #fb923c;
   --sombra: 0 10px 30px rgba(0, 0, 0, .45); --borde-cajon: #2c2f36;   /* la mesa y el cajón son casi del mismo negro: la línea los separa (crítica 2026-10-09, 2) */
@@ -102,18 +102,20 @@ body:has(#aviso-reinicio:not([hidden])) #app { flex: 1; min-height: 0; height: a
 #btn-guardar { padding: 2px 10px; min-height: 28px; }
 .estado-linea .icono-solo { width: 28px; height: 28px; min-height: 28px; padding: 0; }
 #lateral.sin-cuaderno #btn-buscar, #lateral.sin-cuaderno .paginas, #lateral.sin-cuaderno #btn-terminal, #lateral.sin-cuaderno .estado-linea, #lateral.sin-repo .estado-linea { display: none; }
-/* el disparador de la búsqueda: parece un campo pero es un botón (la búsqueda es una modal; el texto y la tecla en tinta suave, ≥ 4,5:1: rev-13 #2) */
-.buscar-disparador { width: calc(100% - 24px); margin: 8px 12px; padding: 8px 10px; justify-content: flex-start; text-align: left; color: var(--tinta-suave); }
-.buscar-disparador .texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.buscar-disparador .pista-tecla { flex: none; font-size: 12px; }
-.buscar-disparador:hover { color: var(--tinta); }
-.paginas { display: flex; flex-direction: column; padding: 4px 8px; }
-.paginas a, .paginas button, #arbol a { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radio); color: var(--tinta-suave); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* barra apagada (dirección C): el texto en tinta suave, ≥ 4,5:1 sobre la mesa */
-.paginas a:hover, .paginas button:hover, #arbol a:hover, #arbol summary:hover { background: rgba(127,127,127,.12); color: var(--tinta); }
+/* La fila de accesos (maqueta A2): casa, lupa, Tareas N, Comentarios N y «+» al final. Los iconos, en cajas de 28 px; el texto, en em */
+.paginas { display: flex; flex-direction: row; align-items: center; padding: 6px 6px 8px; font-size: .8333em; }
+.paginas a, .paginas button { display: flex; align-items: center; gap: 4px; min-height: 30px; padding: 0 5px; border-radius: var(--radio); color: var(--tinta-suave); text-decoration: none; white-space: nowrap; min-width: 0; background: none; border: 0; font: inherit; cursor: pointer; margin: 0; }   /* barra apagada (dirección C): el texto en tinta suave, ≥ 4,5:1 sobre la mesa */
+#arbol a { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radio); color: var(--tinta-suave); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.paginas .solo { flex: none; width: 28px; padding: 0; justify-content: center; }
+.paginas .mas { margin-left: auto; color: var(--acento); }
+.paginas .etiqueta-acceso { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.paginas a:hover, .paginas button:hover, #arbol a:hover, #arbol summary:hover { background: rgba(127,127,127,.16); color: var(--tinta); }
 .paginas a.activa, #arbol a.activa { background: var(--acento-suave); color: var(--acento); }
-.paginas .icono { color: var(--tinta-suave); } .paginas a.activa .icono { color: var(--acento); }
-.contador { font-size: 12px; color: var(--tinta-suave); margin-left: auto; }
-#arbol { flex: 1; overflow: auto; padding: 4px 8px 12px; font-size: 14px; }
+.paginas .icono { width: 17px; height: 17px; } .paginas a.activa .icono { color: var(--acento); }
+.contador { flex: none; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--tinta); }
+.paginas a.activa .contador { color: inherit; }
+/* El árbol: un borde superior algo más grueso en lugar del rótulo «NOTAS» (Roberto, 2026-10-13) */
+#arbol { flex: 1; overflow: auto; margin: 0 8px; padding: 6px 0 12px; border-top: 2px solid var(--borde-arbol); font-size: 14px; }
 /* Árbol: la carpeta lleva un chevron que gira al abrirse; la página, nada (la sangría ya la coloca bajo su carpeta).
    Mismo color para las dos; la carpeta, algo más de peso. Cada nivel entra 16 px. */
 #arbol details details, #arbol details .hoja { margin-left: 16px; }
@@ -160,7 +162,6 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 #nota .visor-imagen { display: block; margin: 0 auto; max-width: 100%; height: auto; border: 1px solid var(--linea); border-radius: 2px; background: repeating-conic-gradient(rgba(127,127,127,.12) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }   /* el damero deja ver la transparencia */
 #nota .fichero-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: rgba(127,127,127,.08); border: 1px solid var(--linea); border-radius: var(--radio-bloque); padding: 14px 16px; margin: 0; }
 #arbol .hoja small { color: var(--tinta-suave); font-size: 12px; margin-left: auto; padding-left: 8px; }   /* dos notas con el mismo título: el fichero las distingue */
-.paginas button { background: none; border: 0; font: inherit; cursor: pointer; width: 100%; justify-content: flex-start; text-align: left; margin: 0; color: var(--tinta-suave); }   /* como los enlaces de encima: alineado a la izquierda, sin borde */
 #arbol .vacio b { color: var(--tinta); }
 #nueva-nota input, #nueva-nota select { width: 100%; }
 .pie-lateral { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--linea); }

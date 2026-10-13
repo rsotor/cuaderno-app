@@ -69,12 +69,12 @@
       <button type="button" id="btn-cuaderno" class="nombre-cuaderno" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-cuaderno" title="Cambiar de cuaderno"><svg class="icono" aria-hidden="true"><use href="#i-cuaderno"/></svg><span id="nombre-curso">Cuaderno</span><svg class="icono chevron" aria-hidden="true"><use href="#i-abajo"/></svg></button><button type="button" id="btn-plegar" class="secundario plegar" aria-label="Plegar la barra lateral" aria-expanded="true" aria-controls="lateral" title="Plegar la barra lateral (Ctrl \)"><svg class="icono" aria-hidden="true"><use href="#i-plegar"/></svg></button>
       <div id="menu-cuaderno" class="menu" role="menu" aria-label="Cuadernos" hidden></div>
       <div class="estado-linea"><span id="estado-git" role="status" aria-live="off"></span><button type="button" id="btn-guardar" class="secundario" title="Guardar en el repositorio del cuaderno">Guardar</button><button type="button" id="btn-traer" class="secundario icono-solo" title="Traer lo que cambió en otro sitio" aria-label="Traer"><svg class="icono" aria-hidden="true"><use href="#i-traer"/></svg></button><button type="button" id="btn-deshacer" class="secundario icono-solo" title="Deshacer el último guardado" aria-label="Deshacer"><svg class="icono" aria-hidden="true"><use href="#i-deshacer"/></svg></button></div></header>
-    <button type="button" id="btn-buscar" class="buscar-disparador" aria-haspopup="dialog" title="Buscar una nota o apuntar una tarea"><svg class="icono" aria-hidden="true"><use href="#i-lupa"/></svg><span class="texto">Buscar…</span><span class="pista-tecla" id="btn-buscar-pista"></span></button>
     <nav class="paginas" aria-label="Páginas">
-      <a id="link-inicio" href="#/" data-pagina="inicio"><svg class="icono" aria-hidden="true"><use href="#i-casa"/></svg>Inicio</a>
-      <a href="#/tareas" data-pagina="tareas"><svg class="icono" aria-hidden="true"><use href="#i-casillas"/></svg>Tareas <span class="contador" id="n-tareas"></span></a>
-      <a href="#/comentarios" data-pagina="comentarios"><svg class="icono" aria-hidden="true"><use href="#i-bocadillo"/></svg>Comentarios <span class="contador" id="n-comentarios"></span></a>
-      <button type="button" id="btn-nueva-nota" title="Crear una nota nueva"><svg class="icono" aria-hidden="true"><use href="#i-lapiz"/></svg>Nueva nota</button>
+      <a id="link-inicio" class="solo" href="#/" data-pagina="inicio" aria-label="Inicio" title="Inicio"><svg class="icono" aria-hidden="true"><use href="#i-casa"/></svg></a>
+      <button type="button" id="btn-buscar" class="solo" aria-haspopup="dialog" aria-label="Buscar" title="Buscar"><svg class="icono" aria-hidden="true"><use href="#i-lupa"/></svg></button>
+      <a id="link-tareas" href="#/tareas" data-pagina="tareas" aria-label="Tareas" title="Tareas"><span class="etiqueta-acceso">Tareas</span><span class="contador" id="n-tareas"></span></a>
+      <a id="link-comentarios" href="#/comentarios" data-pagina="comentarios" aria-label="Comentarios" title="Comentarios"><span class="etiqueta-acceso">Comentarios</span><span class="contador" id="n-comentarios"></span></a>
+      <button type="button" id="btn-nueva-nota" class="solo mas" aria-label="Nueva nota" title="Crear una nota nueva"><svg class="icono" aria-hidden="true"><use href="#i-mas"/></svg></button>
     </nav>
     <nav id="arbol" aria-label="Notas"></nav>
     <footer class="pie-lateral">

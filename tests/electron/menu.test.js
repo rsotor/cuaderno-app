@@ -68,8 +68,8 @@ test('el menú de la app de escritorio: en castellano, con los atajos de la tabl
   assert.deepEqual(aceleradores, ATAJOS.map(a => a.accelerator), 'cada atajo de la tabla está en el menú instalado');
   // Las pistas de la pantalla dicen lo que dice el menú (en Linux, Ctrl; en Mac dirían ⌘).
   const mod = process.platform === 'darwin' ? '⌘' : 'Ctrl ';
-  assert.equal(await pagina.textContent('#btn-buscar-pista'), `${mod}F`, 'el disparador de la búsqueda dice la tecla del menú');
-  assert.match(await pagina.getAttribute('#btn-buscar', 'title'), new RegExp(`\\(${mod}F\\)$`));
+  // La lupa de la fila de accesos ya no lleva texto (decisión de Roberto, 2026-10-13): la tecla del menú está en su title.
+  assert.match(await pagina.getAttribute('#btn-buscar', 'title'), new RegExp(`^Buscar \\(${mod}F\\)$`), 'la lupa dice la tecla del menú');
   assert.equal(await pagina.getAttribute('#btn-guardar', 'title'), `Guardar en el repositorio del cuaderno (${mod}S)`);
   assert.equal(await pagina.getAttribute('#btn-nueva-nota', 'title'), `Crear una nota nueva (${mod}N)`);
   assert.equal(await pagina.getAttribute('#btn-ajustes', 'title'), `Ajustes de la app (${mod},)`);

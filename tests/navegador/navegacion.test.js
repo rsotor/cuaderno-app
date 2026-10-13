@@ -213,3 +213,79 @@ test('selector: en la app, «Abrir carpeta…» llama al diálogo del sistema (e
     assert.equal(await p.evaluate(() => location.hash), '#/n/conceptos/capital.md', 'selector: en la app «Abrir carpeta…» cambió de pantalla');
   } finally { await ctx.close(); }
 });
+
+// ---------- la fila de accesos con la lupa, y el árbol sin rótulo (T2.3)
+
+const ACCESOS = [['#link-inicio', 'Inicio'], ['#btn-buscar', 'Buscar'], ['a[href="#/tareas"]', 'Tareas'], ['a[href="#/comentarios"]', 'Comentarios'], ['#btn-nueva-nota', 'Nueva nota']];
+
+test('accesos: casa, lupa, Tareas, Comentarios y «+» en una sola fila, cada uno con nombre accesible y title; la lupa abre la modal y el foco vuelve a ella', async () => {
+  await e.ir('#/n/conceptos/capital.md');
+  for (const [sel, nombre] of ACCESOS) {
+    const el = e.pagina.locator(sel);
+    const accesible = (await el.getAttribute('aria-label')) || (await el.textContent()).trim();
+    assert.ok(accesible.startsWith(nombre), `accesos: ${sel} debería llamarse «${nombre}…» y se llama «${accesible}»`);
+    assert.ok((await el.getAttribute('title')), `accesos: ${sel} no tiene title`);
+  }
+  assert.match(await e.pagina.getAttribute('#btn-buscar', 'title'), /^Buscar \((⌘|Ctrl )K\)$/, 'accesos: la lupa no dice su atajo');
+  assert.equal(await e.pagina.getAttribute('#link-inicio', 'title'), 'Inicio');
+  // Una sola fila, a 1280 y en el cajón de 260 px.
+  for (const ancho of [1280, 320]) {
+    await e.pagina.setViewportSize({ width: ancho, height: 700 });
+    if (ancho === 320) await abrirCajon();
+    const m = await e.pagina.evaluate(() => {
+      const nav = document.querySelector('nav.paginas').getBoundingClientRect();
+      return { nav: { x: nav.x, derecha: nav.right, h: nav.height }, hijos: [...document.querySelector('nav.paginas').children].map(h => { const r = h.getBoundingClientRect(); return { id: h.id || h.textContent.trim(), cy: r.y + r.height / 2, x: r.x, derecha: r.right, w: r.width }; }) };
+    });
+    assert.equal(m.hijos.length, 5, `accesos (${ancho} px): la fila no tiene cinco accesos`);
+    for (const h of m.hijos) {
+      assert.ok(Math.abs(h.cy - m.hijos[0].cy) <= 2, `accesos (${ancho} px): ${h.id} no está en la misma fila`);
+      assert.ok(h.derecha <= m.nav.derecha + 0.5 && h.x >= m.nav.x - 0.5, `accesos (${ancho} px): ${h.id} se sale de la fila`);
+    }
+    await e.pagina.setViewportSize({ width: 1280, height: 800 });
+  }
+  await e.pagina.focus('#btn-buscar');
+  await e.pagina.locator('#btn-buscar').click();
+  await visible(e.pagina.locator('#busqueda'), 'accesos', 'la modal al pulsar la lupa');
+  await e.pagina.keyboard.press('Escape');
+  await oculto(e.pagina.locator('#busqueda'), 'accesos', 'la modal tras Esc');
+  assert.equal(await enfocado(), 'btn-buscar', 'accesos: el foco no vuelve a la lupa');
+});
+
+test('accesos: los contadores van sin paréntesis y el nombre accesible los dice; «+» no usa el lápiz de Editar', async () => {
+  await e.ir('#/');
+  await hasta(async () => /^\d+$/.test((await e.pagina.locator('#n-tareas').textContent()).trim()), 'accesos', 'el contador de Tareas sin paréntesis');
+  const t = (await e.pagina.locator('#n-tareas').textContent()).trim();
+  assert.match(await e.pagina.getAttribute('a[href="#/tareas"]', 'aria-label'), new RegExp(`^Tareas, ${t} pendientes?$`), 'accesos: Tareas no dice cuántas pendientes');
+  await hasta(async () => /^\d+$/.test((await e.pagina.locator('#n-comentarios').textContent()).trim()), 'accesos', 'el contador de Comentarios sin paréntesis');
+  const c = (await e.pagina.locator('#n-comentarios').textContent()).trim();
+  assert.equal(await e.pagina.getAttribute('a[href="#/comentarios"]', 'aria-label'), `Comentarios, ${c}`);
+  assert.equal(await e.pagina.locator('#btn-nueva-nota use').getAttribute('href'), '#i-mas', 'accesos: «+» no usa el icono de más');
+  assert.equal(await e.pagina.locator('#btn-nueva-nota use[href="#i-lapiz"]').count(), 0, 'accesos: «Nueva nota» sigue con el lápiz de Editar');
+});
+
+test('árbol: un borde superior de 2 px separa los accesos del árbol y no hay rótulo «Notas»', async () => {
+  await e.ir('#/');
+  const b = await e.pagina.evaluate(() => { const s = getComputedStyle(document.querySelector('#arbol')); return { ancho: s.borderTopWidth, estilo: s.borderTopStyle, color: s.borderTopColor }; });
+  assert.equal(b.ancho, '2px', 'árbol: el borde superior no mide 2 px'); assert.equal(b.estilo, 'solid');
+  const rotulos = await e.pagina.evaluate(() => [...document.querySelectorAll('#lateral *')].filter(x => !x.children.length && /^notas$/i.test(x.textContent.trim())).length);
+  assert.equal(rotulos, 0, 'árbol: sigue el rótulo «Notas»');
+});
+
+for (const tema of ['claro', 'oscuro']) {
+  test(`accesos en ${tema}: casa, lupa y «+» ≥ 3:1 y el texto de Tareas y Comentarios ≥ 4,5:1 sobre el lateral; el borde del árbol se ve`, async () => {
+    await e.ir('#/n/conceptos/capital.md');
+    await e.pagina.evaluate(t => { document.documentElement.dataset.tema = t; }, tema);
+    try {
+      const c = await e.pagina.evaluate(() => {
+        const css = s => getComputedStyle(document.querySelector(s));
+        return { lateral: css('#lateral').backgroundColor, casa: css('#link-inicio').color, lupa: css('#btn-buscar').color, mas: css('#btn-nueva-nota').color, tareas: css('a[href="#/tareas"]').color, comentarios: css('a[href="#/comentarios"]').color, borde: css('#arbol').borderTopColor };
+      });
+      for (const k of ['casa', 'lupa', 'mas']) assert.ok(contraste(c[k], c.lateral) >= 3, `${tema}: el icono ${k} ${c[k]} sobre ${c.lateral} da ${contraste(c[k], c.lateral).toFixed(2)}:1`);
+      for (const k of ['tareas', 'comentarios']) assert.ok(contraste(c[k], c.lateral) >= 4.5, `${tema}: el texto de ${k} ${c[k]} sobre ${c.lateral} da ${contraste(c[k], c.lateral).toFixed(2)}:1`);
+      // El borde lleva transparencia (rgba): se compone sobre el lateral antes de medir.
+      const [r, g, b, a = 1] = c.borde.match(/[\d.]+/g).map(Number), [lr, lg, lb] = rgb(c.lateral);
+      const compuesto = `rgb(${r * a + lr * (1 - a)}, ${g * a + lg * (1 - a)}, ${b * a + lb * (1 - a)})`;
+      assert.ok(contraste(compuesto, c.lateral) >= 1.5, `${tema}: el borde del árbol ${c.borde} casi no se ve sobre ${c.lateral} (${contraste(compuesto, c.lateral).toFixed(2)}:1)`);
+    } finally { await e.pagina.evaluate(() => { delete document.documentElement.dataset.tema; }); }
+  });
+}

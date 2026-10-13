@@ -23,8 +23,8 @@ function pintarTitulo() {
 const ponerVista = v => { vistaTitulo = v; pintarTitulo(); };
 // Lo que supone una terminal se dice de otra forma en la app: no hay terminal donde reiniciarla, se cierra y se vuelve a abrir.
 if (enApp()) { const a = $('#aviso-reinicio'); for (const n of [...a.childNodes]) if (n.id !== 'aviso-cerrar') n.remove(); a.prepend('La app se ha actualizado mientras estaba abierta. Cierra y vuelve a abrir la app para que todo funcione. '); }
-// El disparador de la búsqueda: en la app, la pista del menú (⌘F / Ctrl F); en la web, la de la página (⌘K en Mac, Ctrl K en el resto).
-{ const tecla = pista(enMac ? '⌘K' : 'Ctrl K', 'F'); $('#btn-buscar-pista').textContent = tecla; $('#btn-buscar').title = `Buscar una nota o apuntar una tarea (${tecla})`; }
+// La lupa de la fila de accesos: en la app, la pista del menú (⌘F / Ctrl F); en la web, la de la página (⌘K en Mac, Ctrl K en el resto).
+{ const tecla = pista(enMac ? '⌘K' : 'Ctrl K', 'F'); $('#btn-buscar').title = `Buscar (${tecla})`; }
 if (enApp()) { $('#btn-nueva-nota').title = conAtajo('Crear una nota nueva', 'N'); $('#btn-ajustes').title = conAtajo('Ajustes de la app', ','); }
 // El aviso de «la app se ha actualizado» se cierra y no vuelve en esta pestaña (Roberto, 2026-10-09).
 let avisoCerrado = false;
@@ -816,7 +816,10 @@ async function refrescarContadores() {
   if (!cuaderno()) return;
   const [t, c] = await Promise.all([api('/api/tareas'), api('/api/comentarios')]);
   const pend = t.reduce((a, g) => a + g.items.filter(i => !i.hecha).length, 0);
-  $('#n-tareas').textContent = pend ? `(${pend})` : ''; $('#n-comentarios').textContent = c.length ? `(${c.length})` : '';
+  $('#n-tareas').textContent = pend || ''; $('#n-comentarios').textContent = c.length || '';
+  // Sin paréntesis (maqueta A2): el nombre accesible dice lo que el número solo no dice.
+  const nombreT = pend ? `Tareas, ${pend} ${pend === 1 ? 'pendiente' : 'pendientes'}` : 'Tareas', nombreC = c.length ? `Comentarios, ${c.length}` : 'Comentarios';
+  $('#link-tareas').setAttribute('aria-label', nombreT); $('#link-tareas').title = nombreT; $('#link-comentarios').setAttribute('aria-label', nombreC); $('#link-comentarios').title = nombreC;
 }
 
 // ---------- el cajón: dónde va (derecha o abajo) y cuánto mide, siempre dejando sitio a la nota
