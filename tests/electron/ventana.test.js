@@ -134,8 +134,10 @@ test('la app de escritorio: navegando con clics reales en el árbol, ‹ se enci
   await hasta(async () => (await hashDe()) === '#/n/conceptos/capital.md', 'la acción Atrás del menú no vuelve');
   // El gesto por defecto de macOS llega como rueda horizontal: un gesto largo con su inercia da un solo paso.
   await pagina.mouse.move(700, 400);
+  await pagina.evaluate(() => { window.__ruedas = []; window.addEventListener('wheel', e => window.__ruedas.push([Math.round(performance.now()), e.deltaX, e.deltaY, e.deltaMode, e.ctrlKey, e.target.tagName + '#' + e.target.id + '.' + e.target.className]), { passive: true }); });
   for (let i = 0; i < 30; i++) { await pagina.mouse.wheel(20, 0); await dormir(16); }
-  await hasta(async () => (await hashDe()) === '#/n/conceptos/interes.md', 'el deslizamiento a la izquierda no avanza');
+  const diag = async () => JSON.stringify({ ruedas: await pagina.evaluate(() => window.__ruedas.length + ' ' + JSON.stringify(window.__ruedas.slice(0, 4)) + ' ... ' + JSON.stringify(window.__ruedas.slice(-2))), hash: await hashDe(), vent: await pagina.evaluate(() => [innerWidth, innerHeight, navigation.currentEntry.index, navigation.entries().length, document.querySelector('#btn-adelante').disabled]) });
+  try { await hasta(async () => (await hashDe()) === '#/n/conceptos/interes.md', 'el deslizamiento a la izquierda no avanza'); } catch (e) { throw new Error(`${e.message}: ${await diag()}`); }
   await dormir(700);
   assert.equal(await hashDe(), '#/n/conceptos/interes.md', 'un gesto ha dado más de un paso');
   for (let i = 0; i < 30; i++) { await pagina.mouse.wheel(-20, 0); await dormir(16); }
