@@ -307,6 +307,25 @@ test('ocultar: la carpeta y lo que tiene dentro salen del árbol y del buscador,
   } finally { await s.cerrar(); }
 });
 
+test('buscar?por-nota=1: una línea por nota, con las ocultas fuera antes del tope; sin el parámetro, la respuesta de siempre', async () => {
+  const s = await arrancar();
+  const post = body => s.pedir('/api/ocultar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    fs.mkdirSync(path.join(s.c.base, 'lotes'), { recursive: true });
+    for (let i = 0; i < 52; i++) fs.writeFileSync(path.join(s.c.base, 'lotes', `n${String(i).padStart(2, '0')}.md`), 'patata\npatata\n');
+    const antes = await (await s.pedir('/api/buscar?q=patata&por-nota=1')).json();
+    assert.equal(antes.lineas.length, 50);
+    assert.equal(antes.cortado, true);
+    await post({ ruta: 'lotes/' });
+    const despues = await (await s.pedir('/api/buscar?q=patata&por-nota=1')).json();
+    assert.deepEqual(despues.lineas, [], 'lo oculto no sale ni gasta el tope');
+    assert.equal(despues.cortado, false);
+    const sin = await (await s.pedir('/api/buscar?q=capital')).json();
+    assert.equal(sin.cortado, undefined, 'sin el parámetro, la respuesta de hoy');
+    assert.ok(sin.lineas.every(l => !l.ruta.startsWith('lotes/')));
+  } finally { await s.cerrar(); }
+});
+
 test('una sola dirección: http://localhost:<puerto>/, la misma cada vez; 127.0.0.1 lleva a ella y sin cookie se explica cómo entrar', async () => {
   const s = await arrancar();
   try {
