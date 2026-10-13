@@ -90,9 +90,10 @@ test('estructura: un nombre con acentos y espacios se abre y se busca; dos notas
   await abrirCarpeta('estructura');
   await (await visible(e.pagina.locator('#arbol a.hoja', { hasText: 'Nota con acentos y espacios' }), 'estructura', 'la nota con acentos')).click();
   await conTexto(e.pagina.locator('#nota h1'), /^Nota con acentos y espacios$/, 'estructura', 'el título de la nota con acentos');
+  await e.pagina.keyboard.press('Control+k');
   await e.pagina.fill('#buscador', 'acentos y espacios');
-  await visible(e.pagina.locator('#arbol a.resultado', { hasText: 'Nota con acentos y espacios' }), 'buscador', 'la nota con acentos en el buscador');
-  await e.pagina.fill('#buscador', ''); await e.pagina.press('#buscador', 'Escape');
+  await visible(e.pagina.locator('#busqueda-lista [role="option"]', { hasText: 'Nota con acentos y espacios' }), 'buscador', 'la nota con acentos en el buscador');
+  await e.pagina.press('#buscador', 'Escape');
   await abrirCarpeta('estructura');
   // El árbol enseña el nombre del fichero, no el título (Roberto, 2026-10-09): dos notas con el mismo título no se confunden.
   const repetidas = e.pagina.locator('#arbol a.hoja', { hasText: 'repetida-' });
@@ -109,7 +110,7 @@ test('Tareas sin kit: el panel solo enseña tareas.md (no las casillas de otras 
   await e.pagina.keyboard.type('+ Una tarea sin kit');
   await e.pagina.keyboard.press('Enter');
   await ficheroCumple(e.c, 'tareas.md', /\r?\n- \[ \] Una tarea sin kit\r?\n/, 'tareas');   // CRLF en Windows: git lo convierte al deshacer en el recorrido de Guardar
-  await hasta(async () => (await e.pagina.inputValue('#buscador')) === '', 'tareas', 'la tarea se queda escrita en el buscador tras añadirla');
+  await oculto(e.pagina.locator('#busqueda'), 'tareas', 'la modal de búsqueda tras añadir la tarea');
   // Y desde el campo del panel: se vacía aunque el panel conserve su borrador al repintar.
   await e.pagina.fill('#tarea-nueva', 'Otra desde el panel'); await e.pagina.press('#tarea-nueva', 'Enter');
   await ficheroCumple(e.c, 'tareas.md', /- \[ \] Otra desde el panel/, 'tareas');

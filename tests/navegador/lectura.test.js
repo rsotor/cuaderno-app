@@ -22,20 +22,21 @@ test('portada: se ve el título de inicio.md, el nombre del cuaderno y el árbol
   await visible(e.pagina.locator('#link-inicio.activa'), 'portada', 'el enlace Inicio marcado como activo');
 });
 
-test('buscar: Ctrl K enfoca el buscador, «interes» enseña resultados y el primero abre la nota', async () => {
+test('buscar: Ctrl K abre la modal, «interes» enseña una fila por nota con su fragmento y la primera abre la nota; el lateral no cambia', async () => {
   await e.ir('#/');
   await e.pagina.keyboard.press('Control+k');
   await hasta(() => e.pagina.evaluate(() => document.activeElement && document.activeElement.id === 'buscador'), 'buscador', 'Ctrl K no deja el foco en el buscador');
   await e.pagina.keyboard.type('interes');
-  await conTexto(e.pagina.locator('#arbol [role="status"]'), /\d+ notas? y \d+ líneas?/, 'buscador', 'el recuento de resultados');
-  await oculto(e.pagina.locator('.paginas'), 'buscador', 'Inicio/Tareas/Comentarios mientras se busca: los resultados necesitan el sitio');
-  await conTexto(e.pagina.locator('#arbol h3.tramo').first(), /^\d+ notas?$/, 'buscador', 'el tramo «Notas» primero');
-  await conTexto(e.pagina.locator('#arbol h3.tramo').nth(1), /^En el texto/, 'buscador', 'el tramo «En el texto» después');
-  const nota = await visible(e.pagina.locator('#arbol a.resultado', { hasText: 'Interés' }), 'buscador', 'la nota «Interés» entre los resultados');
-  await visible(e.pagina.locator('#arbol a.resultado mark'), 'buscador', 'el texto buscado resaltado');
-  await visible(e.pagina.locator('#arbol a.resultado', { hasText: 'Capital' }), 'buscador', 'la línea de «Capital» que menciona el interés');
+  await conTexto(e.pagina.locator('#busqueda-estado'), /\d+ notas?/, 'buscador', 'el recuento de resultados');
+  await visible(e.pagina.locator('.paginas'), 'buscador', 'Inicio/Tareas/Comentarios: el lateral no cambia mientras se busca');
+  const nota = await visible(e.pagina.locator('#busqueda-lista [role="option"]', { hasText: 'interes' }), 'buscador', 'la nota «interes» entre los resultados');
+  await visible(e.pagina.locator('#busqueda-lista [role="option"] mark'), 'buscador', 'el texto buscado resaltado');
+  const filasCapital = e.pagina.locator('#busqueda-lista [role="option"]', { hasText: 'capital' });
+  await visible(filasCapital, 'buscador', 'la fila de «capital», que menciona el interés');
+  assert.equal(await filasCapital.count(), 1, 'buscador: una nota sale en una sola fila');
   await nota.click();
   await hashCumple(e.pagina, /^#\/n\/conceptos\/interes\.md/, 'buscador');
+  await oculto(e.pagina.locator('#busqueda'), 'buscador', 'la modal tras abrir la nota');
   await conTexto(e.pagina.locator('#nota h1'), /^Interés$/, 'nota', 'el título «Interés»');
   await visible(e.pagina.locator('#nota .propiedades .etiqueta', { hasText: 'rédito' }), 'nota', 'las propiedades del frontmatter (alias)');
   await visible(e.pagina.locator('#nota .backlinks a', { hasText: 'Capital' }), 'nota', 'quién enlaza aquí');
@@ -55,20 +56,19 @@ test('editar una lista desde el editor de la nota: la casilla nueva queda en el 
   await conTexto(e.pagina.locator('#nota'), /Una casilla más/, 'nota Interés', 'la casilla nueva tras aplicar');
 });
 
-test('buscar con teclado: por título («módulo» abre el examen), flecha abajo y Enter; Escape vuelve al árbol', async () => {
+test('buscar con teclado: por título («módulo» abre el examen), flecha abajo y Enter; el foco no sale del campo; Escape cierra', async () => {
   await e.ir('#/');
   await e.pagina.keyboard.press('Control+k');
   await e.pagina.keyboard.type('módulo');   // el fichero se llama 01-examen.md: solo coincide por el título
-  const nota = await visible(e.pagina.locator('#arbol a.resultado', { hasText: 'Módulo 1' }), 'buscador', 'el examen encontrado por su título, no por el nombre de fichero');
+  const nota = await visible(e.pagina.locator('#busqueda-lista [role="option"]', { hasText: 'Módulo 1' }), 'buscador', 'el examen encontrado por su título, no por el nombre de fichero');
   await e.pagina.keyboard.press('ArrowDown');
-  await hasta(() => e.pagina.evaluate(() => document.activeElement && document.activeElement.classList.contains('resultado')), 'buscador', 'la flecha abajo no lleva el foco al primer resultado');
   await e.pagina.keyboard.press('ArrowUp');
-  await hasta(() => e.pagina.evaluate(() => document.activeElement && document.activeElement.id === 'buscador'), 'buscador', 'la flecha arriba desde el primer resultado no vuelve al buscador');
+  await hasta(() => e.pagina.evaluate(() => document.activeElement && document.activeElement.id === 'buscador'), 'buscador', 'las flechas sacan el foco del campo (el foco nunca sale de #buscador)');
   await e.pagina.keyboard.press('Enter');
   await hashCumple(e.pagina, /^#\/n\/examenes\/01-examen\.md/, 'buscador');
   await e.pagina.keyboard.press('Control+k'); await e.pagina.keyboard.press('Escape');
-  await visible(e.pagina.locator('.paginas'), 'buscador', 'Inicio/Tareas/Comentarios al vaciar con Escape');
-  await visible(e.pagina.locator('#arbol summary', { hasText: 'conceptos' }), 'buscador', 'el árbol de vuelta al vaciar');
+  await oculto(e.pagina.locator('#busqueda'), 'buscador', 'la modal tras Escape');
+  await visible(e.pagina.locator('#arbol summary', { hasText: 'conceptos' }), 'buscador', 'el árbol, que no ha cambiado');
   void nota;
 });
 

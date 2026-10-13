@@ -21,12 +21,12 @@ const NOMBRE = 'Cuaderno';
 // pantalla. Para añadir uno: una fila aquí y su caso en ACCIONES_APP de public/app.js. Son los que decidió Roberto (plan
 // §8.1, 2026-10-10: «los típicos: buscar, abrir, la T para la tarea; la K con dudas», y «el de abrir que me abra la carpeta
 // o nota dentro del cuaderno porque no tenemos un importar»):
-//   · Abrir nota… (⌘O) y Buscar… (⌘F) hoy hacen lo mismo en la pantalla (enfocar el buscador, que busca por nombre de nota
-//     y de carpeta y por el texto; Enter abre). Son dos acciones con nombre distinto a propósito: divergirán (abrir por
+//   · Abrir nota… (⌘O) y Buscar… (⌘F) hoy hacen lo mismo en la pantalla (abrir la modal de búsqueda, que busca por nombre de
+//     nota y de carpeta y por el texto; Enter abre). Son dos acciones con nombre distinto a propósito: divergirán (abrir por
 //     nombre irá a la paleta de acciones rápidas; buscar seguirá siendo buscar texto).
 //   · Abrir carpeta… (⇧⌘O) es cambiar de cuaderno con el diálogo del sistema: lo que Roberto ve como un «importar».
 //   · **CmdOrCtrl+K queda RESERVADA y sin acción**: será la paleta de «acciones rápidas», un bloque posterior del plan vivo
-//     (hoy, en la web, Ctrl K enfoca el buscador desde la propia pantalla; el menú no la toca). Tampoco hay CmdOrCtrl+P.
+//     (hoy, Ctrl K abre la modal de búsqueda desde la propia pantalla, en la web y en la app; el menú no la toca). Tampoco hay CmdOrCtrl+P.
 //   · Los de la crítica de diseño del 2026-10-10 (8; aprobados por el director, Roberto puede vetarlos): Nueva nota (⌘N) en
 //     Archivo; en Ver, Barra lateral y Terminal con los aceleradores de la propia página, explícitos y con Ctrl también en
 //     Mac (`Ctrl+\` y `Ctrl+\``: ⌘` en Mac es «siguiente ventana»), y Atrás / Adelante (⌘[ / ⌘]) con el historial del

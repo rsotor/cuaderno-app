@@ -147,13 +147,28 @@ class Cuaderno {
     const re = new RegExp(`\\[\\[(?:[^\\]|]*/)?${nombre}(?:[|\\]#\\\\])`);
     return this.listar().filter(p => p !== rel && p.endsWith('.md') && re.test(this.leer(p)));
   }
-  buscar(q, tope = 60) {
+  // buscar(q, tope) (firma de siempre) o buscar(q, { tope, porNota, excluir }). Con porNota: la primera línea que coincide
+  // de cada nota, hasta 50 notas, saltando las excluidas antes de contar; `cortado` dice si quedaron notas fuera.
+  buscar(q, opciones = 60) {
+    const { tope = 60, porNota = false, excluir = () => false } = typeof opciones === 'number' ? { tope: opciones } : opciones;
     const nq = quitarAcentos(String(q || '').trim());
-    if (!nq) return { ficheros: [], lineas: [] };
+    if (!nq) return porNota ? { ficheros: [], lineas: [], cortado: false } : { ficheros: [], lineas: [] };
     const todos = this.arbol();
     const titulos = this.titulos();
     const ficheros = todos.filter(p => quitarAcentos(p).includes(nq) || (titulos[p] && quitarAcentos(titulos[p]).includes(nq)));
     const lineas = [];
+    if (porNota) {
+      const MAX_NOTAS = 50;
+      let cortado = false;
+      for (const p of todos) {
+        if (!p.endsWith('.md') || excluir(p)) continue;
+        const i = this.lineas(this.leer(p)).findIndex(l => quitarAcentos(l).includes(nq));
+        if (i < 0) continue;
+        if (lineas.length >= MAX_NOTAS) { cortado = true; break; }
+        lineas.push({ ruta: p, linea: i, texto: this.lineas(this.leer(p))[i].trim().slice(0, 160) });
+      }
+      return { ficheros, lineas, cortado };
+    }
     for (const p of todos) {
       if (!p.endsWith('.md') || lineas.length >= tope) continue;
       this.lineas(this.leer(p)).forEach((l, i) => { if (lineas.length < tope && quitarAcentos(l).includes(nq)) lineas.push({ ruta: p, linea: i, texto: l.trim().slice(0, 160) }); });

@@ -551,3 +551,13 @@ baja); 9 aplicadas y 1 aplicada en parte.**
    leyó en `origin/arreglo/recarga-en-vivo-reconecta`.)
 10. **Baja · Foco pisado en la segunda apertura, Escape del cajón a ≤ 760 px, `cambioPropio` booleano.** **Aplicada:** P6,
     T1.3 (Escape del cajón y test 8), T2.2 (marca con la ruta y caducidad, y test del aviso legítimo).
+
+## 12. Seguimiento del PR 1 (2026-10-13)
+
+T1.0 a T1.6 hechas en la rama `navegacion/modal-busqueda`. Diferencias con lo escrito arriba, y por qué:
+
+- **Nota del ejemplo:** `render/fragmentos-de-busqueda.md`, no `busqueda/fragmentos.md`, y sin casilla. Una carpeta nueva subía la parada de Tab a 35 (la medida real era 34, el techo; el plan decía 33) y una casilla movía las cifras del panel Tareas; la casilla con alias se prueba en `tests/busqueda.test.js`. Los contadores de notas de `cuaderno.test.js` y `servidor.test.js` pasan de 21 a 22.
+- **Selectores:** el aviso «Nada con…» y las pistas del «+» están en `#busqueda-nada` (no dentro de `#busqueda-lista`, para que el listbox solo lleve opciones); la fila «Apuntar tarea» sí es una opción del listbox.
+- **Apertura en la línea:** `?l=` solo en las filas de coincidencia por texto (no en las que coinciden por nombre o título).
+- **Título gana a la línea:** si coincide por título y no por nombre, el fragmento es el título aunque haya una línea (p. ej. el frontmatter).
+- Con la crítica de diseño: ver `docs/diseno/critica-2026-10-13-modal.md`.

@@ -16,6 +16,10 @@
 # Solo se lanza cuando cambia algo que afecta a los tests: código, pantalla, la app de escritorio (electron/ y su
 # empaquetado), tests, dependencias o este fichero (el filtro `*.js` no cruza directorios: electron/** va aparte).
 # Un commit que solo toca docs/, capturas o Markdown no gasta nada.
+# `tests-ok` es el único check obligatorio de la regla de `main`: resume los jobs (`needs`) y falla si alguno acabó en
+# failure o cancelled. «skipped» NO es fallo (macOS se salta a propósito sin la etiqueta); así, añadir o quitar un sistema
+# de la matriz no obliga a tocar la regla. Un solo `if: always()` a secas saldría verde aunque todo fallase: por eso mira
+# los resultados.
 # El coste en repo privado: macOS cuenta ×10 y Windows ×2 contra la cuota; en repo público, cero.
 name: Tests
 
@@ -150,3 +154,16 @@ jobs:
         if: runner.os == 'Linux' || github.event_name == 'workflow_dispatch'
         timeout-minutes: 10
         run: ${{ runner.os == 'Linux' && 'xvfb-run -a npm run test:electron' || 'npm run test:electron' }}
+
+  tests-ok:
+    # Check resumen (ver cabecera): el único obligatorio en la regla de `main`.
+    name: tests-ok
+    if: always()
+    needs: [sistemas, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Todos los jobs en verde (o saltados a propósito)
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "Algún job de la CI falló o se canceló"
+          exit 1

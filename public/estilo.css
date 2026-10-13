@@ -82,8 +82,12 @@ body:has(#aviso-reinicio:not([hidden])) #app { flex: 1; min-height: 0; height: a
 .guardar-barra { display: flex; gap: 6px; margin-top: 8px; }
 .guardar-barra #btn-guardar { flex: 1; }
 .guardar-barra .secundario { padding: 6px 9px; }
-#lateral.sin-cuaderno #buscador, #lateral.sin-cuaderno .paginas, #lateral.sin-cuaderno #btn-terminal, #lateral.sin-cuaderno .guardar-barra, #lateral.sin-repo .guardar-barra { display: none; }
-#buscador { margin: 8px 12px; padding: 8px 10px; }
+#lateral.sin-cuaderno #btn-buscar, #lateral.sin-cuaderno .paginas, #lateral.sin-cuaderno #btn-terminal, #lateral.sin-cuaderno .guardar-barra, #lateral.sin-repo .guardar-barra { display: none; }
+/* el disparador de la búsqueda: parece un campo pero es un botón (la búsqueda es una modal; el texto y la tecla en tinta suave, ≥ 4,5:1: rev-13 #2) */
+.buscar-disparador { width: calc(100% - 24px); margin: 8px 12px; padding: 8px 10px; justify-content: flex-start; text-align: left; color: var(--tinta-suave); }
+.buscar-disparador .texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.buscar-disparador .pista-tecla { flex: none; font-size: 12px; }
+.buscar-disparador:hover { color: var(--tinta); }
 .paginas { display: flex; flex-direction: column; padding: 4px 8px; }
 .paginas a, .paginas button, #arbol a { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radio); color: var(--tinta-suave); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* barra apagada (dirección C): el texto en tinta suave, ≥ 4,5:1 sobre la mesa */
 .paginas a:hover, .paginas button:hover, #arbol a:hover, #arbol summary:hover { background: rgba(127,127,127,.12); color: var(--tinta); }
@@ -137,18 +141,9 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 #nota .visor-imagen { display: block; margin: 0 auto; max-width: 100%; height: auto; border: 1px solid var(--linea); border-radius: 2px; background: repeating-conic-gradient(rgba(127,127,127,.12) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }   /* el damero deja ver la transparencia */
 #nota .fichero-texto { font: 13px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: rgba(127,127,127,.08); border: 1px solid var(--linea); border-radius: var(--radio-bloque); padding: 14px 16px; margin: 0; }
 #arbol .hoja small { color: var(--tinta-suave); font-size: 12px; margin-left: auto; padding-left: 8px; }   /* dos notas con el mismo título: el fichero las distingue */
-#lateral.buscando .paginas { display: none; }   /* buscando, los resultados necesitan el sitio */
-#arbol .tramo { margin: 10px 10px 2px; font-size: 12px; font-weight: 600; color: var(--tinta-suave); }   /* sin mayúsculas ni eyebrow (crítica del 2026-10-07) */
-#arbol .tramo small { font-weight: 400; margin-left: 6px; }
-#arbol .resultado { padding: 6px 10px; display: block; color: var(--tinta); }   /* el título del resultado, en tinta: la barra apagada no le quita la jerarquía sobre su fragmento (crítica 2026-10-09, 1) */
-#arbol .resultado.linea { padding: 4px 10px 4px 20px; font-size: 13px; line-height: 1.35; color: var(--tinta-suave); white-space: normal; }   /* las líneas, bajo el título de su nota */
-#arbol .grupo { margin-bottom: 6px; }
 .paginas button { background: none; border: 0; font: inherit; cursor: pointer; width: 100%; justify-content: flex-start; text-align: left; margin: 0; color: var(--tinta-suave); }   /* como los enlaces de encima: alineado a la izquierda, sin borde */
 #arbol .vacio b { color: var(--tinta); }
 #nueva-nota input, #nueva-nota select { width: 100%; }
-#arbol .resultado small { display: block; color: var(--tinta-suave); white-space: normal; font-size: 12px; line-height: 1.35; }
-#arbol .comando { white-space: normal; color: var(--tinta-suave); line-height: 1.45; }   /* la pista del «+»: Enter añade la tarea */
-#arbol .comando b { color: var(--tinta); font-weight: 600; overflow-wrap: anywhere; }
 .pie-lateral { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--linea); }
 .pie-lateral button { flex: 1; white-space: nowrap; }
 .pie-lateral #btn-ajustes { flex: 0 0 auto; }
@@ -354,6 +349,36 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 .aviso-flotante.error pre { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; font: 12px/1.45 var(--mono); }
 .aviso-flotante .cerrar-aviso { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; min-height: 0; padding: 0; background: none; border: 0; color: inherit; font-size: 20px; line-height: 1; border-radius: 50%; }
 .aviso-flotante .cerrar-aviso:hover { background: color-mix(in srgb, currentColor 22%, transparent); }
+
+/* la búsqueda en modal (maqueta A2: 620 px, 11vh, radio 12, filas 8×10, fila elegida en --acento-suave) */
+.modal.busqueda { align-items: flex-start; padding-top: 11vh; background: rgba(10,12,16,.38); }
+.busqueda-caja { width: min(620px, 92vw); max-height: 78vh; display: flex; flex-direction: column; background: var(--papel); border: 1px solid var(--linea); border-radius: 12px; box-shadow: 0 24px 60px rgba(0,0,0,.35); overflow: hidden; color: var(--tinta); }
+.busqueda-campo { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--linea); }
+.busqueda-campo .icono { width: 19px; height: 19px; color: var(--tinta-suave); }
+.busqueda-campo input { flex: 1; min-width: 0; font-size: 17px; border: 0; background: none; padding: 4px 0; }
+.busqueda-campo input:focus-visible { outline: none; }
+.busqueda-campo:focus-within { box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--acento) 40%, transparent); }   /* crítica 2026-10-13 (3): el foco, sin gritar */
+.busqueda-campo kbd, .busqueda-pie kbd { font: inherit; font-size: 12px; line-height: 1; border-width: 1px; padding: 2px 5px; color: var(--tinta-suave); background: none; }
+#busqueda-lista { overflow-y: auto; padding: 6px; }
+#busqueda-lista:empty { display: none; }
+.busqueda .res { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
+.busqueda .res[aria-selected="true"] { background: var(--acento-suave); box-shadow: inset 3px 0 0 var(--acento); }   /* la barra a la izquierda: la elegida no se distingue solo por el color (crítica 2026-10-13, 4) */
+.busqueda .res .icono { width: 17px; height: 17px; color: var(--tinta-suave); }
+.busqueda .res .cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.busqueda .res .t { font-size: 14.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.busqueda .res .s { font-size: 12.5px; color: var(--tinta-suave); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.busqueda .res .c { flex: none; max-width: 40%; font-size: 12.5px; color: var(--tinta-suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.busqueda .res.tarea { margin-top: 4px; border-top: 1px solid var(--linea); border-radius: 0 0 7px 7px; }
+.busqueda .res.tarea .icono { color: var(--acento); }
+.busqueda .res.tarea .t { color: var(--tinta); }
+.busqueda .res mark { background: none; color: var(--acento); font-weight: 700; }
+.busqueda-nada, .busqueda-mas { margin: 0; padding: 12px 16px; font-size: 13.5px; color: var(--tinta-suave); line-height: 1.45; }
+.busqueda-nada b { color: var(--tinta); }
+.busqueda-nada small { display: block; }
+.busqueda-pie { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 8px 16px; border-top: 1px solid var(--linea); background: var(--fondo); font-size: 13px; color: var(--tinta-suave); }
+:root[data-tema="oscuro"] .modal.busqueda { background: rgba(0,0,0,.55); }   /* en oscuro el velo casi no se veía (crítica 2026-10-13, 7) */
+@media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) .modal.busqueda { background: rgba(0,0,0,.55); } }
+@media (max-width: 760px) { .busqueda-pie, .busqueda-campo kbd { display: none; } }   /* en táctil los atajos no sirven y roban altura (crítica 2026-10-13, 2) */
 
 /* estrecho: la barra lateral se despliega sobre el contenido con un botón; nada se corta */
 @media (max-width: 760px) {
