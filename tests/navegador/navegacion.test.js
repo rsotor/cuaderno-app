@@ -552,3 +552,9 @@ test('ratón: los botones laterales (atrás y adelante) recorren el historial de
     assert.equal(prevenido, false, 'ratón: en la web el manejador cancela el botón lateral');
   } finally { await web.ctx.close(); }
 });
+
+test('línea del estado: un cuaderno sin ningún commit y nada pendiente dice «sin cambios»; con cambios, «N cambios»; sin repositorio, nada', async () => {
+  await e.ir('#/n/conceptos/capital.md');
+  const t = await e.pagina.evaluate(() => [textoEstado({ ultimo: null, cambios: 0, sinSubir: 0 }), textoEstado({ ultimo: null, cambios: 3, sinSubir: 0 }), textoEstado({ ultimo: null, cambios: 0, sinSubir: null }), textoEstado(null)]);
+  assert.deepEqual(t, ['sin cambios', '3 cambios', 'sin cambios', '']);
+});

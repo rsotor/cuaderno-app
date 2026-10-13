@@ -968,7 +968,7 @@ const hace = iso => { if (!iso) return 'nunca'; const d = (Date.now() - new Date
 // El estado corto de la línea bajo el nombre (Roberto, 2026-10-13): con cambios «N cambios»; sin cambios y con commits sin subir «N sin subir»;
 // si no, «guardado · 3 h». Sin repositorio, nada. La frase entera (textoGit) va en el title y el aria-label.
 const haceCorto = iso => { if (!iso) return null; const d = (Date.now() - new Date(iso)) / 864e5; if (d < 1 / 24) return 'ahora'; if (d < 1) return `${Math.round(d * 24)} h`; if (d < 30) return `${Math.round(d)} ${Math.round(d) === 1 ? 'día' : 'días'}`; return new Date(iso).toLocaleDateString('es', { day: 'numeric', month: 'short' }); };
-const textoEstado = g => !g ? '' : g.cambios ? `${g.cambios} ${g.cambios === 1 ? 'cambio' : 'cambios'}` : g.sinSubir ? `${g.sinSubir} sin subir` : haceCorto(g.ultimo) ? `guardado · ${haceCorto(g.ultimo)}` : 'sin guardados';
+const textoEstado = g => !g ? '' : g.cambios ? `${g.cambios} ${g.cambios === 1 ? 'cambio' : 'cambios'}` : g.sinSubir ? `${g.sinSubir} sin subir` : haceCorto(g.ultimo) ? `guardado · ${haceCorto(g.ultimo)}` : 'sin cambios';   // repositorio sin ningún commit y nada pendiente (decisión de Roberto, 2026-10-13)
 const textoGit = g => !g ? 'sin repositorio' : `guardado ${hace(g.ultimo)}${g.cambios ? `, ${g.cambios} ${g.cambios === 1 ? 'cambio' : 'cambios'} por guardar` : ''}${g.sinSubir ? `, ${g.sinSubir} sin subir` : ''}`;
 async function abrirCuadernos() {
   rutaActual = null; $('#nota').hidden = true; $('#panel').hidden = false;
