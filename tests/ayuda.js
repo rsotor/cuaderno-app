@@ -71,3 +71,4 @@ function herramientasChivatas(raiz, nombres) {
 }
 
 module.exports = { crearCuaderno, NOTAS, EJEMPLOS, otroNode, herramientasChivatas };
+// control de CI de macOS (rama de prueba)
