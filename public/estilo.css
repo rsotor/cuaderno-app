@@ -164,9 +164,11 @@ button.copiar:hover { color: var(--acento); background: rgba(127,127,127,.15); }
 #arbol .hoja small { color: var(--tinta-suave); font-size: 12px; margin-left: auto; padding-left: 8px; }   /* dos notas con el mismo título: el fichero las distingue */
 #arbol .vacio b { color: var(--tinta); }
 #nueva-nota input, #nueva-nota select { width: 100%; }
-.pie-lateral { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--linea); }
-.pie-lateral button { flex: 1; white-space: nowrap; }
-.pie-lateral #btn-ajustes { flex: 0 0 auto; }
+/* El pie (maqueta A2): Terminal y Ajustes en iconos de 30 px, sin recuadro, a la izquierda */
+.pie-lateral { display: flex; justify-content: flex-start; gap: 2px; padding: 6px 8px; border-top: 1px solid var(--linea); }
+.pie-lateral button { flex: none; width: 30px; min-height: 30px; padding: 0; border: 0; background: none; color: var(--tinta-suave); }
+.pie-lateral button:hover { background: rgba(127,127,127,.16); color: var(--tinta); }
+.pie-lateral .icono { width: 17px; height: 17px; }
 
 #centro { position: relative; overflow: auto; min-height: 0; min-width: 0; padding: 0 0 40px; background: var(--mesa); --hoja-pad: 56px; --texto: 800px; }   /* la mesa: un poco más hundida que la hoja (Roberto, 2026-10-09, dirección A) */
 .miga-barra { position: sticky; top: 0; background: var(--mesa); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px max(calc(var(--hoja-pad) + 8px), calc((100% - var(--texto) - 2 * var(--hoja-pad)) / 2 + var(--hoja-pad))); }   /* empieza donde empieza el texto de la hoja */

@@ -45,7 +45,8 @@ test('ocultar un fichero no abre la nota, y con nada oculto Ajustes no enseña l
 test('el botón de Ajustes dice «Ajustes» y lleva la rueda dentada', async () => {
   await e.ir('#/');
   const b = e.pagina.locator('#btn-ajustes');
-  assert.equal((await b.textContent()).trim(), 'Ajustes');
+  // El pie del lateral es de iconos (maqueta A2, T2.4): el nombre es el accesible (aria-label), ya no el texto del botón.
+  assert.equal(await b.getAttribute('aria-label'), 'Ajustes');
   assert.equal(await b.locator('use').getAttribute('href'), '#i-engranaje');
 });
 

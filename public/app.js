@@ -25,7 +25,8 @@ const ponerVista = v => { vistaTitulo = v; pintarTitulo(); };
 if (enApp()) { const a = $('#aviso-reinicio'); for (const n of [...a.childNodes]) if (n.id !== 'aviso-cerrar') n.remove(); a.prepend('La app se ha actualizado mientras estaba abierta. Cierra y vuelve a abrir la app para que todo funcione. '); }
 // La lupa de la fila de accesos: en la app, la pista del menú (⌘F / Ctrl F); en la web, la de la página (⌘K en Mac, Ctrl K en el resto).
 { const tecla = pista(enMac ? '⌘K' : 'Ctrl K', 'F'); $('#btn-buscar').title = `Buscar (${tecla})`; }
-if (enApp()) { $('#btn-nueva-nota').title = conAtajo('Crear una nota nueva', 'N'); $('#btn-ajustes').title = conAtajo('Ajustes de la app', ','); }
+// En la app, Ajustes vive en el menú (⌘,) y no en el lateral (Roberto, 2026-10-13); la web, que no tiene menú, lo conserva (principio 3).
+if (enApp()) { $('#btn-nueva-nota').title = conAtajo('Crear una nota nueva', 'N'); $('#btn-ajustes').hidden = true; }
 // El aviso de «la app se ha actualizado» se cierra y no vuelve en esta pestaña (Roberto, 2026-10-09).
 let avisoCerrado = false;
 $('#aviso-cerrar').addEventListener('click', () => { avisoCerrado = true; $('#aviso-reinicio').hidden = true; });

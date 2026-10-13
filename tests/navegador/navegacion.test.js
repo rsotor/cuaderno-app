@@ -289,3 +289,43 @@ for (const tema of ['claro', 'oscuro']) {
     } finally { await e.pagina.evaluate(() => { delete document.documentElement.dataset.tema; }); }
   });
 }
+
+// ---------- el pie del lateral: Terminal en icono y Ajustes solo en la web (T2.4)
+
+// Una página con el `cuadernoApp` de mentira del preload de Electron: guarda el callback de las acciones del menú en window.__accion.
+async function paginaConApp(opciones = {}) {
+  const ctx = await e.navegador.newContext({ viewport: { width: 1280, height: 800 }, ...opciones });
+  await ctx.addInitScript(() => { window.__elegirCarpeta = 0; window.cuadernoApp = { plataforma: 'darwin', alAccion(f) { window.__accion = f; }, elegirCarpeta: async () => { window.__elegirCarpeta++; return null; } }; });
+  const p = await ctx.newPage(); p.setDefaultTimeout(8000);
+  await p.goto(e.server.urlEntrada());
+  await p.goto(`${e.base}/#/n/conceptos/capital.md`); await p.reload(); await p.locator('#miga strong').waitFor();
+  return { p, ctx };
+}
+
+test('pie: en la web, Terminal y Ajustes son iconos con nombre y title; Terminal abre el cajón y al cerrarlo el foco vuelve a él', async () => {
+  await e.ir('#/n/conceptos/capital.md');
+  for (const [sel, nombre] of [['#btn-terminal', 'Terminal'], ['#btn-ajustes', 'Ajustes']]) {
+    assert.equal(await e.pagina.getAttribute(sel, 'aria-label'), nombre, `pie: ${sel} no se llama «${nombre}»`);
+    assert.ok(await e.pagina.getAttribute(sel, 'title'), `pie: ${sel} no tiene title`);
+    const caja = await e.pagina.locator(sel).boundingBox();
+    assert.ok(caja.width >= 29.5 && caja.width <= 30.5 && caja.height >= 29.5, `pie: ${sel} no es un icono de 30 px (${caja.width}×${caja.height})`);
+    assert.equal((await e.pagina.locator(sel).textContent()).trim(), '', `pie: ${sel} lleva texto además del icono`);
+  }
+  await e.pagina.locator('#btn-terminal').click();
+  await visible(e.pagina.locator('#cajon'), 'pie', 'el cajón de la terminal');
+  await e.pagina.locator('#btn-cerrar-terminal').click();
+  await oculto(e.pagina.locator('#cajon'), 'pie', 'el cajón tras cerrarlo');
+  assert.equal(await enfocado(), 'btn-terminal', 'pie: el foco no vuelve a Terminal');
+});
+
+test('pie: en la app, Ajustes no se pinta en el lateral y la acción del menú (⌘,) abre Ajustes; Terminal sigue', async () => {
+  const { p, ctx } = await paginaConApp();
+  try {
+    assert.equal(await p.locator('#btn-ajustes').isVisible(), false, 'pie: en la app, Ajustes sigue en el lateral');
+    assert.equal(await p.locator('#btn-terminal').isVisible(), true, 'pie: en la app, Terminal ha desaparecido');
+    await p.evaluate(() => window.__accion('ajustes'));
+    await visible(p.locator('#ajustes'), 'pie', 'Ajustes tras la acción «ajustes» del menú');
+    await p.locator('#ajustes-cerrar').click();
+    await oculto(p.locator('#ajustes'), 'pie', 'Ajustes tras cerrarlos');
+  } finally { await ctx.close(); }
+});

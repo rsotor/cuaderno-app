@@ -72,7 +72,8 @@ test('el menú de la app de escritorio: en castellano, con los atajos de la tabl
   assert.match(await pagina.getAttribute('#btn-buscar', 'title'), new RegExp(`^Buscar \\(${mod}F\\)$`), 'la lupa dice la tecla del menú');
   assert.equal(await pagina.getAttribute('#btn-guardar', 'title'), `Guardar en el repositorio del cuaderno (${mod}S)`);
   assert.equal(await pagina.getAttribute('#btn-nueva-nota', 'title'), `Crear una nota nueva (${mod}N)`);
-  assert.equal(await pagina.getAttribute('#btn-ajustes', 'title'), `Ajustes de la app (${mod},)`);
+  // Ajustes sale del lateral en la app (decisión de Roberto, 2026-10-13): vive en el menú, y «⌘,» lo abre (más abajo, `pulsar('ajustes')`).
+  assert.equal(await pagina.locator('#btn-ajustes').isVisible(), false, 'en la app, Ajustes no se pinta en el lateral');
   assert.equal(await pagina.getAttribute('#btn-terminal', 'title'), 'Abrir la terminal (Ctrl `)', 'el menú también usa Ctrl para la terminal');
   // Un cambio en una nota (en el disco, como lo haría el editor) y Guardar desde el menú: el diálogo de la pantalla, con el cambio contado.
   fs.appendFileSync(path.join(c.base, 'conceptos', 'capital.md'), '\nUna línea más desde la app.\n');
