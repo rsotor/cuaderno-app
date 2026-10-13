@@ -510,3 +510,43 @@ test('‹ ›: en la web no hay flechas y el Atrás del navegador sigue funciona
     await hasta(() => p.url() === 'about:blank', '‹ ›', `el Atrás del navegador rebota a la portada (${p.url()})`);
   } finally { await ctx.close(); }
 });
+
+// ---------- botones laterales del ratón y gesto del trackpad (T2.7)
+
+// El botón lateral del ratón, como lo mandaría el sistema: CDP Input.dispatchMouseEvent (pulsar y soltar el botón «back» o «forward»).
+async function botonLateral(p, boton) {
+  const cdp = await p.context().newCDPSession(p);
+  const dato = { x: 400, y: 300, button: boton, clickCount: 1 };
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...dato });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...dato });
+  await cdp.detach();
+}
+
+test('ratón: los botones laterales (atrás y adelante) recorren el historial de la app de uno en uno; en la web, el manejador no actúa', async () => {
+  const { p, ctx } = await paginaNuevaConApp();
+  try {
+    const primera = await hashDe(p);
+    await irA(p, '#/n/conceptos/capital.md', /capital/);
+    await irA(p, '#/n/conceptos/interes.md', /interes/);
+    await botonLateral(p, 'back');
+    await hasta(async () => (await hashDe(p)) === '#/n/conceptos/capital.md', 'ratón', `el botón atrás no vuelve una entrada (hash ${await hashDe(p)})`);
+    await p.waitForTimeout(400);
+    assert.equal(await hashDe(p), '#/n/conceptos/capital.md', 'ratón: el botón atrás ha dado más de un paso');
+    await botonLateral(p, 'forward');
+    await hasta(async () => (await hashDe(p)) === '#/n/conceptos/interes.md', 'ratón', 'el botón adelante no avanza una entrada');
+    await p.waitForTimeout(400);
+    assert.equal(await hashDe(p), '#/n/conceptos/interes.md', 'ratón: el botón adelante ha dado más de un paso');
+    // En la primera nota no sale de la app.
+    await botonLateral(p, 'back'); await botonLateral(p, 'back'); await botonLateral(p, 'back');
+    await p.waitForTimeout(500);
+    assert.equal(await hashDe(p), primera, 'ratón: atrás de más ha salido de la primera nota');
+    assert.match(p.url(), /^http:\/\/localhost:\d+\//);
+  } finally { await ctx.close(); }
+  // La web no usa el manejador: lo que haga el navegador con sus botones es cosa suya.
+  const web = await paginaNuevaConApp({ app: false });
+  try {
+    await irA(web.p, '#/n/conceptos/capital.md', /capital/);
+    const prevenido = await web.p.evaluate(() => new Promise(r => { const f = ev => { r(ev.defaultPrevented); }; document.addEventListener('mouseup', f, { once: true, capture: false }); document.body.dispatchEvent(new MouseEvent('mouseup', { button: 3, bubbles: true, cancelable: true })); }));
+    assert.equal(prevenido, false, 'ratón: en la web el manejador cancela el botón lateral');
+  } finally { await web.ctx.close(); }
+});

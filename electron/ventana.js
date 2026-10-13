@@ -125,6 +125,21 @@ function preguntarDescartar({ dialog, ventana, env, anotar }) {
   } catch (e) { anotar(`no se ha podido enseñar el diálogo de cerrar: se sigue editando (${e.message})`); return false; }
 }
 
+// El gesto de deslizar del trackpad (evento `swipe` de BrowserWindow, solo macOS): izquierda es Atrás y derecha Adelante (como el
+// deltaX de NSEvent), y mandan la acción a la pantalla, que decide con su historial (irHistorial). Solo llega si en Preferencias del
+// Sistema › Trackpad › Más gestos «Deslizar entre páginas» está en «con dos o tres dedos»; con la opción por defecto (con dos dedos
+// en un desplazamiento horizontal) macOS no emite el evento y el gesto llega como rueda horizontal: eso no se atiende (distinguirlo
+// del desplazamiento de una tabla exigiría una heurística que dispararía sin querer; plan de navegación, T2.7).
+function gestoAtrasAdelante({ ventana, anotar }) {
+  if (!ventana || typeof ventana.on !== 'function') return;
+  ventana.on('swipe', (_evento, direccion) => {
+    const accion = direccion === 'left' ? 'atras' : direccion === 'right' ? 'adelante' : null;
+    if (!accion) return;
+    anotar(`gesto del trackpad: ${direccion} → ${accion}`);
+    ventana.webContents.send('accion', accion);
+  });
+}
+
 // Deja una ventana (la principal o una hija abierta desde la pantalla) con los tratos de arriba: enlaces y cierre.
 function prepararVentana({ ventana, electron, env, puerto, anotar, abrirFuera = null }) {
   const { shell, dialog } = electron;
@@ -144,10 +159,11 @@ function prepararVentana({ ventana, electron, env, puerto, anotar, abrirFuera = 
 // por «Seguir editando» no debe dejar la app sin vigilante).
 function preparar({ ventana, electron, config, env, particion, puerto, anotar, vigilar, alCambiar = null }) {
   prepararVentana({ ventana, electron, env, puerto, anotar });
+  gestoAtrasAdelante({ ventana, anotar });
   permisos({ session: electron.session.fromPartition(particion), anotar });
   const vigilante = vigilarTema({ nativeTheme: electron.nativeTheme, config, ventana, anotar, alCambiar, ...(vigilar ? { vigilar } : {}) });
   electron.app.on('will-quit', vigilante.cerrar);
   return vigilante;
 }
 
-module.exports = { preparar, prepararVentana, aplicarTema, vigilarTema, colorDeFondo, limitesDeVentana, dentroDelArea, permisos, permisoConcedido, preguntarDescartar, tratarEnlace, esPropia, esLocalAjena, PERMISOS, FONDO, VENTANA };
+module.exports = { preparar, prepararVentana, gestoAtrasAdelante, aplicarTema, vigilarTema, colorDeFondo, limitesDeVentana, dentroDelArea, permisos, permisoConcedido, preguntarDescartar, tratarEnlace, esPropia, esLocalAjena, PERMISOS, FONDO, VENTANA };

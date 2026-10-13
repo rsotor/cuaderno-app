@@ -1239,6 +1239,10 @@ if (enApp()) {
   $('#btn-atras').title = conAtajo('Atrás', '['); $('#btn-adelante').title = conAtajo('Adelante', ']');
   $('#btn-atras').onclick = () => irHistorial(-1); $('#btn-adelante').onclick = () => irHistorial(1);
   if (navegacion()) navegacion().addEventListener('currententrychange', () => { marcarEntrada(); pintarFlechas(); });
+  // Los botones laterales del ratón (3 = atrás, 4 = adelante): Electron no navega solo con ellos (en Windows emite app-command, aparte).
+  // Se usa irHistorial y se cancela el evento, para que ni un navegador ni el sistema den un segundo paso por su cuenta.
+  const lateral = e => { if (e.button !== 3 && e.button !== 4) return; e.preventDefault(); if (e.type === 'mouseup') irHistorial(e.button === 3 ? -1 : 1); };
+  for (const tipo of ['mousedown', 'mouseup', 'auxclick']) window.addEventListener(tipo, lateral, true);
 }
 
 // ---------- rutas

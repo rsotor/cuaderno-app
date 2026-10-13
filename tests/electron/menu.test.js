@@ -194,6 +194,11 @@ test('el menú de la app de escritorio: Nueva nota abre su diálogo; Ver → Bar
   await hasta(() => pagina.evaluate(() => location.hash === '#/n/inicio.md' || location.hash === '' || location.hash === '#/'), 'Atrás no vuelve a la portada');
   await pulsar('adelante');
   await hasta(() => pagina.evaluate(() => location.hash === '#/n/conceptos/capital.md'), 'Adelante no vuelve a la nota');
+  // El gesto del trackpad (el evento `swipe` de BrowserWindow, solo macOS y con «Deslizar entre páginas»; aquí emitido a mano): left es Atrás y right Adelante.
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].emit('swipe', {}, 'left'));
+  await hasta(() => pagina.evaluate(() => location.hash !== '#/n/conceptos/capital.md'), 'el gesto left no vuelve atrás');
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].emit('swipe', {}, 'right'));
+  await hasta(() => pagina.evaluate(() => location.hash === '#/n/conceptos/capital.md'), 'el gesto right no avanza');
   // Atrás de más no sale de la app (P17): ni a «Arrancando…» (otro origen) ni a otra pantalla; el menú y el botón ‹ comparten criterio.
   for (let i = 0; i < 6; i++) await pulsar('atras');
   await pagina.waitForTimeout(400);
