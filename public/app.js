@@ -1244,6 +1244,39 @@ if (enApp()) {
   // Se usa irHistorial y se cancela el evento, para que ni un navegador ni el sistema den un segundo paso por su cuenta.
   const lateral = e => { if (e.button !== 3 && e.button !== 4) return; e.preventDefault(); if (e.type === 'mouseup') irHistorial(e.button === 3 ? -1 : 1); };
   for (const tipo of ['mousedown', 'mouseup', 'auxclick']) window.addEventListener(tipo, lateral, true);
+  window.addEventListener('wheel', gestoDeslizar, { passive: true });
+}
+
+// El deslizamiento horizontal de dos dedos del trackpad. Con la preferencia por defecto de macOS («desplazar a izquierda o
+// derecha con dos dedos»), Electron no emite `swipe` (solo existe con «Deslizar entre páginas» en «con dos o tres dedos»; ver
+// electron/ventana.js) y el gesto llega aquí como eventos de rueda con deltaX. Se acumula el deltaX dominante, y al pasar el
+// umbral se da UN paso (deltaX negativo = dedos a la derecha = Atrás, como Chrome y Safari); hasta que la rueda calla (la inercia
+// sigue mandando eventos casi un segundo) no se atiende otro gesto. No cuenta si el gesto es vertical, si va sobre algo que aún
+// puede desplazarse en esa dirección (una tabla, un bloque de código) ni si es un zoom (ctrlKey).
+const GESTO = { umbral: 120, silencioMs: 180 };
+const gesto = { acumulado: 0, usado: false, temporizador: null };
+function sePuedeDesplazarX(el, dir) {   // dir > 0: hacia la derecha (scrollLeft crece)
+  for (; el && el !== document.documentElement; el = el.parentElement) {
+    if (el.scrollWidth <= el.clientWidth) continue;
+    const ox = getComputedStyle(el).overflowX;
+    if (ox !== 'auto' && ox !== 'scroll') continue;
+    if (dir > 0 ? el.scrollLeft + el.clientWidth < el.scrollWidth - 1 : el.scrollLeft > 0) return true;
+  }
+  return false;
+}
+function gestoDeslizar(e) {
+  clearTimeout(gesto.temporizador);
+  gesto.temporizador = setTimeout(() => { gesto.acumulado = 0; gesto.usado = false; }, GESTO.silencioMs);   // la rueda calló: gesto nuevo
+  if (gesto.usado || e.ctrlKey || e.deltaMode !== 0 || Math.abs(e.deltaX) <= Math.abs(e.deltaY) || sePuedeDesplazarX(e.target, e.deltaX)) {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) gesto.acumulado = 0;
+    return;
+  }
+  if (gesto.acumulado * e.deltaX < 0) gesto.acumulado = 0;   // cambio de sentido
+  gesto.acumulado += e.deltaX;
+  if (Math.abs(gesto.acumulado) < GESTO.umbral) return;
+  const dir = gesto.acumulado < 0 ? -1 : 1;
+  gesto.usado = true; gesto.acumulado = 0;
+  irHistorial(dir);
 }
 
 // ---------- rutas

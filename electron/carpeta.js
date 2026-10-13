@@ -85,7 +85,7 @@ function crearAbridor({ electron, estado, anotar, existe, recargar, env = proces
     return recargar();
   };
   abridor.despachar = () => { const c = abridor.tomar(); return c ? abridor.llegada(c, 'espera') : Promise.resolve(false); };
-  const alFrente = () => { const v = estado.ventana; if (!v) return; if (v.isMinimized()) v.restore(); v.focus(); };
+  const alFrente = () => { const v = estado.ventana; if (!v) return; if (env.CUADERNO_OCULTA) return; if (v.isMinimized()) v.restore(); v.focus(); };
 
   // Mac: arrastrar al icono del Dock o «Abrir con». Se registra antes de `ready` (si no, la primera carpeta se pierde).
   app.on('open-file', (evento, ruta) => {

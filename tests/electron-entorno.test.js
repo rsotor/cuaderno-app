@@ -170,10 +170,10 @@ test('temaNativo: auto → system, claro → light, oscuro → dark; cualquier o
   for (const t of ['dark', 'light', 'system', '', null, undefined, 3, 'Oscuro']) assert.equal(temaNativo(t), 'system', String(t));
 });
 
-test('sinVariablesDePrueba: quita las cuatro variables de prueba (diálogos, navegador, diálogo de carpeta, userData) y deja CUADERNO_CONFIG_DIR y lo demás; no toca el env de partida', () => {
-  assert.deepEqual(VARIABLES_DE_PRUEBA, ['CUADERNO_SIN_DIALOGO', 'CUADERNO_SIN_NAVEGADOR', 'CUADERNO_DIALOGO_PRUEBA', 'CUADERNO_USERDATA']);
-  const env = { PATH: '/bin', CUADERNO_CONFIG_DIR: '/cfg', CUADERNO_SIN_DIALOGO: '1', CUADERNO_SIN_NAVEGADOR: '1', CUADERNO_DIALOGO_PRUEBA: '/x', CUADERNO_USERDATA: '/ud', CUADERNO_NODE: '/n' };
+test('sinVariablesDePrueba: quita las cinco variables de prueba (diálogos, navegador, diálogo de carpeta, userData, ventana oculta) y deja CUADERNO_CONFIG_DIR y lo demás; no toca el env de partida', () => {
+  assert.deepEqual(VARIABLES_DE_PRUEBA, ['CUADERNO_SIN_DIALOGO', 'CUADERNO_SIN_NAVEGADOR', 'CUADERNO_DIALOGO_PRUEBA', 'CUADERNO_USERDATA', 'CUADERNO_OCULTA']);
+  const env = { PATH: '/bin', CUADERNO_CONFIG_DIR: '/cfg', CUADERNO_SIN_DIALOGO: '1', CUADERNO_SIN_NAVEGADOR: '1', CUADERNO_DIALOGO_PRUEBA: '/x', CUADERNO_USERDATA: '/ud', CUADERNO_OCULTA: '1', CUADERNO_NODE: '/n' };
   assert.deepEqual(sinVariablesDePrueba(env), { PATH: '/bin', CUADERNO_CONFIG_DIR: '/cfg', CUADERNO_NODE: '/n' });
-  assert.equal(Object.keys(env).length, 7, 'el de partida sigue entero');
+  assert.equal(Object.keys(env).length, 8, 'el de partida sigue entero');
   assert.deepEqual(sinVariablesDePrueba({}), {});
 });

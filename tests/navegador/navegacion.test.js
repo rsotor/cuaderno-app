@@ -558,3 +558,60 @@ test('línea del estado: un cuaderno sin ningún commit y nada pendiente dice «
   const t = await e.pagina.evaluate(() => [textoEstado({ ultimo: null, cambios: 0, sinSubir: 0 }), textoEstado({ ultimo: null, cambios: 3, sinSubir: 0 }), textoEstado({ ultimo: null, cambios: 0, sinSubir: null }), textoEstado(null)]);
   assert.deepEqual(t, ['sin cambios', '3 cambios', 'sin cambios', '']);
 });
+
+// ---------- el deslizamiento horizontal de dos dedos del trackpad (Atrás / Adelante)
+// Con la preferencia por defecto de macOS el gesto llega a la página como eventos de rueda con deltaX (el evento `swipe` de
+// Electron solo existe con «Deslizar entre páginas» en «con dos o tres dedos»). Un gesto = una sola navegación, aunque la inercia
+// siga mandando eventos; no navega con el scroll vertical ni sobre algo que aún puede desplazarse en horizontal.
+const rueda = async (p, dx, dy = 0, veces = 1) => { for (let i = 0; i < veces; i++) { await p.mouse.wheel(dx, dy); await p.waitForTimeout(16); } };
+const prepararGesto = async p => {
+  await irA(p, '#/n/conceptos/capital.md', /capital/); await irA(p, '#/n/conceptos/interes.md', /interes/);
+  await hasta(() => p.locator('#btn-atras').isEnabled(), 'gesto', 'Atrás no se enciende');
+  await p.mouse.move(700, 400);
+};
+
+test('gesto de dos dedos: un deslizamiento a la derecha (deltaX negativo, con su inercia) vuelve UNA nota; a la izquierda avanza una' , async () => {
+  const { p, ctx } = await paginaNuevaConApp();
+  try {
+    await prepararGesto(p);
+    await rueda(p, -20, 0, 30);   // un gesto largo: 600 px en 30 eventos
+    await conTexto(p.locator('#miga strong'), /capital/, 'gesto', 'el gesto no vuelve a la nota anterior');
+    await p.waitForTimeout(900);
+    assert.equal(await hashDe(p), '#/n/conceptos/capital.md', 'gesto: un solo gesto ha dado más de un paso atrás');
+    await rueda(p, 20, 0, 30);
+    await conTexto(p.locator('#miga strong'), /interes/, 'gesto', 'el gesto contrario no avanza');
+    await p.waitForTimeout(900);
+    assert.equal(await hashDe(p), '#/n/conceptos/interes.md', 'gesto: un solo gesto ha dado más de un paso adelante');
+  } finally { await ctx.close(); }
+});
+
+test('gesto de dos dedos: el scroll vertical, un roce pequeño y la web (sin cuadernoApp) no navegan' , async () => {
+  const { p, ctx } = await paginaNuevaConApp();
+  try {
+    await prepararGesto(p);
+    await rueda(p, -3, 40, 20);   // vertical dominante
+    await rueda(p, -20, 0, 3);    // 60 px: un roce
+    await p.waitForTimeout(900);
+    assert.equal(await hashDe(p), '#/n/conceptos/interes.md', 'gesto: ha navegado sin ser un gesto');
+  } finally { await ctx.close(); }
+  const web = await paginaNuevaConApp({ app: false });
+  try {
+    await web.p.mouse.move(700, 400); await rueda(web.p, -20, 0, 30); await web.p.waitForTimeout(500);
+    assert.equal(await hashDe(web.p), '#/n/inicio.md', 'gesto: en la web el navegador manda; la pantalla no navega');
+  } finally { await web.ctx.close(); }
+});
+
+test('gesto de dos dedos: sobre una tabla o un bloque que aún se desplaza en horizontal, la rueda desplaza y no navega' , async () => {
+  const { p, ctx } = await paginaNuevaConApp();
+  try {
+    await prepararGesto(p);
+    await p.evaluate(() => { const d = document.createElement('div'); d.id = 'ancho'; d.style.cssText = 'position:fixed;left:300px;top:300px;width:300px;height:100px;overflow-x:auto;background:#fff;z-index:50'; d.innerHTML = '<div style="width:1500px;height:50px">ancho</div>'; document.body.appendChild(d); d.scrollLeft = 400; });
+    await p.mouse.move(400, 340);
+    await rueda(p, -20, 0, 10);   // aún puede desplazarse a la izquierda (scrollLeft 400): no es de la página
+    await p.waitForTimeout(900);
+    assert.equal(await hashDe(p), '#/n/conceptos/interes.md', 'gesto: ha navegado con un bloque que aún se desplazaba');
+    await p.evaluate(() => { document.querySelector('#ancho').scrollLeft = 0; });
+    await p.waitForTimeout(300); await rueda(p, -20, 0, 30);   // ya en el borde: ahora sí es de la página
+    await conTexto(p.locator('#miga strong'), /capital/, 'gesto', 'en el borde del bloque el gesto no navega');
+  } finally { await ctx.close(); }
+});

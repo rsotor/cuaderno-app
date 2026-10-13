@@ -54,7 +54,7 @@ function electronFalso({ lock = true, fallosURL = [], sistemaOscuro = false, emp
     return h;
   } };
   const app = {
-    rutas: {}, isPackaged: empaquetada, setPath(k, v) { this.rutas[k] = v; }, requestSingleInstanceLock() { return lock; },
+    rutas: {}, docOculto: 0, dock: { hide() { app.docOculto++; } }, isPackaged: empaquetada, setPath(k, v) { this.rutas[k] = v; }, requestSingleInstanceLock() { return lock; },
     whenReady() { return Promise.resolve(); }, on(e, f) { eventos.on(e, f); }, emitir(e, ...a) { eventos.emit(e, ...a); }, oyentes: e => eventos.listenerCount(e),
     // quit(): before-quit y, como nadie lo cancela en el falso, will-quit (en Electron, un «Seguir editando» corta entre los dos).
     quit() { pasos.push('quit'); salidas.push('quit'); eventos.emit('before-quit'); eventos.emit('will-quit'); }, exit(c) { pasos.push(`exit ${c}`); salidas.push(c); },
@@ -423,11 +423,11 @@ test('CUADERNO_SIN_DIALOGO: el diálogo se sustituye por una línea en el regist
 });
 
 test('app empaquetada (isPackaged): las variables de prueba se ignoran y queda anotado (userData no se toca, el diálogo de error se enseña, el hijo no las hereda); CUADERNO_CONFIG_DIR se respeta', async () => {
-  const variables = { CUADERNO_USERDATA: '/tmp/ud', CUADERNO_SIN_DIALOGO: '1', CUADERNO_SIN_NAVEGADOR: '1', CUADERNO_DIALOGO_PRUEBA: '/cuadernos/x' };
+  const variables = { CUADERNO_USERDATA: '/tmp/ud', CUADERNO_SIN_DIALOGO: '1', CUADERNO_SIN_NAVEGADOR: '1', CUADERNO_DIALOGO_PRUEBA: '/cuadernos/x', CUADERNO_OCULTA: '1' };
   const m = montar({ empaquetada: true, env: { ...variables, CUADERNO_CONFIG_DIR: '/cfg' }, argv: ['/apps/Cuaderno'] });
   await tic();
   assert.deepEqual(m.electron.app.rutas, {}, 'userData sin tocar: el lock va donde Electron diga');
-  assert.ok(m.registro.lineas.includes('[app] variables de prueba ignoradas (app empaquetada): CUADERNO_SIN_DIALOGO, CUADERNO_SIN_NAVEGADOR, CUADERNO_DIALOGO_PRUEBA, CUADERNO_USERDATA'));
+  assert.ok(m.registro.lineas.includes('[app] variables de prueba ignoradas (app empaquetada): CUADERNO_SIN_DIALOGO, CUADERNO_SIN_NAVEGADOR, CUADERNO_DIALOGO_PRUEBA, CUADERNO_USERDATA, CUADERNO_OCULTA'));
   for (const v of Object.keys(variables)) assert.equal(v in m.hijos[0].opciones.env, false, `${v} llega al hijo`);
   assert.equal(m.hijos[0].opciones.env.CUADERNO_CONFIG_DIR, '/cfg');
   m.hijos[0].escucha(7331, 't0k'); await m.estado.listo;
@@ -729,4 +729,17 @@ test('Ayuda → Cómo se usa, Atajos de teclado y Plan vivo abren páginas del r
   assert.ok(sin.registro.lineas.includes(`[app] navegador no abierto (CUADERNO_SIN_NAVEGADOR): ${URL_PLAN_VIVO}`));
   assert.ok(sin.registro.lineas.includes('[app] registro no abierto (CUADERNO_SIN_NAVEGADOR): /config/registro.log'));
   sin.electron.app.emitir('will-quit');
+});
+
+test('CUADERNO_OCULTA (solo tests): la ventana nace con show:false y el Dock se oculta; sin la variable, la ventana es la de siempre; empaquetada, la variable se ignora', async () => {
+  const oculta = montar({ env: { CUADERNO_OCULTA: '1' } }); await tic();
+  assert.equal(oculta.ventanas[0].opciones.show, false);
+  assert.equal(oculta.ventanas[0].opciones.webPreferences.backgroundThrottling, false, 'una ventana oculta no ahoga sus temporizadores');
+  assert.equal(oculta.ventanas[0].opciones.webPreferences.partition, 'cuaderno', 'el resto de webPreferences sigue');
+  assert.equal(oculta.electron.app.docOculto, 1);
+  const normal = montar({}); await tic();
+  assert.equal('show' in normal.ventanas[0].opciones, false);
+  assert.equal(normal.electron.app.docOculto, 0);
+  const empaquetada = montar({ empaquetada: true, env: { CUADERNO_OCULTA: '1' }, argv: ['/apps/Cuaderno'] }); await tic();
+  assert.equal('show' in empaquetada.ventanas[0].opciones, false, 'la app empaquetada ignora la variable');
 });
