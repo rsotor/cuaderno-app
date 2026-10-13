@@ -255,3 +255,4 @@ herramientas de `.kit/` del kit, no la memoria.
 
 ---
 *Los detalles del kit (formatos, herramientas, reglas) viven en el repo del kit. Este documento es solo la app.*
+
