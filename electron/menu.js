@@ -29,8 +29,8 @@ const NOMBRE = 'Cuaderno';
 //     (hoy, Ctrl K abre la modal de búsqueda desde la propia pantalla, en la web y en la app; el menú no la toca). Tampoco hay CmdOrCtrl+P.
 //   · Los de la crítica de diseño del 2026-10-10 (8; aprobados por el director, Roberto puede vetarlos): Nueva nota (⌘N) en
 //     Archivo; en Ver, Barra lateral y Terminal con los aceleradores de la propia página, explícitos y con Ctrl también en
-//     Mac (`Ctrl+\` y `Ctrl+\``: ⌘` en Mac es «siguiente ventana»), y Atrás / Adelante (⌘[ / ⌘]) con el historial del
-//     webContents, sin acción en la pantalla (NAVEGACION).
+//     Mac (`Ctrl+\` y `Ctrl+\``: ⌘` en Mac es «siguiente ventana»), y Atrás / Adelante (⌘[ / ⌘]), que mandan su
+//     acción a la pantalla (NAVEGACION).
 const ATAJOS = [
   { id: 'nueva-nota', label: 'Nueva nota', accelerator: 'CmdOrCtrl+N', accion: 'nueva-nota', menu: 'archivo' },
   { id: 'nueva-tarea', label: 'Nueva tarea', accelerator: 'CmdOrCtrl+T', accion: 'nueva-tarea', menu: 'archivo' },
@@ -42,10 +42,12 @@ const ATAJOS = [
   { id: 'barra-lateral', label: 'Barra lateral', accelerator: 'Ctrl+\\', accion: 'barra-lateral', menu: 'ver' },
   { id: 'terminal', label: 'Terminal', accelerator: 'Ctrl+`', accion: 'terminal', menu: 'ver' },
 ];
-// Atrás y Adelante: el historial del webContents (navigationHistory), desde el principal; la pantalla no se entera.
+// Atrás y Adelante mandan su acción a la pantalla, como los demás: es ella la que decide con su historial (public/app.js, irHistorial:
+// solo la entrada vecina de esta app y de este cuaderno), y los botones ‹ ›, los del ratón y el gesto del trackpad dicen lo mismo.
+// Desde el principal (navigationHistory) volvería a «Arrancando…» o a una nota del cuaderno anterior.
 const NAVEGACION = [
-  { id: 'atras', label: 'Atrás', accelerator: 'CmdOrCtrl+[', hacer: 'atras' },
-  { id: 'adelante', label: 'Adelante', accelerator: 'CmdOrCtrl+]', hacer: 'adelante' },
+  { id: 'atras', label: 'Atrás', accelerator: 'CmdOrCtrl+[', accion: 'atras' },
+  { id: 'adelante', label: 'Adelante', accelerator: 'CmdOrCtrl+]', accion: 'adelante' },
 ];
 const RESERVADOS = ['CmdOrCtrl+K'];   // sin asignar a propósito (acciones rápidas); el test vigila que ningún atajo lo use
 const atajo = id => ATAJOS.find(a => a.id === id);
@@ -59,11 +61,11 @@ function submenuRecientes(recientes, abrirCarpeta) {
   return lista.map(r => ({ id: `reciente:${r.ruta}`, label: r.nombre || path.basename(r.ruta), toolTip: r.ruta, click: () => abrirCarpeta(r.ruta) }));
 }
 
-// La plantilla entera. `acciones`: { accion(nombre), abrirCarpeta(ruta), atras(), adelante(), comoSeUsa(), atajos(), planVivo(),
+// La plantilla entera. `acciones`: { accion(nombre), abrirCarpeta(ruta), comoSeUsa(), atajos(), planVivo(),
 // mostrarRegistro(), diagnostico(), acercaDe() }; las que falten no hacen nada (vale para pintar el menú sin app detrás).
 function plantillaMenu({ plataforma = process.platform, recientes = [], version = '', acciones = {} } = {}) {
   const nada = () => {};
-  const a = { accion: nada, abrirCarpeta: nada, atras: nada, adelante: nada, comoSeUsa: nada, atajos: nada, planVivo: nada, mostrarRegistro: nada, diagnostico: nada, acercaDe: nada, ...acciones };
+  const a = { accion: nada, abrirCarpeta: nada, comoSeUsa: nada, atajos: nada, planVivo: nada, mostrarRegistro: nada, diagnostico: nada, acercaDe: nada, ...acciones };
   const mac = plataforma === 'darwin';
   const propio = id => { const t = atajo(id); return { id: t.id, label: t.label, accelerator: t.accelerator, click: () => a.accion(t.accion) }; };
   const acercaDe = { id: 'acerca-de', label: `Acerca de ${NOMBRE}`, click: () => a.acercaDe() };
@@ -89,7 +91,7 @@ function plantillaMenu({ plataforma = process.platform, recientes = [], version 
     { role: 'undo', label: 'Deshacer' }, { role: 'redo', label: 'Rehacer' }, sep,
     { role: 'cut', label: 'Cortar' }, { role: 'copy', label: 'Copiar' }, { role: 'paste', label: 'Pegar' }, { role: 'selectAll', label: 'Seleccionar todo' },
   ] };
-  const navegar = n => ({ id: n.id, label: n.label, accelerator: n.accelerator, click: () => a[n.hacer]() });
+  const navegar = n => ({ id: n.id, label: n.label, accelerator: n.accelerator, click: () => a.accion(n.accion) });
   const ver = { id: 'ver', label: 'Ver', submenu: [
     { role: 'reload', label: 'Recargar' }, sep,
     ...NAVEGACION.map(navegar), sep,
@@ -175,17 +177,8 @@ function instalarMenu({ electron, estado, config, registro, env = process.env, a
     if (sinNavegador) return anotar(`navegador no abierto (CUADERNO_SIN_NAVEGADOR): ${url}`);
     return Promise.resolve(shell.openExternal(url)).catch(e => anotar(`no se ha podido abrir ${que}: ${e.message}`));
   };
-  // Atrás y Adelante con el historial de la ventana (webContents.navigationHistory, Electron ≥ 32); sin historial, nada.
-  const historial = (metodo, puede) => {
-    const v = ventana(), h = v && v.webContents && v.webContents.navigationHistory;
-    if (!h) return anotar(`${metodo} sin ventana, se ignora`);
-    if (typeof h[puede] === 'function' && !h[puede]()) return;
-    h[metodo]();
-  };
   const acciones = {
     accion: nombre => { anotar(`menú: ${nombre}`); mandar(nombre); },
-    atras: () => historial('goBack', 'canGoBack'),
-    adelante: () => historial('goForward', 'canGoForward'),
     abrirCarpeta: ruta => { anotar(`menú: cuaderno reciente ${ruta}`); return abrirCarpeta(ruta); },
     comoSeUsa: () => fuera(URL_COMO_SE_USA, 'cómo se usa'),
     atajos: () => fuera(URL_ATAJOS, 'los atajos de teclado'),

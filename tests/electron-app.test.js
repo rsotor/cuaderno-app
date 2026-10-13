@@ -613,23 +613,23 @@ test('si instalar el menú falla, se anota y se vuelve a intentar al siguiente c
   m.electron.app.emitir('will-quit');
 });
 
-test('cada atajo de la tabla manda su nombre a la pantalla por el canal «accion» (y queda en el registro); Atrás y Adelante van al historial del webContents (solo si se puede); sin ventana se ignoran y se anota', async () => {
+test('cada atajo de la tabla manda su nombre a la pantalla por el canal «accion» (y queda en el registro); Atrás y Adelante mandan su acción a la pantalla, que decide con su historial (P17); sin ventana se ignoran y se anota', async () => {
   const m = await arrancado();
   const wc = m.ventanas[0].webContents;
   const { ATAJOS } = require('../electron/menu');
   for (const a of ATAJOS) m.menu.getMenuItemById(a.id).click();
   assert.deepEqual(wc.mensajes, ATAJOS.map(a => ['accion', a.accion]));
   assert.ok(m.registro.lineas.includes('[app] menú: guardar'));
+  // Atrás y Adelante no tocan el historial del webContents desde el principal (no ve «Arrancando…» ni otro cuaderno): lo decide la pantalla.
+  const antes = wc.mensajes.length;
   m.menu.getMenuItemById('atras').click(); m.menu.getMenuItemById('adelante').click();
-  assert.deepEqual(wc.historial, [], 'sin historial (canGoBack false) no se navega');
-  wc.puedeAtras = true;
-  m.menu.getMenuItemById('atras').click(); m.menu.getMenuItemById('adelante').click();
-  assert.deepEqual(wc.historial, ['goBack']);
+  assert.deepEqual(wc.mensajes.slice(antes), [['accion', 'atras'], ['accion', 'adelante']]);
+  assert.deepEqual(wc.historial, [], 'el principal no navega por el historial');
   m.estado.ventana = null;
   m.menu.getMenuItemById('guardar').click(); m.menu.getMenuItemById('atras').click();
-  assert.equal(wc.mensajes.length, ATAJOS.length);
+  assert.equal(wc.mensajes.length, ATAJOS.length + 2);
   assert.ok(m.registro.lineas.includes('[app] acción del menú sin ventana, se ignora: guardar'));
-  assert.ok(m.registro.lineas.includes('[app] goBack sin ventana, se ignora'));
+  assert.ok(m.registro.lineas.includes('[app] acción del menú sin ventana, se ignora: atras'));
   m.electron.app.emitir('will-quit');
 });
 

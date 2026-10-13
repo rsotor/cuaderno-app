@@ -418,3 +418,95 @@ test('barra superior: con la barra lateral plegada, el botón para abrirla y la 
     assert.ok(Math.abs(m.desplegar.cy - m.editar.cy) <= 1, `barra: el botón de desplegar (y=${m.desplegar.cy}) y Editar (y=${m.editar.cy}) no comparten eje`);
   } finally { await e.pagina.locator('#btn-desplegar').click(); }
 });
+
+// ---------- ‹ › Atrás y Adelante, con un solo criterio de historial (T2.6)
+
+// Una página NUEVA (sin las entradas de los demás recorridos) con el `cuadernoApp` de mentira: solo cuenta lo que ella navega.
+async function paginaNuevaConApp({ app = true } = {}) {
+  const ctx = await e.navegador.newContext({ viewport: { width: 1280, height: 800 } });
+  if (app) await ctx.addInitScript(() => { window.cuadernoApp = { plataforma: 'darwin', alAccion(f) { window.__accion = f; }, elegirCarpeta: async () => null }; });
+  const p = await ctx.newPage(); p.setDefaultTimeout(8000);
+  await p.goto(e.server.urlEntrada());
+  await p.locator('#miga strong').waitFor();
+  return { p, ctx };
+}
+const hashDe = p => p.evaluate(() => location.hash);
+const irA = async (p, hash, re) => { await p.evaluate(h => { location.hash = h; }, hash); await conTexto(p.locator('#miga strong'), re, '‹ ›', `la miga de ${hash}`); };
+
+test('‹ ›: al cargar la portada están apagadas; con dos notas, ‹ vuelve a la primera y › a la segunda; en la primera, ‹ y ⌘[ no salen de la app', async () => {
+  const { p, ctx } = await paginaNuevaConApp();
+  try {
+    assert.equal(await p.locator('#btn-atras').isVisible(), true, '‹ ›: en la app no están las flechas');
+    assert.equal(await p.getAttribute('#btn-atras', 'aria-label'), 'Atrás'); assert.equal(await p.getAttribute('#btn-adelante', 'aria-label'), 'Adelante');
+    assert.match(await p.getAttribute('#btn-atras', 'title'), /^Atrás \((⌘|Ctrl )\[\)$/); assert.match(await p.getAttribute('#btn-adelante', 'title'), /^Adelante \((⌘|Ctrl )\]\)$/);
+    assert.equal(await p.locator('#btn-atras').isDisabled(), true, '‹ ›: Atrás está encendida al cargar la portada (la redirección de «/» deja una entrada)');
+    assert.equal(await p.locator('#btn-adelante').isDisabled(), true);
+    const primera = await hashDe(p), origen = await p.evaluate(() => location.origin);
+    await p.evaluate(() => window.__accion('atras'));   // ⌘[ del menú, en la primera nota
+    await p.waitForTimeout(300);
+    assert.equal(await hashDe(p), primera, '‹ ›: ⌘[ en la primera nota ha cambiado de sitio');
+    assert.equal(await p.evaluate(() => location.origin), origen, '‹ ›: ⌘[ en la primera nota ha salido de la app');
+    await irA(p, '#/n/conceptos/capital.md', /capital/);
+    await hasta(() => p.locator('#btn-atras').isEnabled(), '‹ ›', 'Atrás no se enciende con dos notas');
+    assert.equal(await p.locator('#btn-adelante').isDisabled(), true);
+    await p.locator('#btn-atras').click();
+    await hasta(async () => (await hashDe(p)) === primera, '‹ ›', '‹ no vuelve a la primera nota');
+    await hasta(() => p.locator('#btn-adelante').isEnabled(), '‹ ›', 'Adelante no se enciende tras volver');
+    assert.equal(await p.locator('#btn-atras').isDisabled(), true, '‹ ›: Atrás sigue encendida en la primera nota');
+    await p.locator('#btn-adelante').click();
+    await hasta(async () => (await hashDe(p)) === '#/n/conceptos/capital.md', '‹ ›', '› no va a la segunda nota');
+    await p.evaluate(() => window.__accion('atras'));   // ⌘[ y el botón dicen lo mismo
+    await hasta(async () => (await hashDe(p)) === primera, '‹ ›', '⌘[ no vuelve a la primera nota');
+  } finally { await ctx.close(); }
+});
+
+test('‹ ›: tras cambiar de cuaderno con el selector, ‹ queda apagada (las entradas del cuaderno viejo no cuentan)', async () => {
+  const otro = crearCuaderno({ kit: false });
+  await pedirAbrir(otro.raiz); await pedirAbrir(e.c.raiz);
+  const { p, ctx } = await paginaNuevaConApp();
+  try {
+    await irA(p, '#/n/conceptos/capital.md', /capital/);
+    await hasta(() => p.locator('#btn-atras').isEnabled(), '‹ ›', 'Atrás no se enciende');
+    await p.locator('#btn-cuaderno').click();
+    await p.locator('#menu-cuaderno [role="menuitemradio"]', { hasText: nombreDe(otro.raiz) }).click();
+    await conTexto(p.locator('#nombre-curso'), new RegExp(nombreDe(otro.raiz)), '‹ ›', 'el nombre del cuaderno nuevo');
+    await p.waitForTimeout(600);
+    assert.equal(await p.locator('#btn-atras').isDisabled(), true, '‹ ›: tras cambiar de cuaderno, Atrás lleva al cuaderno anterior');
+    await p.evaluate(() => window.__accion('atras')); await p.waitForTimeout(300);
+    await conTexto(p.locator('#nombre-curso'), new RegExp(nombreDe(otro.raiz)), '‹ ›', '⌘[ ha vuelto al cuaderno anterior');
+  } finally {
+    await ctx.close();
+    await pedirAbrir(e.c.raiz);
+    await e.pagina.request.post(`${e.base}/api/olvidar`, { data: { ruta: otro.raiz }, headers: { origin: e.base } });
+    otro.borrar();
+  }
+});
+
+test('‹ ›: con el editor sucio, ‹ pregunta «¿Descartar lo escrito?» y «Seguir editando» se queda', async () => {
+  const { p, ctx } = await paginaNuevaConApp();
+  try {
+    await irA(p, '#/n/conceptos/capital.md', /capital/);
+    await p.locator('#btn-editar').click();
+    await visible(p.locator('#edicion-cm .cm-content'), '‹ ›', 'el editor');
+    await p.keyboard.press('ControlOrMeta+End'); await p.keyboard.type('Algo sin aplicar.');
+    await hasta(() => p.locator('#btn-atras').isEnabled(), '‹ ›', 'Atrás no se enciende');
+    await p.locator('#btn-atras').click();
+    await visible(p.locator('#descartar'), '‹ ›', '«¿Descartar lo escrito?»');
+    await p.locator('#descartar-seguir').click();
+    await oculto(p.locator('#descartar'), '‹ ›', 'el diálogo tras «Seguir editando»');
+    assert.equal(await p.locator('#edicion-cm .cm-content').isVisible(), true, '‹ ›: «Seguir editando» ha cerrado el editor');
+    assert.equal(await hashDe(p), '#/n/conceptos/capital.md', '‹ ›: «Seguir editando» ha cambiado de nota');
+  } finally { await ctx.close(); }
+});
+
+test('‹ ›: en la web no hay flechas y el Atrás del navegador sigue funcionando sin rebotar a la portada', async () => {
+  const { p, ctx } = await paginaNuevaConApp({ app: false });
+  try {
+    assert.equal(await p.locator('#btn-atras').isVisible(), false, '‹ ›: la web tiene flechas');
+    await irA(p, '#/n/conceptos/capital.md', /capital/);
+    await p.goBack();
+    await conTexto(p.locator('#miga strong'), /inicio/, '‹ ›', 'el Atrás del navegador a la portada');
+    await p.goBack();   // la portada fue la primera entrada de la app: lo siguiente es salir de ella, no volver a empujar la portada
+    await hasta(() => p.url() === 'about:blank', '‹ ›', `el Atrás del navegador rebota a la portada (${p.url()})`);
+  } finally { await ctx.close(); }
+});

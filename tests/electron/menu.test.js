@@ -194,6 +194,12 @@ test('el menú de la app de escritorio: Nueva nota abre su diálogo; Ver → Bar
   await hasta(() => pagina.evaluate(() => location.hash === '#/n/inicio.md' || location.hash === '' || location.hash === '#/'), 'Atrás no vuelve a la portada');
   await pulsar('adelante');
   await hasta(() => pagina.evaluate(() => location.hash === '#/n/conceptos/capital.md'), 'Adelante no vuelve a la nota');
+  // Atrás de más no sale de la app (P17): ni a «Arrancando…» (otro origen) ni a otra pantalla; el menú y el botón ‹ comparten criterio.
+  for (let i = 0; i < 6; i++) await pulsar('atras');
+  await pagina.waitForTimeout(400);
+  assert.match(pagina.url(), /^http:\/\/localhost:\d+\//, 'Atrás ha salido de la app (¿vuelve a «Arrancando…»?)');
+  await pulsar('adelante');
+  await pagina.locator('#btn-adelante').waitFor();
   await pagina.locator('#link-inicio').click();
   await esperarTitulo(c);
 });

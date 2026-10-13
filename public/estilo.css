@@ -547,3 +547,10 @@ button.comentado:focus-visible { outline: 2px solid var(--acento); outline-offse
 .caja-titulo { margin: 0; font-weight: 650; }
 .menu .sub { margin-left: auto; font-size: 12px; color: var(--tinta-suave); }
 .menu [role^="menuitem"].borrar, .menu [role^="menuitem"].borrar .icono { color: var(--mal); }   /* la papelera, última y en rojo */
+/* ‹ › Atrás y Adelante (solo en la app), antes de la ruta: apagadas sin historial */
+.flechas { display: flex; flex: none; margin-right: 4px; }
+.flecha { width: 30px; min-height: 30px; padding: 0; border: 0; background: none; color: var(--tinta); }
+.flecha:hover:not(:disabled) { background: rgba(127,127,127,.16); }
+.flecha:disabled { opacity: 1; color: var(--apagado, var(--tinta-suave)); cursor: default; }
+.flecha .icono { width: 19px; height: 19px; stroke-width: 2; }
+@media (max-width: 760px) { .flechas { display: none; } }
