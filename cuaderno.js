@@ -6,6 +6,9 @@ const path = require('node:path');
 const { crearRender, leerFrontmatter } = require('./markdown');
 const { crearFiltro } = require('./ignorar');
 const Imagenes = require('./public/imagenes');
+// Hay algo con ese nombre, aunque sea un enlace simbólico roto (existsSync lo sigue y diría que no; en Windows, «wx»
+// sobre un enlace roto escribe en su destino).
+const hayEntrada = f => { try { fs.lstatSync(f); return true; } catch { return false; } };
 
 class ErrorConflicto extends Error { constructor(msg) { super(msg); this.status = 409; } }
 class ErrorPeticion extends Error { constructor(msg, status = 400) { super(msg); this.status = status; } }
@@ -120,7 +123,7 @@ class Cuaderno {
     const hay = fs.readdirSync(dirNota).filter(esCarpeta);
     const carpeta = Imagenes.CARPETAS.map(c => hay.find(n => n.toLowerCase() === c)).find(Boolean) || 'imagenes';
     const dirRel = path.posix.dirname(nota), prefijo = dirRel === '.' ? '' : `${dirRel}/`;
-    const ocupado = n => reservados.includes(`${prefijo}${carpeta}/${n}`) || fs.existsSync(path.join(dirNota, carpeta, n));
+    const ocupado = n => reservados.includes(`${prefijo}${carpeta}/${n}`) || hayEntrada(path.join(dirNota, carpeta, n));
     const ruta = `${prefijo}${carpeta}/${Imagenes.libre(Imagenes.limpiarNombre(nombre), ocupado)}`;
     return { dentro: false, ruta, enlace: Imagenes.enlaceDe(nota, ruta) };
   }
@@ -146,7 +149,7 @@ class Cuaderno {
     const dirRel = path.posix.dirname(ruta.replace(/\\/g, '/')), prefijo = dirRel === '.' ? '' : `${dirRel}/`;
     const intentados = new Set();
     for (;;) {
-      const candidato = Imagenes.libre(nombre, n => intentados.has(n) || fs.existsSync(path.join(carpeta, n)));
+      const candidato = Imagenes.libre(nombre, n => intentados.has(n) || hayEntrada(path.join(carpeta, n)));
       try {
         fs.writeFileSync(path.join(carpeta, candidato), bytes, { flag: 'wx' });
         this.invalidar();
