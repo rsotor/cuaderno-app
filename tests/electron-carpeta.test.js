@@ -229,14 +229,15 @@ test('abrirEnServidor con un servidor de verdad: la petición llega con la cooki
   await assert.rejects(pedir({ host: '127.0.0.1', port: puerto, method: 'POST', path: '/api/abrir' }, '{}'), /ECONNREFUSED/);
 });
 
-test('el preload corre en el sandbox: solo require de electron, expone cuadernoApp con elegirCarpeta, alAccion y version por contextBridge, y lee la versión de --cuaderno-version', () => {
+test('el preload corre en el sandbox: solo require de electron, expone cuadernoApp con elegirCarpeta, alAccion, rutaDeFichero y version por contextBridge, y lee la versión de --cuaderno-version', () => {
   const fuente = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8').split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');   // el código, sin los comentarios
   const requires = [...fuente.matchAll(/require\(([^)]*)\)/g)].map(m => m[1]);
   assert.deepEqual(requires, ["'electron'"], 'en el sandbox no hay más módulos que electron');
   assert.match(fuente, /contextBridge\.exposeInMainWorld\('cuadernoApp'/);
-  for (const clave of ['elegirCarpeta', 'alAccion', 'version']) assert.match(fuente, new RegExp(`^\\s*${clave}[,:]`, 'm'), `expone ${clave}`);
+  for (const clave of ['elegirCarpeta', 'alAccion', 'rutaDeFichero', 'version']) assert.match(fuente, new RegExp(`^\\s*${clave}[,:]`, 'm'), `expone ${clave}`);
   assert.match(fuente, /ipcRenderer\.invoke\('elegir-carpeta'\)/);
   assert.match(fuente, /ipcRenderer\.on\('accion'/);
+  assert.match(fuente, /webUtils\.getPathForFile/);
   assert.match(fuente, /--cuaderno-version=/);
   assert.doesNotMatch(fuente, /\bprocess\.env\b|\bfs\b|child_process/, 'nada del sistema');
 });

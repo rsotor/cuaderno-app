@@ -24,8 +24,10 @@ nota, y una ruta de la API que recibe bytes) · Rama: `imagenes-editor` (desde `
   con el cliente aún subiendo y le llegaba `EPIPE`/`ECONNRESET`, test intermitente); basta `res.end()` + `req.resume()`
   (sin `req.destroy()`), y el 413 llega siempre. Cobertura: servidor.js ramas 84,50 → 85,30 %.
 
+- T4 (2026-10-14): `rutaDeFichero` en `electron/preload.js` (`webUtils.getPathForFile`). Los tests de las claves del preload ganan la clave nueva y `webUtils` (función nueva, no un valor tocado para que pase). Sin desvíos.
+
 **Siguiente**
-- T4.
+- T5.
 
 ## 1. Objetivo, enfoque y restricciones
 

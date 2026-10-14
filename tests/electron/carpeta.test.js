@@ -55,10 +55,10 @@ test('abrir carpeta en la app de escritorio: con la carpeta en los argumentos, l
   assert.match(registro(), new RegExp(`\\[app\\] carpeta en los argumentos: ${porArgv.raiz.replace(/[\\\\^$.*+?()[\]{}|]/g, '\\$&')}`));
   assert.match(registro(), /\[app\] servidor en el puerto \d+; la carpeta: /);
   assert.equal(await pagina.evaluate(() => fetch('/api/info').then(r => r.status)), 200);
-  // Lo que la pantalla ve de Electron: solo las tres cosas del preload, en el sandbox.
-  assert.deepEqual(await pagina.evaluate(() => Object.keys(window.cuadernoApp).sort()), ['alAccion', 'elegirCarpeta', 'version']);
+  // Lo que la pantalla ve de Electron: solo las cuatro cosas del preload, en el sandbox.
+  assert.deepEqual(await pagina.evaluate(() => Object.keys(window.cuadernoApp).sort()), ['alAccion', 'elegirCarpeta', 'rutaDeFichero', 'version']);
   assert.equal(await pagina.evaluate(() => window.cuadernoApp.version), version);
-  assert.deepEqual(await pagina.evaluate(() => [typeof window.cuadernoApp.elegirCarpeta, typeof window.cuadernoApp.alAccion, typeof window.require, typeof window.process]), ['function', 'function', 'undefined', 'undefined']);
+  assert.deepEqual(await pagina.evaluate(() => [typeof window.cuadernoApp.elegirCarpeta, typeof window.cuadernoApp.alAccion, typeof window.cuadernoApp.rutaDeFichero, typeof window.require, typeof window.process]), ['function', 'function', 'function', 'undefined', 'undefined']);
   assert.match(await pagina.locator('#aviso-reinicio').textContent(), /Cierra y vuelve a abrir la app/);
   assert.doesNotMatch(await pagina.locator('#aviso-reinicio').textContent(), /terminal|run-cuaderno-app/);
 });
