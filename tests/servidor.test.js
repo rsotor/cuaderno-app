@@ -28,6 +28,18 @@ async function arrancar({ ejecutarNode = null, ...opciones } = {}) {
   return { c, server, base, puerto, cookie, pedir, cerrar, lanzado, ejecutado };
 }
 
+test('el src de una imagen con %20 se sirve: ida y vuelta por /fichero/ con espacios', async () => {
+  const s = await arrancar({ kit: false });
+  try {
+    const { html } = await (await s.pedir('/api/nota?p=insertar-imagen/con-attachments/nota.md')).json();
+    const src = html.match(/<img src="([^"]+)"/)[1];
+    assert.equal(src, '/fichero/insertar-imagen/con-attachments/attachments/Mi%20captura.png');
+    const r = await s.pedir(src);
+    assert.equal(r.status, 200);
+    assert.match(r.headers.get('content-type'), /image\/png/);
+  } finally { await s.cerrar(); }
+});
+
 test('sin cookie no se entra; con el token de la URL se fija la cookie y se redirige', async () => {
   const s = await arrancar();
   try {
@@ -421,7 +433,7 @@ test('rutas de lectura y de nota nueva: títulos, recorrido y crear una nota', a
     const t = await (await s.pedir('/api/titulos')).json();
     assert.equal(t['conceptos/capital.md'], 'Capital'); assert.equal(t['material/calculadora-50-30-20.html'], 'Calculadora 50/30/20');
     const r = await (await s.pedir('/api/recorrido')).json();
-    assert.equal(r.notas, 23); assert.deepEqual(r.fallos, []);   // 23 (2026-10-13: +navegacion/una-nota-con-un-nombre-muy-largo-para-la-barra-superior.md, y antes +render/fragmentos-de-busqueda.md): con la nota larga de lectura/ (2026-10-09) y comentarios/nota-comentada.md
+    assert.equal(r.notas, 24); assert.deepEqual(r.fallos, []);   // 24 (2026-10-14: +insertar-imagen/con-attachments/nota.md); 23 (2026-10-13: +navegacion/una-nota-con-un-nombre-muy-largo-para-la-barra-superior.md, y antes +render/fragmentos-de-busqueda.md): con la nota larga de lectura/ (2026-10-09) y comentarios/nota-comentada.md
     const n = await (await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).json();
     assert.equal(n.ruta, 'conceptos/Idea nueva.md'); assert.equal(s.c.leer('conceptos/Idea nueva.md'), '# Idea nueva\n\n');   // el título y una línea en blanco para escribir debajo
     assert.equal((await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).status, 400, 'una nota repetida no da error');

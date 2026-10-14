@@ -84,7 +84,7 @@ test('cada módulo que el proceso principal y el hijo requieren (recursivamente)
     if (f.endsWith('.js')) pendientes.push(...requiresLocales(f));
   }
   for (const f of vistos) {
-    if (f.startsWith('electron/')) continue;   // los cubre electron/**
+    if (f.startsWith('electron/') || f.startsWith('public/')) continue;   // los cubren electron/** y public/** (markdown.js requiere public/imagenes.js)
     assert.ok(incluye(f), `${f} lo requiere la app y no está en files`);
   }
   const listados = files.filter(p => /^[a-z-]+\.js$/.test(p));

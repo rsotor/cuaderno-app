@@ -65,6 +65,16 @@ test('imágenes: la ruta relativa se resuelve desde la carpeta de la nota y se s
   assert.match(html, /class="wiki roto"/, 'el wikilink normal sigue siendo un enlace');
 });
 
+test('imágenes: una ruta codificada (%20, %23, un % suelto) llega a /fichero/ codificada una sola vez', () => {
+  const md = crearRender(() => null);
+  const html = md.render('![a](attachments/Mi%20captura.png) ![b](Foto%20%231.png) ![c](100%.png) ![[Mi foto.png]]\n', { ruta: 'ini/nota.md' });
+  assert.match(html, /src="\/fichero\/ini\/attachments\/Mi%20captura\.png"/);
+  assert.match(html, /src="\/fichero\/ini\/Foto%20%231\.png"/);
+  assert.match(html, /src="\/fichero\/ini\/100%25\.png"/);
+  assert.match(html, /src="\/fichero\/ini\/Mi%20foto\.png"/);
+  assert.doesNotMatch(html, /%2520/);
+});
+
 test('bloques: una lista seguida de línea en blanco acaba donde acaba la lista, no en la línea en blanco', () => {
   const md = crearRender(() => null);
   const html = md.render('# T\n\n- uno\n- dos\n\nPárrafo.\n');
