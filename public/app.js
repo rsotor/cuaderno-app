@@ -569,17 +569,18 @@ const FORMATOS_BARRA = [
   ['negrita', '<b>B</b>', 'Negrita', `${teclaMod} B`], ['cursiva', '<i>I</i>', 'Cursiva', `${teclaMod} I`], ['titulo', 'H', 'Título (cada pulsación sube el nivel: ##, ###, ####; en el último, lo quita)', ''],
   ['lista', '•', 'Lista', ''], ['casilla', '☐', 'Casilla', ''],
   ['enlace', '<svg class="icono" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>', 'Enlace', ''], ['codigo', '&lt;/&gt;', 'Código', ''],
+  ['imagen', '<svg class="icono" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m21 16-5-5-8 9"/></svg>', 'Imagen (o arrástrala al editor)', '', true],   // el último: de acción, no de formato (sin aria-pressed)
 ];
-const htmlBarra = () => `<div class="edicion-barra" role="toolbar" aria-label="Formato" aria-orientation="horizontal">${FORMATOS_BARRA.map(([id, icono, nombre, atajo], i) => `<button type="button" class="secundario" data-formato="${id}" aria-label="${nombre.replace(/ \(.*/, '')}" title="${nombre}${atajo ? ` (${atajo})` : ''}" aria-pressed="false" tabindex="${i === 0 ? 0 : -1}">${icono}</button>`).join('')}</div>`;
+const htmlBarra = () => `<div class="edicion-barra" role="toolbar" aria-label="Formato" aria-orientation="horizontal">${FORMATOS_BARRA.map(([id, icono, nombre, atajo, accion], i) => `<button type="button" class="secundario" data-formato="${id}" aria-label="${nombre.replace(/ \(.*/, '')}" title="${nombre}${atajo ? ` (${atajo})` : ''}"${accion ? '' : ' aria-pressed="false"'} tabindex="${i === 0 ? 0 : -1}">${icono}</button>`).join('')}</div>`;
 function actualizarBarra() {
   if (!edicion || !live) return;
   const activos = live.formatosActivos();
-  document.querySelectorAll('.edicion-barra button').forEach(b => b.setAttribute('aria-pressed', String(!!activos[b.dataset.formato])));
+  document.querySelectorAll('.edicion-barra button[aria-pressed]').forEach(b => b.setAttribute('aria-pressed', String(!!activos[b.dataset.formato])));
 }
 function enlazarBarra() {
   const barra = $('.edicion-barra'), botones = () => [...barra.querySelectorAll('button')];
   barra.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });   // el editor no pierde el foco ni la selección
-  barra.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; live.formato(b.dataset.formato); live.enfocar(); actualizarBarra(); });
+  barra.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.formato === 'imagen') return $('#imagen-fichero').click(); live.formato(b.dataset.formato); live.enfocar(); actualizarBarra(); });
   barra.addEventListener('keydown', e => {
     const bs = botones(), i = bs.indexOf(document.activeElement); if (i < 0) return;
     const j = { ArrowRight: (i + 1) % bs.length, ArrowLeft: (i - 1 + bs.length) % bs.length, Home: 0, End: bs.length - 1 }[e.key];
@@ -587,6 +588,40 @@ function enlazarBarra() {
     e.preventDefault(); bs.forEach((b, k) => { b.tabIndex = k === j ? 0 : -1; }); bs[j].focus();
   });
 }
+// ---------- meter imágenes (plan docs/planes/imagenes-editor.md, P8-P10, P13): el botón «Imagen» (selector del sistema) y soltar
+// ficheros en el editor. Aquí no se escribe nada en el cuaderno: el servidor dice dónde irá cada una, el texto lleva ya
+// el enlace definitivo y la imagen se ve desde la memoria hasta Aplicar.
+async function meterImagenes(ficheros, pos) {
+  if (!edicion || !live) return;
+  const { ruta, imagenes } = edicion, tope = Math.round(Imagenes.TOPE_IMAGEN / 1048576);
+  const validos = [];
+  for (const f of ficheros) {
+    if (!Imagenes.EXTENSIONES.includes(f.name.split('.').pop().toLowerCase())) { avisar(`Solo imágenes: ${Imagenes.EXTENSIONES.join(', ')}`); continue; }
+    if (f.size > Imagenes.TOPE_IMAGEN) { avisar(`${f.name} pasa de ${tope} MB`); continue; }
+    validos.push(f);
+  }
+  const lista = [], reservados = [...imagenes.values()].map(i => i.ruta);
+  try {
+    for (const f of validos) {   // en serie: cada destino cuenta lo que ya devolvió el anterior (dos captura.png nunca chocan)
+      const origen = enApp() && window.cuadernoApp.rutaDeFichero ? window.cuadernoApp.rutaDeFichero(f) : '';
+      const clave = origen || `${f.name}|${f.size}|${f.lastModified}`, alt = f.name.replace(/\.[^.]*$/, '');
+      if (imagenes.has(clave)) { const i = imagenes.get(clave); lista.push({ enlace: i.enlace, alt, pendiente: i.pendiente }); continue; }
+      const bytes = await f.arrayBuffer();
+      const d = await api('/api/imagen/destino', { nota: ruta, nombre: f.name, origen, reservados });
+      if (d.dentro) { lista.push({ enlace: d.enlace, alt, pendiente: null }); continue; }
+      const pendiente = { ruta: d.ruta, blob: new Blob([bytes], { type: f.type || 'application/octet-stream' }) };
+      imagenes.set(clave, { enlace: d.enlace, ruta: d.ruta, pendiente });
+      reservados.push(d.ruta);
+      lista.push({ enlace: d.enlace, alt, pendiente });
+    }
+  } catch (e) { return avisarError('No se ha podido meter la imagen.', e.message); }
+  if (!edicion || edicion.ruta !== ruta || !lista.length) return;   // mientras se leía se salió del editor
+  live.insertarImagenes(lista, pos);
+}
+$('#imagen-fichero').addEventListener('change', e => { const ficheros = [...e.target.files]; e.target.value = ''; meterImagenes(ficheros); });
+// Soltar ficheros fuera del editor no debe sacar de la nota (el navegador abriría la imagen y se perdería lo escrito): con el
+// editor abierto se cancela el arrastre de ficheros, en la web y en la app. En dragover `files` viene vacía: se mira `types`.
+for (const tipo of ['dragover', 'drop']) document.addEventListener(tipo, e => { if (edicion && e.dataTransfer && e.dataTransfer.types.includes('Files')) e.preventDefault(); });
 const desplazamientoDeLinea = (texto, linea) => texto.split('\n').slice(0, linea).reduce((a, l) => a + l.length + 1, 0);
 async function entrarEdicion() {
   if (edicion || !rutaActual || $('#nota').hidden || $('#btn-editar').hidden || dialogoAbierto()) return;
@@ -598,12 +633,12 @@ async function entrarEdicion() {
   try { original = await textoFichero(ruta); live = live || await import('/public/live.js'); } catch (e) { return avisarError('No se ha podido abrir el editor.', e.message); }
   if (rutaActual !== ruta || edicion) return;   // mientras llegaba se cambió de nota
   const texto = original.replace(/\r\n/g, '\n'), linea = bloque ? +bloque.dataset.desde : 0;
-  edicion = { ruta, original, texto0: texto, linea, hash: location.hash };
+  edicion = { ruta, original, texto0: texto, linea, hash: location.hash, imagenes: new Map() };   // imagenes: la clave de cada fichero metido → { enlace, ruta, pendiente } (P9)
   $('#btn-editar').hidden = true;
   $('#nota').dataset.vista = 'edicion';
   $('#nota').style.setProperty('--alto-miga', `${$('.miga-barra').offsetHeight}px`);
   $('#nota').innerHTML = `${htmlBarra()}<div id="edicion-cm"></div><div class="edicion-pie"><div id="franja-edicion" role="alert" hidden></div><button type="button" id="edicion-cancelar" class="secundario">Cancelar</button><button type="button" id="edicion-aplicar" class="primario" disabled>Aplicar</button><span class="pista">${teclaAplicar} aplica · Esc cancela</span></div>`;
-  live.montar($('#edicion-cm'), texto, { plano: info.configuracion.editor === 'plano', ruta, propiedades: propiedadesActual, posicion: desplazamientoDeLinea(texto, linea), alCambiar: actualizarEstadoEdicion, alSeleccionar: actualizarBarra });
+  live.montar($('#edicion-cm'), texto, { plano: info.configuracion.editor === 'plano', ruta, propiedades: propiedadesActual, posicion: desplazamientoDeLinea(texto, linea), alCambiar: actualizarEstadoEdicion, alSeleccionar: actualizarBarra, alSoltarFicheros: meterImagenes });
   enlazarBarra();
   $('#edicion-cancelar').onclick = pedirSalida;
   $('#edicion-aplicar').onclick = aplicarEdicion;

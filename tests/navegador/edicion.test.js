@@ -511,7 +511,7 @@ test('barra: flechas mueven el foco entre botones, aria-pressed sigue a la selec
   assert.equal(await e.pagina.locator('.edicion-barra').getAttribute('aria-label'), 'Formato');
   const botones = e.pagina.locator('.edicion-barra button');
   const nombres = await botones.evaluateAll(l => l.map(b => b.dataset.formato));
-  assert.deepEqual(nombres, ['negrita', 'cursiva', 'titulo', 'lista', 'casilla', 'enlace', 'codigo']);
+  assert.deepEqual(nombres, ['negrita', 'cursiva', 'titulo', 'lista', 'casilla', 'enlace', 'codigo', 'imagen']);
   for (const b of await botones.all()) { assert.ok(await b.getAttribute('aria-label'), 'barra: un botón sin aria-label'); assert.ok(await b.getAttribute('title'), 'barra: un botón sin pista'); }
   assert.match(await boton('negrita').getAttribute('title'), /(Ctrl|⌘) B/, 'barra: la pista de Negrita no dice el atajo');
   // Una sola parada de Tab (roving tabindex), flechas, Inicio y Fin.
@@ -522,11 +522,11 @@ test('barra: flechas mueven el foco entre botones, aria-pressed sigue a la selec
   assert.equal(await e.pagina.evaluate(() => document.activeElement.dataset.formato), 'cursiva', 'barra: la flecha derecha no pasa al botón siguiente');
   assert.deepEqual(await parada(), ['cursiva'], 'barra: el tabindex no sigue al foco');
   await e.pagina.keyboard.press('End');
-  assert.equal(await e.pagina.evaluate(() => document.activeElement.dataset.formato), 'codigo');
+  assert.equal(await e.pagina.evaluate(() => document.activeElement.dataset.formato), 'imagen');
   await e.pagina.keyboard.press('ArrowRight');
   assert.equal(await e.pagina.evaluate(() => document.activeElement.dataset.formato), 'negrita', 'barra: la flecha derecha en el último no vuelve al primero');
   await e.pagina.keyboard.press('ArrowLeft');
-  assert.equal(await e.pagina.evaluate(() => document.activeElement.dataset.formato), 'codigo');
+  assert.equal(await e.pagina.evaluate(() => document.activeElement.dataset.formato), 'imagen');
   await e.pagina.keyboard.press('Home');
   assert.equal(await e.pagina.evaluate(() => document.activeElement.dataset.formato), 'negrita');
   // aria-pressed sigue a la selección: dentro de la negrita sí, en otra línea no; el título también.

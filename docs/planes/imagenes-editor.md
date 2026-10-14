@@ -28,8 +28,10 @@ nota, y una ruta de la API que recibe bytes) · Rama: `imagenes-editor` (desde `
 
 - T5 (2026-10-14): `public/live.js`: widget `Imagen`, `decosImagen`, extensión `imagenesPlano` (la imagen también en «Markdown plano», solo ella), `insertarImagenes`, `pendientes`, `alSoltarFicheros` (por `dataTransfer.types`), `destruir` revoca las URL; `.live-imagen*` en `estilo.css`; ejemplo `insertar-imagen/sin-carpeta/` (contadores de notas 24 → 25 en `cuaderno.test.js` y `servidor.test.js`: nota nueva, no un valor arreglado); recorrido `tests/navegador/imagenes.test.js`. Desvíos: con el crudo (línea del cursor y modo plano) la imagen es un widget de **bloque** tras la línea, no en línea (P7 decía `side: 1`, que se mantiene); `alSoltarFicheros` solo instala `dragover`/`drop` si se le pasa (la app lo pasa en T6; hasta entonces el soltar no cambia). Ningún test existente esperaba «ninguna img» en plano (no había): no se cambió ninguna expectativa. Capturas del después en `docs/capturas/imagenes/` para la crítica de T9.
 
+- T6 (2026-10-14): `public/app.js`: botón «Imagen» (`FORMATOS_BARRA`, quinto campo `accion`: sin `aria-pressed` en `htmlBarra`, fuera de `actualizarBarra` por `button[aria-pressed]`, el clic abre `#imagen-fichero`), `meterImagenes` (extensión y `TOPE_IMAGEN` con aviso, destinos **en serie** sumando a `reservados`, P9 por `origen` o `nombre|tamaño|fecha`, error del destino → `avisarError` y nada insertado), `alSoltarFicheros` en `live.montar`, y `dragover`/`drop` de `document` con `types.includes('Files')` mientras `edicion` (P13); `public/index.html`: `#imagen-fichero`. Recorridos en `tests/navegador/imagenes.test.js` (4 nuevos; el (6) mira `defaultPrevented` de eventos sintéticos sobre `document`). Cambia `tests/navegador/edicion.test.js` (la lista de botones gana `imagen` y el último de la barra, donde da la vuelta el foco, pasa de `codigo` a `imagen`: botón nuevo, no un valor arreglado). Desvío: soltar en la línea del título cae tras el `# ` (posición real de `posAtCoords`), así que el recorrido suelta en la línea del párrafo. Capturas en `docs/capturas/imagenes/despues-barra-imagen-{claro,oscuro}-2026-10-14.png`. Hasta T7, Aplicar aún no copia las pendientes.
+
 **Siguiente**
-- T6.
+- T7.
 
 ## 1. Objetivo, enfoque y restricciones
 
