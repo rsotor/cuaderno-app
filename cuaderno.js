@@ -124,6 +124,39 @@ class Cuaderno {
     const ruta = `${prefijo}${carpeta}/${Imagenes.libre(Imagenes.limpiarNombre(nombre), ocupado)}`;
     return { dentro: false, ruta, enlace: Imagenes.enlaceDe(nota, ruta) };
   }
+  // Escribe una imagen (bytes) en `ruta`, que tiene que ser un fichero de imagen dentro de una carpeta HIJA DIRECTA de la
+  // carpeta de la nota (la crea si no existe, solo ese nivel). Nunca sobrescribe: `wx`, y si el nombre existe prueba -2, -3…
+  // Rechaza (ErrorPeticion) rutas fuera de la base (../, absolutas, enlaces simbólicos) y lo que no sea una imagen.
+  // → { ruta, enlace } definitivos.
+  guardarImagen(nota, ruta, bytes) {
+    const dirNota = path.dirname(this.dentro(nota)), abs = this.dentro(ruta), carpeta = path.dirname(abs);
+    if (!Imagenes.EXTENSIONES.includes(path.extname(abs).slice(1).toLowerCase())) throw new ErrorPeticion(`solo imágenes: ${Imagenes.EXTENSIONES.join(', ')}`);
+    if (path.dirname(carpeta) !== dirNota) throw new ErrorPeticion('la imagen va en una carpeta dentro de la de la nota');
+    const nombre = Imagenes.limpiarNombre(path.basename(abs));
+    let realNota, realBase;
+    try { realNota = fs.realpathSync(dirNota); realBase = fs.realpathSync(this.base); } catch { throw new ErrorPeticion('la carpeta de la nota no existe'); }
+    if (realNota !== realBase && !realNota.startsWith(realBase + path.sep)) throw new ErrorPeticion('ruta fuera del cuaderno');
+    let existe = true;
+    try { fs.lstatSync(carpeta); } catch { existe = false; }
+    if (existe) {
+      let real;
+      try { real = fs.realpathSync(carpeta); } catch { throw new ErrorPeticion('la carpeta de la imagen no se puede usar'); }
+      if (!fs.statSync(real).isDirectory() || path.dirname(real) !== realNota) throw new ErrorPeticion('ruta fuera del cuaderno');
+    } else fs.mkdirSync(carpeta);
+    const dirRel = path.posix.dirname(ruta.replace(/\\/g, '/')), prefijo = dirRel === '.' ? '' : `${dirRel}/`;
+    const intentados = new Set();
+    for (;;) {
+      const candidato = Imagenes.libre(nombre, n => intentados.has(n) || fs.existsSync(path.join(carpeta, n)));
+      try {
+        fs.writeFileSync(path.join(carpeta, candidato), bytes, { flag: 'wx' });
+        this.invalidar();
+        return { ruta: `${prefijo}${candidato}`, enlace: Imagenes.enlaceDe(nota, `${prefijo}${candidato}`) };
+      } catch (e) {
+        if (e.code !== 'EEXIST') throw e;
+        intentados.add(candidato);   // alguien lo creó entre la comprobación y la escritura: el siguiente
+      }
+    }
+  }
   resolverWiki(destino) {
     const limpio = destino.replace(/\.md$/, '').replace(/#.*$/, '').replace(/^\//, '');
     // Una nota se enlaza con o sin .md; cualquier otro fichero, con su extensión ([[datos.json]], [[pagina.html]]).

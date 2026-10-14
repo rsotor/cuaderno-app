@@ -19,8 +19,13 @@ nota, y una ruta de la API que recibe bytes) · Rama: `imagenes-editor` (desde `
   `Cuaderno.destinoImagen` en `cuaderno.js`; `POST /api/imagen/destino` en `servidor.js`. Sin desvíos; ninguna cifra
   existente cambió (el ejemplo no crece en T2).
 
+- T3 (2026-10-14): `Cuaderno.guardarImagen` en `cuaderno.js`; `POST /api/imagen` (en crudo, antes de `leerCuerpo`) con
+  `leerBytes`/`rechazar` en `servidor.js`. Desvío de P5: el 413 **no** lleva `connection: close` (con él Node cierra el socket
+  con el cliente aún subiendo y le llegaba `EPIPE`/`ECONNRESET`, test intermitente); basta `res.end()` + `req.resume()`
+  (sin `req.destroy()`), y el 413 llega siempre. Cobertura: servidor.js ramas 84,50 → 85,30 %.
+
 **Siguiente**
-- T3.
+- T4.
 
 ## 1. Objetivo, enfoque y restricciones
 

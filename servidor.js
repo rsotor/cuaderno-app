@@ -11,6 +11,7 @@ const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { WebSocketServer } = require('ws');
 const { Cuaderno, ErrorPeticion } = require('./cuaderno');
+const Imagenes = require('./public/imagenes');
 const { detectar } = require('./kit');
 const sistema = require('./sistema');
 const config = require('./config');
@@ -131,6 +132,29 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
     let d = ''; req.on('data', c => { d += c; if (d.length > 2e6) req.destroy(); }); req.on('end', () => { try { ok(d ? JSON.parse(d) : {}); } catch { mal(new ErrorPeticion('JSON inválido')); } });
   });
 
+  // Responde sin leer el cuerpo y lo drena sin guardarlo (nunca req.destroy(): el cliente recibiría un corte, no la respuesta;
+  // tampoco connection: close, que cierra el socket con el cliente aún subiendo y le da EPIPE/ECONNRESET en vez del 413).
+  const rechazar = (req, res, codigo, mensaje) => {
+    res.writeHead(codigo, { 'content-type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: mensaje }));
+    req.resume();
+    return null;
+  };
+  // El cuerpo en crudo de una petición, de `tope` bytes como mucho. Si pasa del tope (declarado o leyendo) responde 413 y
+  // devuelve null: la ruta no sigue.
+  const leerBytes = (req, res, tope) => new Promise((ok, mal) => {
+    const declarado = req.headers['content-length'];
+    if (declarado !== undefined && Number(declarado) > tope) return ok(rechazar(req, res, 413, 'la imagen pasa del tope'));
+    const trozos = []; let total = 0, pasado = false;
+    req.on('data', c => {
+      if (pasado) return;
+      total += c.length;
+      if (total > tope) { pasado = true; trozos.length = 0; ok(rechazar(req, res, 413, 'la imagen pasa del tope')); } else trozos.push(c);
+    });
+    req.on('end', () => { if (!pasado) ok(Buffer.concat(trozos)); });
+    req.on('error', mal);
+  });
+
   const server = http.createServer(async (req, res) => {
     const puerto = server.address().port;
     const url = new URL(req.url, 'http://x');
@@ -188,6 +212,14 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
       }
       if (p === '/api/guardar/propuesta') { const raiz = conCuaderno().raiz; return json(res, { mensaje: acciones.proponerMensaje(raiz), cambios: acciones.cambios(raiz), repo: acciones.esRepo(raiz), kit: estado.kit.tipo }); }
       if (p.startsWith('/fichero/')) return servirDelCuaderno(res, decodeURIComponent(p.slice(9)), req);
+      // La imagen llega en crudo (no JSON): se atiende antes de leerCuerpo, que solo entiende JSON de hasta 2 MB.
+      if (req.method === 'POST' && p === '/api/imagen') {
+        const cu = conCuaderno();
+        if (!/^(application\/octet-stream|image\/)/.test(req.headers['content-type'] || '')) return rechazar(req, res, 415, 'el cuerpo tiene que ser una imagen');
+        const bytes = await leerBytes(req, res, Imagenes.TOPE_IMAGEN);
+        if (!bytes) return;
+        return json(res, cu.guardarImagen(url.searchParams.get('nota'), url.searchParams.get('ruta'), bytes));
+      }
       if (req.method === 'POST') {
         const b = await leerCuerpo(req);
         if (p === '/api/abrir') return json(res, abrir(b.ruta));
