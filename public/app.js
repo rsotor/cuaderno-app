@@ -31,9 +31,10 @@ if (enApp()) { $('#btn-nueva-nota').title = conAtajo('Crear una nota nueva', 'N'
 let avisoCerrado = false;
 $('#aviso-cerrar').addEventListener('click', () => { avisoCerrado = true; $('#aviso-reinicio').hidden = true; });
 
-// Toda llamada a la API: GET sin cuerpo, POST con JSON. Un 409 significa que la nota cambió debajo: se recarga.
+// Toda llamada a la API: GET sin cuerpo, POST con JSON (o con los bytes de un Blob, en crudo: /api/imagen). Un 409 significa que la nota cambió debajo: se recarga.
 async function api(p, body) {
-  const r = await fetch(p, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : undefined);
+  const crudo = body instanceof Blob;
+  const r = await fetch(p, body ? { method: 'POST', headers: { 'content-type': crudo ? body.type || 'application/octet-stream' : 'application/json' }, body: crudo ? body : JSON.stringify(body) } : undefined);
   const d = await r.json().catch(() => ({ error: `respuesta ${r.status}` }));
   if (!r.ok) {
     if (r.status === 404 && p.startsWith('/api/') && !avisoCerrado) $('#aviso-reinicio').hidden = false;   // una ruta que el servidor no conoce: es de antes
@@ -609,7 +610,7 @@ async function meterImagenes(ficheros, pos) {
       const bytes = await f.arrayBuffer();
       const d = await api('/api/imagen/destino', { nota: ruta, nombre: f.name, origen, reservados });
       if (d.dentro) { lista.push({ enlace: d.enlace, alt, pendiente: null }); continue; }
-      const pendiente = { ruta: d.ruta, blob: new Blob([bytes], { type: f.type || 'application/octet-stream' }) };
+      const pendiente = { ruta: d.ruta, blob: new File([bytes], f.name, { type: f.type || 'application/octet-stream' }) };   // un File: guarda el nombre de origen para Aplicar
       imagenes.set(clave, { enlace: d.enlace, ruta: d.ruta, pendiente });
       reservados.push(d.ruta);
       lista.push({ enlace: d.enlace, alt, pendiente });
@@ -655,17 +656,42 @@ async function salirEdicion() {
   if (!$('#btn-editar').hidden) $('#btn-editar').focus();
 }
 async function aplicarEdicion() {
-  if (!edicion) return;
+  if (!edicion || escribiendo) return;
   const { ruta, original } = edicion, texto = live.texto();
   if (texto === original.replace(/\r\n/g, '\n')) return salirEdicion();   // nada que escribir
+  await escribirConImagenes(ruta, texto, original);
+}
+// La única que escribe la nota desde el editor (Aplicar y «Sobrescribir»; plan docs/planes/imagenes-editor.md, P12): primero
+// sube, una a una, las imágenes pendientes que el texto sigue enlazando; si el servidor les cambió el nombre (alguien ocupó
+// el suyo), cambia sus enlaces en una sola pasada; y solo entonces escribe la nota. Si algo falla, lo subido en este intento
+// va a la papelera, la nota no se escribe y el editor se queda como estaba (texto y pendientes). Con `escribiendo` no hace
+// nada: dos ⌘ Enter seguidos no suben dos copias.
+async function escribirConImagenes(ruta, texto, original) {
+  if (escribiendo || !edicion) return;
   escribiendo = true;   // la recarga en vivo que provoca esta escritura no repinta ni compara: salirEdicion repinta al acabar
+  const subidas = [];
   try {
-    try { await api('/api/nota/escribir', { ruta, texto, original }); }
-    catch (e) { if (e.status === 409) return mostrarFranja('conflicto'); return avisarError('No se ha podido escribir la nota.', e.message); }
+    const cambios = new Map();
+    for (const p of live.pendientes()) {
+      // Se pide con el nombre de origen en la carpeta reservada: si alguien ocupó el reservado, el servidor da el siguiente
+      // libre de ese nombre (captura-3.png), no uno del reservado (captura-2-2.png).
+      const carpeta = p.ruta.split('/').slice(0, -1).join('/'), pedida = p.blob.name ? `${carpeta ? `${carpeta}/` : ''}${p.blob.name}` : p.ruta;
+      let d;
+      try { d = await api(`/api/imagen?nota=${encodeURIComponent(ruta)}&ruta=${encodeURIComponent(pedida)}`, p.blob); }
+      catch (e) { await soltarSubidas(subidas); return avisarError(`No se ha podido copiar la imagen «${p.ruta.split('/').pop()}»: la nota no se ha escrito.`, e.message); }
+      subidas.push(d.ruta);
+      if (d.enlace !== p.enlace) cambios.set(p.enlace, d.enlace);
+    }
+    try { await api('/api/nota/escribir', { ruta, texto: Imagenes.sustituirEnlaces(texto, cambios), original }); }
+    catch (e) { await soltarSubidas(subidas); if (e.status === 409) return mostrarFranja('conflicto'); return avisarError('No se ha podido escribir la nota.', e.message); }
     avisar('Nota escrita');
     await salirEdicion();
   } finally { escribiendo = false; }
   refrescarContadores();
+}
+// Lo subido en un intento que no llegó a escribir la nota va a la papelera (§9 Q1); si ni eso, se queda y se dice dónde.
+async function soltarSubidas(rutas) {
+  for (const r of rutas) { try { await api('/api/papelera', { ruta: r }); } catch (e) { avisarError(`No se ha podido mandar a ${PAPELERA} la imagen copiada: se queda en ${r}.`, e.message); } }
 }
 $('#btn-editar').onclick = entrarEdicion;
 // Esc cancela y Ctrl/⌘ Enter aplica, con el foco en el editor (en captura: el editor no debe insertar una línea con Mod-Enter).
@@ -721,10 +747,11 @@ document.addEventListener('click', async e => {
     try { await navigator.clipboard.writeText(texto); } catch { const t = document.createElement('textarea'); t.value = texto; document.body.append(t); t.select(); document.execCommand('copy'); t.remove(); }
     avisar('Tu texto está copiado'); await recargarDesdeDisco();
   } else if (b.id === 'franja-sobrescribir') {
+    if (escribiendo) return;
     const { ruta } = edicion, texto = live.texto();
-    try { const original = await textoFichero(ruta); await api('/api/nota/escribir', { ruta, texto, original }); }
-    catch (err) { return avisarError('No se ha podido escribir la nota.', err.message); }
-    avisar('Nota escrita'); await salirEdicion(); refrescarContadores();
+    let original;
+    try { original = await textoFichero(ruta); } catch (err) { return avisarError('No se ha podido escribir la nota.', err.message); }
+    await escribirConImagenes(ruta, texto, original);
   }
 });
 // La recarga en vivo con el editor abierto no repinta: se vuelve a pedir el texto y solo si difiere del que se abrió hay franja.

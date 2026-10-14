@@ -245,3 +245,155 @@ test('imágenes: con el editor abierto, soltar ficheros fuera del editor no nave
   const fuera = await e.pagina.evaluate(() => { const dt = new DataTransfer(); dt.items.add(new File(['x'], 'a.png')); const ev = new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }); document.body.dispatchEvent(ev); return ev.defaultPrevented; });
   assert.equal(fuera, false, 'sin editor abierto no se debe cancelar el arrastre');
 });
+
+// ---------- T7: Aplicar copia las pendientes que el texto sigue enlazando y después escribe la nota (P12)
+const CON = 'insertar-imagen/con-attachments', SIN = 'insertar-imagen/sin-carpeta';
+const leer = rel => fs.readFileSync(path.join(e.c.base, rel));
+const notaEnDisco = rel => fs.readFileSync(path.join(e.c.base, rel), 'utf8');
+// Deja las dos carpetas del ejemplo como estaban: la nota con su texto (el del ejemplo) y sin imágenes nuevas.
+const ORIGINALES = Object.fromEntries([CON, SIN].map(d => [d, fs.readFileSync(path.join(__dirname, '..', '..', 'ejemplos', 'cuaderno-ejemplo', d, 'nota.md'), 'utf8')]));
+const limpiar = () => {
+  for (const d of [CON, SIN]) fs.writeFileSync(path.join(e.c.base, d, 'nota.md'), ORIGINALES[d]);
+  for (const f of listar(`${CON}/attachments`)) if (f !== 'Mi captura.png') fs.rmSync(path.join(e.c.base, CON, 'attachments', f));
+  fs.rmSync(path.join(e.c.base, SIN, 'imagenes'), { recursive: true, force: true });
+};
+const aplicar = () => e.pagina.locator('#edicion-aplicar').click();
+const tras = async () => { await oculto(e.pagina.locator('#edicion-cm'), 'aplicar', 'el editor tras aplicar'); };
+const elegir = async (...rutas) => { const antes = await textoEditor(); await e.pagina.locator('#imagen-fichero').setInputFiles(rutas); await hasta(async () => (await textoEditor()) !== antes, 'aplicar', 'la imagen elegida no entra en el texto'); };
+
+test('imágenes: aplicar copia la imagen pendiente junto a la nota con el nombre del enlace, escribe la nota y la lectura la enseña', async () => {
+  try {
+    await ajustarEditor('vista', `${CON}/nota.md`);
+    await abrirEditor();
+    const png = pngFuera('Mi captura.png', 'uno');
+    await elegir(png);
+    assert.ok((await textoEditor()).includes('](attachments/Mi%20captura-2.png)'));
+    await aplicar(); await tras();
+    assert.deepEqual(leer(`${CON}/attachments/Mi captura-2.png`), fs.readFileSync(png), 'los bytes de la imagen copiada');
+    assert.ok(notaEnDisco(`${CON}/nota.md`).includes('![Mi captura](attachments/Mi%20captura-2.png)'), 'la nota no lleva el enlace');
+    const img = e.pagina.locator('#nota img[src$="Mi%20captura-2.png"]');
+    await visible(img, 'aplicar', 'la imagen en la lectura');
+    await hasta(() => cargada(img.first()), 'aplicar', 'la imagen de la lectura no carga');
+  } finally { limpiar(); }
+});
+
+test('imágenes: aplicar, sin carpeta de imágenes, crea imagenes/ con la imagen', async () => {
+  try {
+    await ajustarEditor('vista', `${SIN}/nota.md`);
+    await abrirEditor();
+    const png = pngFuera('foto.png', 'dos');
+    await elegir(png);
+    await aplicar(); await tras();
+    assert.deepEqual(listar(`${SIN}/imagenes`), ['foto.png']);
+    assert.deepEqual(leer(`${SIN}/imagenes/foto.png`), fs.readFileSync(png));
+    assert.ok(notaEnDisco(`${SIN}/nota.md`).includes('![foto](imagenes/foto.png)'));
+  } finally { limpiar(); }
+});
+
+test('imágenes: aplicar con el nombre ocupado en el disco después de insertar va al siguiente libre y la nota enlaza ese; lo de fuera no cambia', async () => {
+  try {
+    await ajustarEditor('vista', `${CON}/nota.md`);
+    await abrirEditor();
+    const png = pngFuera('Mi captura.png', 'tres');
+    await elegir(png);
+    assert.ok((await textoEditor()).includes('](attachments/Mi%20captura-2.png)'));
+    fs.writeFileSync(path.join(e.c.base, CON, 'attachments', 'Mi captura-2.png'), 'puesto a mano');
+    await aplicar(); await tras();
+    assert.equal(leer(`${CON}/attachments/Mi captura-2.png`).toString(), 'puesto a mano', 'el fichero creado a mano no debe cambiar');
+    assert.deepEqual(leer(`${CON}/attachments/Mi captura-3.png`), fs.readFileSync(png));
+    const nota = notaEnDisco(`${CON}/nota.md`);
+    assert.ok(nota.includes('![Mi captura](attachments/Mi%20captura-3.png)'), `la nota debe enlazar -3: ${nota}`);
+    assert.ok(!nota.includes('Mi%20captura-2.png'), 'la nota no debe enlazar el fichero de fuera');
+  } finally { limpiar(); }
+});
+
+test('imágenes: aplicar con el enlace ya borrado del texto no copia ninguna imagen', async () => {
+  try {
+    await ajustarEditor('vista', `${SIN}/nota.md`);
+    await abrirEditor();
+    await elegir(pngFuera('foto.png'));
+    await e.pagina.keyboard.press('ControlOrMeta+a'); await e.pagina.keyboard.type('# Otra cosa\n');
+    await aplicar(); await tras();
+    assert.equal(listar(`${SIN}/imagenes`), null, 'no debe crearse imagenes/');
+    assert.equal(notaEnDisco(`${SIN}/nota.md`), '# Otra cosa\n');
+  } finally { limpiar(); }
+});
+
+test('imágenes: aplicar con una subida que falla no escribe la nota, manda a la papelera lo subido, avisa y conserva el editor; después se aplica entero', async () => {
+  const subida = /\/api\/imagen\?/;
+  try {
+    await ajustarEditor('vista', `${SIN}/nota.md`);
+    await abrirEditor();
+    const a = pngFuera('a.png', 'a'), b = pngFuera('b.png', 'b');
+    await elegir(a, b);
+    const texto = await textoEditor();
+    let n = 0;
+    await e.pagina.route(subida, ruta => (++n === 2 ? ruta.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'disco lleno (de prueba)' }) }) : ruta.continue()));
+    await aplicar();
+    await aviso('No se ha podido copiar la imagen');
+    assert.equal(n, 2);
+    assert.equal(notaEnDisco(`${SIN}/nota.md`), ORIGINALES[SIN], 'la nota no debe cambiar');
+    await hasta(async () => (listar(`${SIN}/imagenes`) || []).length === 0, 'aplicar', `la primera imagen debía ir a la papelera; hay ${listar(`${SIN}/imagenes`)}`);
+    await visible(e.pagina.locator('#edicion-cm'), 'aplicar', 'el editor sigue abierto');
+    assert.equal(await textoEditor(), texto, 'el texto del editor no cambia');
+    assert.equal(await e.pagina.evaluate(async () => (await import('/public/live.js')).pendientes().length), 2, 'las dos siguen pendientes');
+    await e.pagina.unroute(subida);
+    await cerrarAvisos();
+    await aplicar(); await tras();
+    assert.deepEqual(listar(`${SIN}/imagenes`), ['a.png', 'b.png']);
+    assert.deepEqual(leer(`${SIN}/imagenes/a.png`), fs.readFileSync(a));
+    assert.deepEqual(leer(`${SIN}/imagenes/b.png`), fs.readFileSync(b));
+    assert.ok(notaEnDisco(`${SIN}/nota.md`).includes('![a](imagenes/a.png)\n![b](imagenes/b.png)'));
+  } finally { await e.pagina.unroute(subida).catch(() => {}); limpiar(); }
+});
+
+test('imágenes: aplicar con la nota cambiada por fuera abre la franja; Sobrescribir escribe la imagen y la nota', async () => {
+  try {
+    await ajustarEditor('vista', `${SIN}/nota.md`);
+    await abrirEditor();
+    const png = pngFuera('foto.png', 'seis');
+    await elegir(png);
+    const texto = await textoEditor();
+    fs.writeFileSync(path.join(e.c.base, SIN, 'nota.md'), '# Cambiada por fuera\n');
+    await aplicar();
+    await visible(e.pagina.locator('#franja-sobrescribir'), 'aplicar', 'la franja de conflicto');
+    await hasta(async () => (listar(`${SIN}/imagenes`) || []).length === 0, 'aplicar', 'lo subido en el intento con 409 debía ir a la papelera');
+    await e.pagina.locator('#franja-sobrescribir').click(); await tras();
+    assert.deepEqual(listar(`${SIN}/imagenes`), ['foto.png'], 'una sola imagen');
+    assert.deepEqual(leer(`${SIN}/imagenes/foto.png`), fs.readFileSync(png));
+    assert.equal(notaEnDisco(`${SIN}/nota.md`), texto);
+  } finally { limpiar(); }
+});
+
+test('imágenes: aplicar con ⌘/Ctrl Enter dos veces seguidas sube la imagen una sola vez', async () => {
+  const subida = /\/api\/imagen\?/;
+  try {
+    await ajustarEditor('vista', `${SIN}/nota.md`);
+    await abrirEditor();
+    await elegir(pngFuera('foto.png'));
+    let n = 0;
+    await e.pagina.route(subida, async ruta => { n++; await new Promise(r => setTimeout(r, 400)); await ruta.continue(); });   // la primera tarda: la segunda pulsación llega mientras escribe
+    await e.pagina.keyboard.press('ControlOrMeta+Enter'); await e.pagina.keyboard.press('ControlOrMeta+Enter');
+    await tras();
+    assert.equal(n, 1, 'una sola subida');
+    assert.deepEqual(listar(`${SIN}/imagenes`), ['foto.png']);
+  } finally { await e.pagina.unroute(subida).catch(() => {}); limpiar(); }
+});
+
+test('imágenes: aplicar con nombres encadenados (dos captura.png y aparece captura.png en el disco) deja cada enlace con su imagen', async () => {
+  const otra = Buffer.concat([Buffer.from(PNG, 'base64'), Buffer.from('segunda')]).toString('base64');
+  try {
+    await ajustarEditor('vista', `${SIN}/nota.md`);
+    await abrirEditor();
+    await soltar([{ nombre: 'captura.png', modificado: 1 }, { nombre: 'captura.png', modificado: 2, b64: otra }], 2);
+    await hasta(async () => (await textoEditor()).includes('![captura](imagenes/captura.png)\n![captura](imagenes/captura-2.png)'), 'aplicar', 'no se insertaron captura y captura-2');
+    fs.mkdirSync(path.join(e.c.base, SIN, 'imagenes'));
+    fs.writeFileSync(path.join(e.c.base, SIN, 'imagenes', 'captura.png'), 'de fuera');
+    await aplicar(); await tras();
+    assert.equal(leer(`${SIN}/imagenes/captura.png`).toString(), 'de fuera', 'el fichero de fuera no cambia');
+    assert.deepEqual(leer(`${SIN}/imagenes/captura-2.png`), Buffer.from(PNG, 'base64'), 'la primera va a captura-2');
+    assert.deepEqual(leer(`${SIN}/imagenes/captura-3.png`), Buffer.from(otra, 'base64'), 'la segunda va a captura-3');
+    const nota = notaEnDisco(`${SIN}/nota.md`), enlaces = [...nota.matchAll(/\]\(([^)]+)\)/g)].map(m => m[1]);
+    assert.deepEqual(enlaces, ['imagenes/captura-2.png', 'imagenes/captura-3.png'], `enlaces de la nota: ${enlaces}`);
+  } finally { limpiar(); }
+});

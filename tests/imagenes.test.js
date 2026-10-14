@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { resolver, aUrl, enlaceDe, limpiarNombre, libre, EXTENSIONES, CARPETAS, TOPE_IMAGEN } = require('../public/imagenes');
+const { resolver, aUrl, enlaceDe, limpiarNombre, libre, sustituirEnlaces, EXTENSIONES, CARPETAS, TOPE_IMAGEN } = require('../public/imagenes');
 
 test('resolver: decodifica una vez la ruta del enlace y la normaliza desde la carpeta de la nota', () => {
   assert.equal(resolver('ini/nota.md', 'attachments/Mi%20captura.png'), 'ini/attachments/Mi captura.png');
@@ -58,4 +58,16 @@ test('constantes: extensiones, carpetas conocidas y tope de 25 MB', () => {
   assert.deepEqual(EXTENSIONES, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif']);
   assert.deepEqual(CARPETAS, ['attachments', 'adjuntos', 'imagenes', 'images', 'assets']);
   assert.equal(TOPE_IMAGEN, 25 * 1024 * 1024);
+});
+
+test('sustituirEnlaces: una sola pasada con el mapa viejo → nuevo; los nombres encadenados no se cruzan', () => {
+  const texto = '![a](imagenes/captura.png)\n![b](imagenes/captura-2.png "t")\n![c](imagenes/captura.png.png)\n[texto](imagenes/captura.png) y imagenes/captura.png suelto\n';
+  const mapa = new Map([['imagenes/captura.png', 'imagenes/captura-2.png'], ['imagenes/captura-2.png', 'imagenes/captura-3.png']]);
+  assert.equal(sustituirEnlaces(texto, mapa), '![a](imagenes/captura-2.png)\n![b](imagenes/captura-3.png "t")\n![c](imagenes/captura.png.png)\n[texto](imagenes/captura-2.png) y imagenes/captura.png suelto\n');
+  // Caracteres de regex en el enlace (paréntesis codificados, puntos, %): se escapan.
+  assert.equal(sustituirEnlaces('![x](a/Mi%20captura%20%281%29.png)', new Map([['a/Mi%20captura%20%281%29.png', 'a/Mi%20captura%20%281%29-2.png']])), '![x](a/Mi%20captura%20%281%29-2.png)');
+  // Un enlace que es prefijo de otro: cada uno con el suyo.
+  assert.equal(sustituirEnlaces('![](i/x.png) ![](i/x.png.png)', new Map([['i/x.png', 'i/x-2.png'], ['i/x.png.png', 'i/y.png']])), '![](i/x-2.png) ![](i/y.png)');
+  // Mapa vacío: el texto tal cual.
+  assert.equal(sustituirEnlaces(texto, new Map()), texto);
 });

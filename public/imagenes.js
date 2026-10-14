@@ -53,7 +53,16 @@
     for (let n = 2; ; n++) if (!existe(`${base}-${n}${ext}`)) return `${base}-${n}${ext}`;
   }
 
-  const Imagenes = { resolver, aUrl, enlaceDe, limpiarNombre, libre, EXTENSIONES, CARPETAS, TOPE_IMAGEN };
+  // Cambia en el texto cada enlace `](viejo)` o `](viejo "título")` por el suyo del mapa viejo → nuevo, en UNA sola pasada
+  // (plan, P12): con captura.png → captura-2.png y captura-2.png → captura-3.png, dos reemplazos seguidos mandarían los dos
+  // enlaces a captura-3.png. Las claves más largas primero, por si una es el principio de otra.
+  function sustituirEnlaces(texto, mapa) {
+    if (!mapa.size) return texto;
+    const claves = [...mapa.keys()].sort((a, b) => b.length - a.length).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    return texto.replace(new RegExp(`\\]\\((${claves.join('|')})(?=\\)| ")`, 'g'), (_, viejo) => `](${mapa.get(viejo)}`);
+  }
+
+  const Imagenes = { resolver, aUrl, enlaceDe, limpiarNombre, libre, sustituirEnlaces, EXTENSIONES, CARPETAS, TOPE_IMAGEN };
   if (typeof window !== 'undefined') window.Imagenes = Imagenes;
   if (typeof module !== 'undefined' && module.exports) module.exports = Imagenes;
 })();

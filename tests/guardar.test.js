@@ -145,3 +145,33 @@ test('guardar y deshacer con el kit de verdad', { skip: !kitReal && 'sin CUADERN
   const r = deshacer(kitReal, KIT, { ver: false });
   assert.equal(r.codigo, 0, r.salida); assert.match(r.salida, /Deshecho/);
 });
+
+// Con kit, Guardar se lleva las imágenes que la app copia junto a una nota (plan docs/planes/imagenes-editor.md, §2: el
+// guardar.js del kit hace `git add -A`). Una nota nueva con su imagen, guardar, y deshacer para dejar el curso como estaba.
+test('con kit de verdad, guardar se lleva la imagen copiada junto a la nota y la nota', { skip: !kitReal && 'sin CUADERNO_KIT_PRUEBA' }, () => {
+  const { Cuaderno } = require('../cuaderno');
+  const { detectar } = require('../kit');
+  const k = detectar(kitReal), cu = new Cuaderno(kitReal, k.base);
+  const marca = Date.now(), nota = `prueba-imagen-${marca}.md`, abs = path.join(k.base, nota);
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
+  fs.writeFileSync(abs, '# Prueba de imagen\n');
+  let imagen = null;
+  try {
+    imagen = cu.guardarImagen(nota, `imagenes-${marca}/captura.png`, png);
+    assert.equal(imagen.ruta, `imagenes-${marca}/captura.png`);
+    cu.escribirNota(nota, `# Prueba de imagen\n\n![captura](${imagen.enlace})\n`, '# Prueba de imagen\n');
+    const g = guardar(kitReal, KIT, 'Prueba de imagen desde la app');
+    assert.equal(g.codigo, 0, g.salida);
+    const enCommit = git(kitReal, 'show', '--name-only', '--format=', 'HEAD').split('\n');
+    const rel = path.relative(kitReal, k.base).split(path.sep).join('/');
+    assert.ok(enCommit.includes(`${rel}/${imagen.ruta}`), `el commit no lleva la imagen: ${enCommit}`);
+    assert.ok(enCommit.includes(`${rel}/${nota}`), `el commit no lleva la nota: ${enCommit}`);
+    const r = deshacer(kitReal, KIT, { ver: false });
+    assert.equal(r.codigo, 0, r.salida); assert.match(r.salida, /Deshecho/);
+    assert.equal(fs.existsSync(abs), false, 'deshacer debía quitar la nota');
+    assert.equal(fs.existsSync(path.join(k.base, imagen.ruta)), false, 'deshacer debía quitar la imagen');
+  } finally {
+    fs.rmSync(abs, { force: true });
+    fs.rmSync(path.join(k.base, `imagenes-${marca}`), { recursive: true, force: true });
+  }
+});
