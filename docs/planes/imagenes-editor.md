@@ -10,8 +10,13 @@ nota, y una ruta de la API que recibe bytes) · Rama: `imagenes-editor` (desde `
 - Plan escrito y revisado (2026-10-14): ronda completa del abogado del diablo hecha, 5 objeciones, 5 aplicadas (§10).
   Falta el sí de Roberto y que confirme las respuestas por defecto de §9.
 
+**Hecho**
+- T1 (2026-10-14): `public/imagenes.js` (`resolver`, `aUrl`), `markdown.js` las usa para `![](…)` y `![[…]]`; ejemplo
+  `insertar-imagen/con-attachments/`. Desvíos: `tests/empaquetado.test.js` aprende que un módulo de `public/` lo cubre
+  `public/**`; los contadores de notas del recorrido (23 → 24) en `tests/cuaderno.test.js` y `tests/servidor.test.js`.
+
 **Siguiente**
-- T1 (puede salir sola como arreglo: hoy el render no enseña las imágenes con `%20` del workspace de Roberto).
+- T2.
 
 ## 1. Objetivo, enfoque y restricciones
 

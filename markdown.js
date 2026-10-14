@@ -1,6 +1,7 @@
 'use strict';
 // Render de Markdown "del kit": wikilinks, callouts, casillas con su línea, matemáticas y bloques editables.
 const MarkdownIt = require('markdown-it');
+const Imagenes = require('./public/imagenes');
 
 function crearRender(resolverWiki) {
   const md = new MarkdownIt({ html: false, linkify: true, typographer: false, breaks: false });
@@ -85,7 +86,9 @@ function crearRender(resolverWiki) {
     return enlaceBase(t, i, o, env, self);
   };
   const imagenBase = md.renderer.rules.image;
-  md.renderer.rules.image = (t, i, o, env, self) => { t[i].attrSet('src', rutaImagen(env, t[i].attrGet('src') || '')); return imagenBase(t, i, o, env, self); };
+  // La ruta de una imagen: decodificada una vez y vuelta a codificar (Imagenes), para que `Mi%20captura.png` llegue al disco como «Mi captura.png».
+  const srcImagen = (env, src) => { const rel = Imagenes.resolver(env && env.ruta, src); return rel === null ? src : Imagenes.aUrl(rel); };
+  md.renderer.rules.image = (t, i, o, env, self) => { t[i].attrSet('src', srcImagen(env, t[i].attrGet('src') || '')); return imagenBase(t, i, o, env, self); };
   md.inline.ruler.before('wikilink', 'imagen_wiki', (state, silent) => {
     const src = state.src, pos = state.pos;
     if (src[pos] !== '!' || src[pos + 1] !== '[' || src[pos + 2] !== '[') return false;
@@ -94,7 +97,7 @@ function crearRender(resolverWiki) {
     const dentro = src.slice(pos + 3, cierre);
     if (!dentro || dentro.includes('\n') || !/\.(png|jpe?g|gif|svg|webp)$/i.test(dentro.split('|')[0].trim())) return false;
     const [fichero, alt] = dentro.split('|').map(s => s.trim());
-    if (!silent) { const t = state.push('imagen_wiki', '', 0); t.attrSet('src', rutaImagen(state.env, fichero)); t.content = alt || fichero; }
+    if (!silent) { const t = state.push('imagen_wiki', '', 0); t.attrSet('src', srcImagen(state.env, fichero)); t.content = alt || fichero; }
     state.pos = cierre + 2;
     return true;
   });
