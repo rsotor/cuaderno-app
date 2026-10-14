@@ -221,7 +221,7 @@ test('imágenes: soltar ficheros sobre el editor los inserta donde se sueltan; l
   await cerrarAvisos();
   // Dos con el mismo nombre (contenidos distintos) soltadas juntas, al principio de la línea del párrafo (la 3.ª).
   await soltar([{ nombre: 'captura.png', modificado: 1 }, { nombre: 'captura.png', modificado: 2 }], 2);
-  await hasta(async () => (await textoEditor()).includes('\n\n![captura](imagenes/captura.png)\n![captura](imagenes/captura-2.png)Una nota con solo texto'), 'imágenes', `dos captura.png soltadas juntas no dieron captura y captura-2; texto: ${await textoEditor()}`);
+  await hasta(async () => (await textoEditor()).includes('\n\n![captura](imagenes/captura.png)\n![captura](imagenes/captura-2.png)\nUna nota con solo texto'), 'imágenes', `dos captura.png soltadas juntas no dieron captura y captura-2; texto: ${await textoEditor()}`);
   assert.equal(listar('insertar-imagen/sin-carpeta/imagenes'), null);
   await salir();
 });
@@ -396,4 +396,19 @@ test('imágenes: aplicar con nombres encadenados (dos captura.png y aparece capt
     const nota = notaEnDisco(`${SIN}/nota.md`), enlaces = [...nota.matchAll(/\]\(([^)]+)\)/g)].map(m => m[1]);
     assert.deepEqual(enlaces, ['imagenes/captura-2.png', 'imagenes/captura-3.png'], `enlaces de la nota: ${enlaces}`);
   } finally { limpiar(); }
+});
+
+test('imágenes: insertar con el cursor en mitad de una línea deja la imagen en su propia línea (el título no se rompe)', async () => {
+  await ajustarEditor('vista', NOTA);
+  await abrirEditor();
+  await e.pagina.keyboard.press('ControlOrMeta+Home');   // al principio de «# Nota con captura»
+  const antes = await textoEditor();
+  await e.pagina.evaluate(async () => {
+    const live = await import('/public/live.js');
+    live.insertarImagenes([{ enlace: 'attachments/Mi%20captura.png', alt: 'Otra' }]);
+  });
+  const texto = await textoEditor();
+  assert.ok(texto.startsWith('![Otra](attachments/Mi%20captura.png)\n# Nota con captura'), `la imagen debe ir en su línea: «${texto}»`);
+  assert.equal(texto.length, antes.length + '![Otra](attachments/Mi%20captura.png)\n'.length);
+  await salir();
 });

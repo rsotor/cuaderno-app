@@ -460,8 +460,11 @@ export function insertarImagenes(lista, pos) {
     }
     return `![${n === 0 && seleccion ? seleccion : it.alt}](${it.enlace})`;
   });
-  const texto = trozos.join('\n');
-  vista.dispatch({ changes: { from: desde, to: hasta, insert: texto }, selection: { anchor: desde + texto.length }, userEvent: 'input.imagen', scrollIntoView: true });
+  // Cada imagen en su línea: si el punto cae en mitad de una línea, se abre una antes y otra después (con `# Título` delante,
+  // el enlace se pegaba al `#` y el título dejaba de serlo).
+  const doc = vista.state.doc, antes = desde > 0 && doc.sliceString(desde - 1, desde) !== '\n', despues = hasta < doc.length && doc.sliceString(hasta, hasta + 1) !== '\n';
+  const texto = (antes ? '\n' : '') + trozos.join('\n') + (despues ? '\n' : '');
+  vista.dispatch({ changes: { from: desde, to: hasta, insert: texto }, selection: { anchor: desde + texto.length - (despues ? 1 : 0) }, userEvent: 'input.imagen', scrollIntoView: true });
   vista.focus();
 }
 // Las pendientes que el texto de ahora todavía enlaza (con `](enlace)` o `](enlace "título")`): lo que hay que copiar al aplicar.
