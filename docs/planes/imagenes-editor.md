@@ -11,6 +11,13 @@ nota, y una ruta de la API que recibe bytes) · Rama: `imagenes-editor` (desde `
   resto en el PR de `bloque/imagenes-2`. Crítica de diseño: `docs/diseno/critica-2026-10-14-imagenes.md`. Las capturas
   de T5/T6 se sustituyeron por las de T9 (`pruebas/capturas-imagenes.js`).
 
+**Siguiente (al reanudar, 2026-10-15):** el PR #40 está rojo solo en Windows, por dos recorridos de
+  `tests/navegador/imagenes.test.js` (:318 y :346) que comparan el fichero con `\n` y en Windows el cuaderno de ejemplo
+  sale con CRLF (`'# Otra cosa\r\n'`). La app conserva el CRLF, que está bien: hay que arreglar la comparación del test
+  (normalizar los finales de línea al leer `notaEnDisco`), no el valor esperado. Mirar si otros recorridos ya lo hacen así.
+  Después: CI en verde, automerge (ya activado), `npm run instalar` y decir la versión. Ya arreglado (3d39231): un enlace
+  simbólico roto con el nombre de la imagen cuenta como ocupado (en Windows, `wx` lo seguía).
+
 **Hecho**
 - T1 (2026-10-14): `public/imagenes.js` (`resolver`, `aUrl`), `markdown.js` las usa para `![](…)` y `![[…]]`; ejemplo
   `insertar-imagen/con-attachments/`. Desvíos: `tests/empaquetado.test.js` aprende que un módulo de `public/` lo cubre
