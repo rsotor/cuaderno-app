@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { crearRender, leerFrontmatter } = require('./markdown');
 const { crearFiltro } = require('./ignorar');
+const Imagenes = require('./public/imagenes');
 
 class ErrorConflicto extends Error { constructor(msg) { super(msg); this.status = 409; } }
 class ErrorPeticion extends Error { constructor(msg, status = 400) { super(msg); this.status = status; } }
@@ -101,6 +102,27 @@ class Cuaderno {
     const abs = path.resolve(this.base, rel);
     if (abs !== this.base && !abs.startsWith(this.base + path.sep)) throw new ErrorPeticion('ruta fuera del cuaderno');
     return abs;
+  }
+  // Dónde va una imagen que se mete en la nota `nota` y con qué nombre; no escribe nada. Si `origen` (ruta absoluta) ya está
+  // dentro de la base (por su ruta real), no se copia: { dentro: true, enlace }. Si no: la carpeta de imágenes que ya haya
+  // junto a la nota (o `imagenes`, sin crearla) y un nombre libre contra el disco y `reservados` → { dentro: false, ruta, enlace }.
+  destinoImagen(nota, nombre, { origen = '', reservados = [] } = {}) {
+    const dirNota = path.dirname(this.dentro(nota));
+    const ext = path.extname(String(nombre || '')).slice(1).toLowerCase();
+    if (!Imagenes.EXTENSIONES.includes(ext)) throw new ErrorPeticion(`solo imágenes: ${Imagenes.EXTENSIONES.join(', ')}`);
+    if (typeof origen === 'string' && path.isAbsolute(origen)) {
+      try {
+        const real = fs.realpathSync(origen), base = fs.realpathSync(this.base);
+        if (fs.statSync(real).isFile() && real.startsWith(base + path.sep)) return { dentro: true, enlace: Imagenes.enlaceDe(nota, path.relative(base, real).split(path.sep).join('/')) };
+      } catch { /* no existe o no se puede leer: se trata como de fuera */ }
+    }
+    const esCarpeta = n => { try { return fs.statSync(path.join(dirNota, n)).isDirectory(); } catch { return false; } };
+    const hay = fs.readdirSync(dirNota).filter(esCarpeta);
+    const carpeta = Imagenes.CARPETAS.map(c => hay.find(n => n.toLowerCase() === c)).find(Boolean) || 'imagenes';
+    const dirRel = path.posix.dirname(nota), prefijo = dirRel === '.' ? '' : `${dirRel}/`;
+    const ocupado = n => reservados.includes(`${prefijo}${carpeta}/${n}`) || fs.existsSync(path.join(dirNota, carpeta, n));
+    const ruta = `${prefijo}${carpeta}/${Imagenes.libre(Imagenes.limpiarNombre(nombre), ocupado)}`;
+    return { dentro: false, ruta, enlace: Imagenes.enlaceDe(nota, ruta) };
   }
   resolverWiki(destino) {
     const limpio = destino.replace(/\.md$/, '').replace(/#.*$/, '').replace(/^\//, '');

@@ -517,3 +517,15 @@ test('/api/comentario acepta la fecha (para deshacer un cierre con la del coment
     assert.doesNotMatch(s.c.leer('conceptos/capital.md'), /Alumno \(ayer\)/, 'una fecha que no es AAAA-MM-DD se ignora');
   } finally { await s.cerrar(); }
 });
+
+test('POST /api/imagen/destino: dónde va la imagen y con qué nombre; una nota fuera del cuaderno → 400', async () => {
+  const s = await arrancar({ kit: false });
+  try {
+    const post = body => s.pedir('/api/imagen/destino', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await post({ nota: 'insertar-imagen/con-attachments/nota.md', nombre: 'Mi captura.png', origen: '', reservados: [] });
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), { dentro: false, ruta: 'insertar-imagen/con-attachments/attachments/Mi captura-2.png', enlace: 'attachments/Mi%20captura-2.png' });
+    assert.equal((await post({ nota: '../x.md', nombre: 'a.png' })).status, 400);
+    assert.equal((await post({ nota: 'inicio.md', nombre: 'a.pdf' })).status, 400);
+  } finally { await s.cerrar(); }
+});

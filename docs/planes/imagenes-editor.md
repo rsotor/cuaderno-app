@@ -15,8 +15,12 @@ nota, y una ruta de la API que recibe bytes) · Rama: `imagenes-editor` (desde `
   `insertar-imagen/con-attachments/`. Desvíos: `tests/empaquetado.test.js` aprende que un módulo de `public/` lo cubre
   `public/**`; los contadores de notas del recorrido (23 → 24) en `tests/cuaderno.test.js` y `tests/servidor.test.js`.
 
+- T2 (2026-10-14): `enlaceDe`, `limpiarNombre`, `libre`, `EXTENSIONES`, `CARPETAS`, `TOPE_IMAGEN` en `public/imagenes.js`;
+  `Cuaderno.destinoImagen` en `cuaderno.js`; `POST /api/imagen/destino` en `servidor.js`. Sin desvíos; ninguna cifra
+  existente cambió (el ejemplo no crece en T2).
+
 **Siguiente**
-- T2.
+- T3.
 
 ## 1. Objetivo, enfoque y restricciones
 

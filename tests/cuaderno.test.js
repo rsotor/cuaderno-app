@@ -374,3 +374,70 @@ test('renderizar pinta igual que nota(): callout, fórmula e imagen relativa', c
   assert.equal(typeof cu.renderizar('hola', ''), 'string');
   assert.equal(typeof cu.renderizar('hola'), 'string');
 }));
+
+// destinoImagen: dónde va una imagen y con qué nombre; no escribe nada.
+test('destinoImagen: reutiliza attachments/ junto a la nota', con({}, (c, cu) => {
+  fs.mkdirSync(path.join(c.base, 'conceptos', 'attachments'));
+  const d = cu.destinoImagen('conceptos/interes.md', 'Mi captura.png');
+  assert.deepEqual(d, { dentro: false, ruta: 'conceptos/attachments/Mi captura.png', enlace: 'attachments/Mi%20captura.png' });
+}));
+
+test('destinoImagen: la carpeta conocida se compara sin mayúsculas y se usa el nombre del disco', con({}, (c, cu) => {
+  fs.mkdirSync(path.join(c.base, 'conceptos', 'Adjuntos'));
+  assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png').ruta, 'conceptos/Adjuntos/a.png');
+}));
+
+test('destinoImagen: con varias carpetas gana la primera del orden (imagenes antes que assets)', con({}, (c, cu) => {
+  for (const d of ['assets', 'imagenes']) fs.mkdirSync(path.join(c.base, 'conceptos', d));
+  assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png').ruta, 'conceptos/imagenes/a.png');
+}));
+
+test('destinoImagen: sin carpeta conocida propone imagenes/ y NO la crea', con({}, (c, cu) => {
+  const d = cu.destinoImagen('conceptos/interes.md', 'a.png');
+  assert.equal(d.ruta, 'conceptos/imagenes/a.png');
+  assert.equal(fs.existsSync(path.join(c.base, 'conceptos', 'imagenes')), false);
+}));
+
+test('destinoImagen: un archivo (no carpeta) llamado attachments no cuenta', con({}, (c, cu) => {
+  fs.writeFileSync(path.join(c.base, 'conceptos', 'attachments'), 'x');
+  assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png').ruta, 'conceptos/imagenes/a.png');
+}));
+
+test('destinoImagen: nombre que existe o reservado → -2; limpia el nombre', con({}, (c, cu) => {
+  fs.mkdirSync(path.join(c.base, 'conceptos', 'attachments'));
+  fs.writeFileSync(path.join(c.base, 'conceptos', 'attachments', 'a.png'), 'x');
+  assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png').ruta, 'conceptos/attachments/a-2.png');
+  assert.equal(cu.destinoImagen('conceptos/interes.md', 'b.png', { reservados: ['conceptos/attachments/b.png'] }).ruta, 'conceptos/attachments/b-2.png');
+  assert.equal(cu.destinoImagen('conceptos/interes.md', '../c:d?.png').ruta, 'conceptos/attachments/imagen.png');
+}));
+
+test('destinoImagen: origen dentro de la base → dentro:true y enlace relativo con ../ (sin copiar)', con({}, (c, cu) => {
+  const origen = path.join(c.base, 'material', 'reparto-50-30-20.png');
+  assert.ok(fs.existsSync(origen));
+  assert.deepEqual(cu.destinoImagen('conceptos/interes.md', 'reparto-50-30-20.png', { origen }), { dentro: true, enlace: '../material/reparto-50-30-20.png' });
+}));
+
+test('destinoImagen: origen fuera, relativo o que no existe → se copia', con({}, (c, cu) => {
+  const fuera = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'img-fuera-'));
+  try {
+    fs.writeFileSync(path.join(fuera, 'a.png'), 'x');
+    assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png', { origen: path.join(fuera, 'a.png') }).dentro, false);
+    assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png', { origen: 'material/reparto-50-30-20.png' }).dentro, false);
+    assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png', { origen: path.join(c.base, 'no-existe.png') }).dentro, false);
+    // un enlace simbólico dentro de la base que sale de ella no es «dentro»
+    fs.symlinkSync(path.join(fuera, 'a.png'), path.join(c.base, 'enlace.png'));
+    assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png', { origen: path.join(c.base, 'enlace.png') }).dentro, false);
+  } finally { fs.rmSync(fuera, { recursive: true, force: true }); }
+}));
+
+test('destinoImagen con kit: origen bajo la raíz pero fuera de la base → se copia', con({ kit: true }, (c, cu) => {
+  const origen = path.join(c.raiz, 'config', 'a.png');
+  fs.writeFileSync(origen, 'x');
+  assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png', { origen }).dentro, false);
+}));
+
+test('destinoImagen: lo que no es imagen o la nota fuera del cuaderno → ErrorPeticion', con({}, (c, cu) => {
+  assert.throws(() => cu.destinoImagen('conceptos/interes.md', 'a.pdf'), ErrorPeticion);
+  assert.throws(() => cu.destinoImagen('conceptos/interes.md', 'sin-extension'), ErrorPeticion);
+  assert.throws(() => cu.destinoImagen('../x.md', 'a.png'), ErrorPeticion);
+}));
