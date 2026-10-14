@@ -7,8 +7,9 @@ nota, y una ruta de la API que recibe bytes) · Rama: `imagenes-editor` (desde `
 ## 0. Estado del bloque
 
 **Ahora**
-- Plan escrito y revisado (2026-10-14): ronda completa del abogado del diablo hecha, 5 objeciones, 5 aplicadas (§10).
-  Falta el sí de Roberto y que confirme las respuestas por defecto de §9.
+- Bloque hecho (2026-10-14): plan aprobado por Roberto con las respuestas de §9, T1 a T9 hechas; T1 mergeada (#39), el
+  resto en el PR de `bloque/imagenes-2`. Crítica de diseño: `docs/diseno/critica-2026-10-14-imagenes.md`. Las capturas
+  de T5/T6 se sustituyeron por las de T9 (`pruebas/capturas-imagenes.js`).
 
 **Hecho**
 - T1 (2026-10-14): `public/imagenes.js` (`resolver`, `aUrl`), `markdown.js` las usa para `![](…)` y `![[…]]`; ejemplo
