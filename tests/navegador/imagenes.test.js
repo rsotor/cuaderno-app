@@ -250,6 +250,8 @@ test('imágenes: con el editor abierto, soltar ficheros fuera del editor no nave
 const CON = 'insertar-imagen/con-attachments', SIN = 'insertar-imagen/sin-carpeta';
 const leer = rel => fs.readFileSync(path.join(e.c.base, rel));
 const notaEnDisco = rel => fs.readFileSync(path.join(e.c.base, rel), 'utf8');
+// En Windows el cuaderno de ejemplo sale con CRLF y la app lo conserva: para comparar con un texto escrito aquí, sin \r.
+const sinCR = t => t.replace(/\r\n/g, '\n');
 // Deja las dos carpetas del ejemplo como estaban: la nota con su texto (el del ejemplo) y sin imágenes nuevas.
 const ORIGINALES = Object.fromEntries([CON, SIN].map(d => [d, fs.readFileSync(path.join(__dirname, '..', '..', 'ejemplos', 'cuaderno-ejemplo', d, 'nota.md'), 'utf8')]));
 const limpiar = () => {
@@ -315,7 +317,7 @@ test('imágenes: aplicar con el enlace ya borrado del texto no copia ninguna ima
     await e.pagina.keyboard.press('ControlOrMeta+a'); await e.pagina.keyboard.type('# Otra cosa\n');
     await aplicar(); await tras();
     assert.equal(listar(`${SIN}/imagenes`), null, 'no debe crearse imagenes/');
-    assert.equal(notaEnDisco(`${SIN}/nota.md`), '# Otra cosa\n');
+    assert.equal(sinCR(notaEnDisco(`${SIN}/nota.md`)), '# Otra cosa\n');
   } finally { limpiar(); }
 });
 
@@ -343,7 +345,7 @@ test('imágenes: aplicar con una subida que falla no escribe la nota, manda a la
     assert.deepEqual(listar(`${SIN}/imagenes`), ['a.png', 'b.png']);
     assert.deepEqual(leer(`${SIN}/imagenes/a.png`), fs.readFileSync(a));
     assert.deepEqual(leer(`${SIN}/imagenes/b.png`), fs.readFileSync(b));
-    assert.ok(notaEnDisco(`${SIN}/nota.md`).includes('![a](imagenes/a.png)\n![b](imagenes/b.png)'));
+    assert.ok(sinCR(notaEnDisco(`${SIN}/nota.md`)).includes('![a](imagenes/a.png)\n![b](imagenes/b.png)'));
   } finally { await e.pagina.unroute(subida).catch(() => {}); limpiar(); }
 });
 
