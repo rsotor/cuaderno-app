@@ -55,7 +55,8 @@ const RE_WIKI = /\[\[([^\]\n]+)\]\]/g;
 
 // ---------- live preview (bloques): fórmula, callout, tabla y código se pintan con el HTML de /api/render (el mismo render
 // que la lectura); las propiedades (frontmatter) son una tabla de solo lectura. Con el cursor dentro de un bloque se ve el crudo.
-let contexto = { ruta: '', cache: new Map(), alturas: new Map(), propiedades: '' };   // del editor montado; se vacía en destruir()
+const contextoNuevo = (ruta = '', propiedades = '') => ({ ruta, cache: new Map(), alturas: new Map(), propiedades, pendientes: new Map() });
+let contexto = contextoNuevo();   // del editor montado; se vacía en destruir()
 const pintarKatex = el => el.querySelectorAll('.math').forEach(m => { try { window.katex.render(m.textContent, m, { displayMode: m.dataset.display === '1', throwOnError: false }); } catch { /* se queda el texto */ } });
 // Lo de la lectura que escribiría en el fichero desde dentro del widget (casillas de una tabla) o llevaría a otra nota: inerte.
 const volverInerte = el => { el.querySelectorAll('input').forEach(i => { i.disabled = true; i.removeAttribute('data-linea'); }); el.addEventListener('click', e => { if (e.target.closest('a')) e.preventDefault(); }); };
@@ -102,6 +103,49 @@ class Propiedades extends WidgetType {
     return d;
   }
   ignoreEvent() { return true; }
+}
+
+// ---------- imágenes: el nodo Image del árbol se pinta como <img>. Las pendientes (todavía sin copiar al cuaderno) se ven desde
+// la memoria (blob:). Con el cursor en la línea (o en el modo plano) va el crudo y la imagen detrás; si no, solo la imagen.
+// Lo que se sirve: la URL blob: si el enlace está pendiente; http(s) tal cual; una ruta del cuaderno por /fichero/. Otra cosa: nada.
+function origenImagen(enlace) {
+  const pendiente = contexto.pendientes.get(enlace);
+  if (pendiente) return { src: pendiente.url, ruta: pendiente.ruta };
+  if (/^https?:/i.test(enlace)) return { src: enlace, ruta: enlace };
+  const rel = window.Imagenes.resolver(contexto.ruta, enlace);
+  return rel === null ? null : { src: window.Imagenes.aUrl(rel), ruta: rel };
+}
+class Imagen extends WidgetType {
+  constructor(src, alt, ruta, bloque) { super(); this.src = src; this.alt = alt; this.ruta = ruta; this.bloque = bloque; }
+  eq(o) { return o.src === this.src && o.alt === this.alt && o.ruta === this.ruta && o.bloque === this.bloque; }
+  get estimatedHeight() { return contexto.alturas.get(this.src) || 120; }   // la última altura medida, o 120
+  toDOM(vista) {
+    const d = document.createElement(this.bloque ? 'div' : 'span'); d.className = 'live-imagen-caja';
+    const ctx = contexto, i = document.createElement('img');
+    i.className = 'live-imagen'; i.alt = this.alt; i.src = this.src; i.draggable = false;
+    i.addEventListener('load', () => vista.requestMeasure());
+    i.addEventListener('error', () => {   // no está: el texto alternativo en una caja, con la ruta en el title
+      const r = document.createElement('span'); r.className = 'live-imagen-rota'; r.textContent = this.alt || 'imagen'; r.title = `No se encuentra: ${this.ruta}`;
+      i.replaceWith(r); vista.requestMeasure();
+    });
+    d.append(i);
+    d._observador = new ResizeObserver(() => { ctx.alturas.set(this.src, d.offsetHeight); vista.requestMeasure(); });
+    d._observador.observe(d);
+    alPulsar(d, vista, v => v.posAtDOM(d));
+    return d;
+  }
+  destroy(dom) { if (dom._observador) dom._observador.disconnect(); }
+  ignoreEvent() { return true; }
+}
+// Las decoraciones de una imagen del árbol, o [] si no hay nada que pintar. `crudo`: se deja el texto y la imagen va detrás.
+function decosImagen(doc, nodo, crudo) {
+  const url = nodo.node.getChild('URL'), marcas = nodo.node.getChildren('LinkMark');
+  if (!url || marcas.length < 2) return [];
+  const enlace = doc.sliceString(url.from, url.to).replace(/^<(.*)>$/, '$1'), origen = origenImagen(enlace);
+  if (!origen) return [];
+  const alt = doc.sliceString(marcas[0].to, marcas[1].from);
+  if (crudo) return [Decoration.widget({ widget: new Imagen(origen.src, alt, origen.ruta, true), block: true, side: 1 }).range(doc.lineAt(nodo.to).to)];
+  return [Decoration.replace({ widget: new Imagen(origen.src, alt, origen.ruta, false) }).range(nodo.from, nodo.to)];
 }
 
 // El frontmatter: «---» en la primera línea y el siguiente «---». { from: 0, to: fin de la línea de cierre, cuerpo: donde empieza el cuerpo }.
@@ -156,7 +200,7 @@ function construir(estado) {
       if (nm === 'Document') return;
       if (dentro(from)) return false;
       if (nm === 'FencedCode' || nm === 'CodeBlock') return false;   // el código en bloque, en crudo, no se decora
-      if (nm === 'Image') return false;
+      if (nm === 'Image') { if (!(nodo.node.parent && nodo.node.parent.name === 'Link')) decos.push(...decosImagen(doc, nodo, activo(from, to))); return false; }
       const ac = activo(from, to);
       if (/^ATXHeading[1-6]$/.test(nm)) decos.push(linea('live-h' + nm.slice(-1)).range(doc.lineAt(from).from));
       else if (nm === 'HeaderMark') { const padre = nodo.node.parent; if (padre && /^ATXHeading/.test(padre.name)) decos.push(ac ? marca('live-marca').range(from, Math.min(to + 1, doc.lineAt(from).to)) : ocultar.range(from, Math.min(to + 1, doc.lineAt(from).to))); }
@@ -210,6 +254,21 @@ const vistaPrevia = StateField.define({
   create: construir,
   update(v, tr) { return tr.docChanged || tr.selection || syntaxTree(tr.state) !== syntaxTree(tr.startState) ? construir(tr.state) : v; },
   provide: f => EditorView.decorations.from(f, v => v.decos),
+});
+// En el modo plano no hay vista previa, pero la imagen sí se ve (solo ese widget): siempre con el crudo delante.
+function construirImagenes(estado) {
+  const decos = [];
+  (ensureSyntaxTree(estado, estado.doc.length, 200) || syntaxTree(estado)).iterate({
+    enter(nodo) {
+      if (nodo.name === 'Image') { if (!(nodo.node.parent && nodo.node.parent.name === 'Link')) decos.push(...decosImagen(estado.doc, nodo, true)); return false; }
+    },
+  });
+  return Decoration.set(decos, true);
+}
+const imagenesPlano = StateField.define({
+  create: construirImagenes,
+  update(v, tr) { return tr.docChanged || syntaxTree(tr.state) !== syntaxTree(tr.startState) ? construirImagenes(tr.state) : v; },
+  provide: f => EditorView.decorations.from(f),
 });
 // Las propiedades no se editan en el contenido: el cursor las salta, no se escribe en ellas y Ctrl+Inicio / Ctrl+A van al cuerpo.
 const protegerPropiedades = [
@@ -347,9 +406,9 @@ let vista = null;
 
 // Monta el editor en `contenedor` con `texto` (LF). `posicion`: el desplazamiento donde queda el cursor, y que se
 // trae a la vista. `plano`: sin decoraciones (el Markdown tal cual).
-export function montar(contenedor, texto, { plano = false, posicion = 0, ruta = '', propiedades = '', alCambiar = null, alSeleccionar = null } = {}) {
+export function montar(contenedor, texto, { plano = false, posicion = 0, ruta = '', propiedades = '', alCambiar = null, alSeleccionar = null, alSoltarFicheros = null } = {}) {
   destruir();
-  contexto = { ruta, cache: new Map(), alturas: new Map(), propiedades };
+  contexto = contextoNuevo(ruta, propiedades);
   const extensiones = [
     history(), drawSelection(), EditorView.lineWrapping,
     markdown({ extensions: [GFM] }),
@@ -360,7 +419,20 @@ export function montar(contenedor, texto, { plano = false, posicion = 0, ruta = 
   if (alSeleccionar) extensiones.push(EditorView.updateListener.of(u => { if (u.docChanged || u.selectionSet) alSeleccionar(); }));
   extensiones.unshift(atajosFormato);
   if (alCambiar) extensiones.push(EditorView.updateListener.of(u => { if (u.docChanged) alCambiar(); }));
-  if (!plano) extensiones.unshift(protegerPropiedades, vistaPrevia);
+  if (!plano) extensiones.unshift(protegerPropiedades, vistaPrevia); else extensiones.unshift(imagenesPlano);
+  // Soltar ficheros: va a la app (alSoltarFicheros) y no a CodeMirror, que los insertaría como texto. En dragover la lista
+  // `files` viene vacía por seguridad: se mira `types` (P13).
+  const conFicheros = e => !!(e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files'));
+  if (alSoltarFicheros) extensiones.push(EditorView.domEventHandlers({
+    dragover(e) { if (!conFicheros(e)) return false; e.preventDefault(); return true; },
+    drop(e, v) {
+      if (!conFicheros(e)) return false;
+      e.preventDefault();
+      const pos = v.posAtCoords({ x: e.clientX, y: e.clientY });
+      alSoltarFicheros([...e.dataTransfer.files], pos === null ? v.state.selection.main.head : pos);
+      return true;
+    },
+  }));
   let pos = Math.max(0, Math.min(posicion, texto.length));
   if (!plano) { const lineas = texto.split('\n'); if (lineas[0] === '---') { const k = lineas.indexOf('---', 1); if (k > 0) pos = Math.max(pos, Math.min(lineas.slice(0, k + 1).join('\n').length + 1, texto.length)); } }   // nunca dentro de las propiedades
   vista = new EditorView({ state: EditorState.create({ doc: texto, selection: { anchor: pos }, extensions: extensiones }), parent: contenedor });
@@ -369,7 +441,38 @@ export function montar(contenedor, texto, { plano = false, posicion = 0, ruta = 
   return vista;
 }
 
-export function destruir() { if (vista) { vista.destroy(); vista = null; } contexto = { ruta: '', cache: new Map(), alturas: new Map(), propiedades: '' }; }
+export function destruir() {
+  if (vista) { vista.destroy(); vista = null; }
+  for (const p of contexto.pendientes.values()) URL.revokeObjectURL(p.url);   // las imágenes pendientes no se guardan: se sueltan de la memoria
+  contexto = contextoNuevo();
+}
+
+// Mete imágenes en el texto. `lista`: [{ enlace, alt, pendiente: { ruta, blob } | null }] (la pendiente es la que aún no está en el
+// cuaderno: se ve desde la memoria y se copia al aplicar). Una imagen: en línea; varias: una por línea. `pos`: donde meterlas;
+// sin él, en el cursor (con selección, la selección es el texto alternativo de la primera). La misma pendiente dos veces reutiliza la URL.
+export function insertarImagenes(lista, pos) {
+  if (!vista || !lista.length) return;
+  const { from, to } = vista.state.selection.main, desde = pos === undefined ? from : pos, hasta = pos === undefined ? to : pos;
+  const seleccion = pos === undefined && to > from ? vista.state.doc.sliceString(from, to) : '';
+  const trozos = lista.map((it, n) => {
+    if (it.pendiente && !contexto.pendientes.has(it.enlace)) {
+      contexto.pendientes.set(it.enlace, { enlace: it.enlace, ruta: it.pendiente.ruta, blob: it.pendiente.blob, url: URL.createObjectURL(it.pendiente.blob) });
+    }
+    return `![${n === 0 && seleccion ? seleccion : it.alt}](${it.enlace})`;
+  });
+  // Cada imagen en su línea: si el punto cae en mitad de una línea, se abre una antes y otra después (con `# Título` delante,
+  // el enlace se pegaba al `#` y el título dejaba de serlo).
+  const doc = vista.state.doc, antes = desde > 0 && doc.sliceString(desde - 1, desde) !== '\n', despues = hasta < doc.length && doc.sliceString(hasta, hasta + 1) !== '\n';
+  const texto = (antes ? '\n' : '') + trozos.join('\n') + (despues ? '\n' : '');
+  vista.dispatch({ changes: { from: desde, to: hasta, insert: texto }, selection: { anchor: desde + texto.length - (despues ? 1 : 0) }, userEvent: 'input.imagen', scrollIntoView: true });
+  vista.focus();
+}
+// Las pendientes que el texto de ahora todavía enlaza (con `](enlace)` o `](enlace "título")`): lo que hay que copiar al aplicar.
+export function pendientes() {
+  if (!vista) return [];
+  const t = vista.state.doc.toString();
+  return [...contexto.pendientes.values()].filter(p => t.includes(`](${p.enlace})`) || t.includes(`](${p.enlace} "`));
+}
 export const enfocar = () => { if (vista) vista.focus(); };
 export const texto = () => vista ? vista.state.doc.toString() : null;
 // El número de línea (desde 0) donde está el cursor.

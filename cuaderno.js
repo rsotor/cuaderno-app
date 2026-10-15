@@ -5,6 +5,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { crearRender, leerFrontmatter } = require('./markdown');
 const { crearFiltro } = require('./ignorar');
+const Imagenes = require('./public/imagenes');
+// Hay algo con ese nombre, aunque sea un enlace simbólico roto (existsSync lo sigue y diría que no; en Windows, «wx»
+// sobre un enlace roto escribe en su destino).
+const hayEntrada = f => { try { fs.lstatSync(f); return true; } catch { return false; } };
 
 class ErrorConflicto extends Error { constructor(msg) { super(msg); this.status = 409; } }
 class ErrorPeticion extends Error { constructor(msg, status = 400) { super(msg); this.status = status; } }
@@ -101,6 +105,60 @@ class Cuaderno {
     const abs = path.resolve(this.base, rel);
     if (abs !== this.base && !abs.startsWith(this.base + path.sep)) throw new ErrorPeticion('ruta fuera del cuaderno');
     return abs;
+  }
+  // Dónde va una imagen que se mete en la nota `nota` y con qué nombre; no escribe nada. Si `origen` (ruta absoluta) ya está
+  // dentro de la base (por su ruta real), no se copia: { dentro: true, enlace }. Si no: la carpeta de imágenes que ya haya
+  // junto a la nota (o `imagenes`, sin crearla) y un nombre libre contra el disco y `reservados` → { dentro: false, ruta, enlace }.
+  destinoImagen(nota, nombre, { origen = '', reservados = [] } = {}) {
+    const dirNota = path.dirname(this.dentro(nota));
+    const ext = path.extname(String(nombre || '')).slice(1).toLowerCase();
+    if (!Imagenes.EXTENSIONES.includes(ext)) throw new ErrorPeticion(`solo imágenes: ${Imagenes.EXTENSIONES.join(', ')}`);
+    if (typeof origen === 'string' && path.isAbsolute(origen)) {
+      try {
+        const real = fs.realpathSync(origen), base = fs.realpathSync(this.base);
+        if (fs.statSync(real).isFile() && real.startsWith(base + path.sep)) return { dentro: true, enlace: Imagenes.enlaceDe(nota, path.relative(base, real).split(path.sep).join('/')) };
+      } catch { /* no existe o no se puede leer: se trata como de fuera */ }
+    }
+    const esCarpeta = n => { try { return fs.statSync(path.join(dirNota, n)).isDirectory(); } catch { return false; } };
+    const hay = fs.readdirSync(dirNota).filter(esCarpeta);
+    const carpeta = Imagenes.CARPETAS.map(c => hay.find(n => n.toLowerCase() === c)).find(Boolean) || 'imagenes';
+    const dirRel = path.posix.dirname(nota), prefijo = dirRel === '.' ? '' : `${dirRel}/`;
+    const ocupado = n => reservados.includes(`${prefijo}${carpeta}/${n}`) || hayEntrada(path.join(dirNota, carpeta, n));
+    const ruta = `${prefijo}${carpeta}/${Imagenes.libre(Imagenes.limpiarNombre(nombre), ocupado)}`;
+    return { dentro: false, ruta, enlace: Imagenes.enlaceDe(nota, ruta) };
+  }
+  // Escribe una imagen (bytes) en `ruta`, que tiene que ser un fichero de imagen dentro de una carpeta HIJA DIRECTA de la
+  // carpeta de la nota (la crea si no existe, solo ese nivel). Nunca sobrescribe: `wx`, y si el nombre existe prueba -2, -3…
+  // Rechaza (ErrorPeticion) rutas fuera de la base (../, absolutas, enlaces simbólicos) y lo que no sea una imagen.
+  // → { ruta, enlace } definitivos.
+  guardarImagen(nota, ruta, bytes) {
+    const dirNota = path.dirname(this.dentro(nota)), abs = this.dentro(ruta), carpeta = path.dirname(abs);
+    if (!Imagenes.EXTENSIONES.includes(path.extname(abs).slice(1).toLowerCase())) throw new ErrorPeticion(`solo imágenes: ${Imagenes.EXTENSIONES.join(', ')}`);
+    if (path.dirname(carpeta) !== dirNota) throw new ErrorPeticion('la imagen va en una carpeta dentro de la de la nota');
+    const nombre = Imagenes.limpiarNombre(path.basename(abs));
+    let realNota, realBase;
+    try { realNota = fs.realpathSync(dirNota); realBase = fs.realpathSync(this.base); } catch { throw new ErrorPeticion('la carpeta de la nota no existe'); }
+    if (realNota !== realBase && !realNota.startsWith(realBase + path.sep)) throw new ErrorPeticion('ruta fuera del cuaderno');
+    let existe = true;
+    try { fs.lstatSync(carpeta); } catch { existe = false; }
+    if (existe) {
+      let real;
+      try { real = fs.realpathSync(carpeta); } catch { throw new ErrorPeticion('la carpeta de la imagen no se puede usar'); }
+      if (!fs.statSync(real).isDirectory() || path.dirname(real) !== realNota) throw new ErrorPeticion('ruta fuera del cuaderno');
+    } else fs.mkdirSync(carpeta);
+    const dirRel = path.posix.dirname(ruta.replace(/\\/g, '/')), prefijo = dirRel === '.' ? '' : `${dirRel}/`;
+    const intentados = new Set();
+    for (;;) {
+      const candidato = Imagenes.libre(nombre, n => intentados.has(n) || hayEntrada(path.join(carpeta, n)));
+      try {
+        fs.writeFileSync(path.join(carpeta, candidato), bytes, { flag: 'wx' });
+        this.invalidar();
+        return { ruta: `${prefijo}${candidato}`, enlace: Imagenes.enlaceDe(nota, `${prefijo}${candidato}`) };
+      } catch (e) {
+        if (e.code !== 'EEXIST') throw e;
+        intentados.add(candidato);   // alguien lo creó entre la comprobación y la escritura: el siguiente
+      }
+    }
   }
   resolverWiki(destino) {
     const limpio = destino.replace(/\.md$/, '').replace(/#.*$/, '').replace(/^\//, '');

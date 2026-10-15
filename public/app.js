@@ -31,9 +31,10 @@ if (enApp()) { $('#btn-nueva-nota').title = conAtajo('Crear una nota nueva', 'N'
 let avisoCerrado = false;
 $('#aviso-cerrar').addEventListener('click', () => { avisoCerrado = true; $('#aviso-reinicio').hidden = true; });
 
-// Toda llamada a la API: GET sin cuerpo, POST con JSON. Un 409 significa que la nota cambió debajo: se recarga.
+// Toda llamada a la API: GET sin cuerpo, POST con JSON (o con los bytes de un Blob, en crudo: /api/imagen). Un 409 significa que la nota cambió debajo: se recarga.
 async function api(p, body) {
-  const r = await fetch(p, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : undefined);
+  const crudo = body instanceof Blob;
+  const r = await fetch(p, body ? { method: 'POST', headers: { 'content-type': crudo ? body.type || 'application/octet-stream' : 'application/json' }, body: crudo ? body : JSON.stringify(body) } : undefined);
   const d = await r.json().catch(() => ({ error: `respuesta ${r.status}` }));
   if (!r.ok) {
     if (r.status === 404 && p.startsWith('/api/') && !avisoCerrado) $('#aviso-reinicio').hidden = false;   // una ruta que el servidor no conoce: es de antes
@@ -569,17 +570,18 @@ const FORMATOS_BARRA = [
   ['negrita', '<b>B</b>', 'Negrita', `${teclaMod} B`], ['cursiva', '<i>I</i>', 'Cursiva', `${teclaMod} I`], ['titulo', 'H', 'Título (cada pulsación sube el nivel: ##, ###, ####; en el último, lo quita)', ''],
   ['lista', '•', 'Lista', ''], ['casilla', '☐', 'Casilla', ''],
   ['enlace', '<svg class="icono" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>', 'Enlace', ''], ['codigo', '&lt;/&gt;', 'Código', ''],
+  ['imagen', '<svg class="icono" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m21 16-5-5-8 9"/></svg>', 'Imagen (o arrástrala al editor)', '', true],   // el último: de acción, no de formato (sin aria-pressed)
 ];
-const htmlBarra = () => `<div class="edicion-barra" role="toolbar" aria-label="Formato" aria-orientation="horizontal">${FORMATOS_BARRA.map(([id, icono, nombre, atajo], i) => `<button type="button" class="secundario" data-formato="${id}" aria-label="${nombre.replace(/ \(.*/, '')}" title="${nombre}${atajo ? ` (${atajo})` : ''}" aria-pressed="false" tabindex="${i === 0 ? 0 : -1}">${icono}</button>`).join('')}</div>`;
+const htmlBarra = () => `<div class="edicion-barra" role="toolbar" aria-label="Formato" aria-orientation="horizontal">${FORMATOS_BARRA.map(([id, icono, nombre, atajo, accion], i) => `<button type="button" class="secundario" data-formato="${id}" aria-label="${nombre.replace(/ \(.*/, '')}" title="${nombre}${atajo ? ` (${atajo})` : ''}"${accion ? '' : ' aria-pressed="false"'} tabindex="${i === 0 ? 0 : -1}">${icono}</button>`).join('')}</div>`;
 function actualizarBarra() {
   if (!edicion || !live) return;
   const activos = live.formatosActivos();
-  document.querySelectorAll('.edicion-barra button').forEach(b => b.setAttribute('aria-pressed', String(!!activos[b.dataset.formato])));
+  document.querySelectorAll('.edicion-barra button[aria-pressed]').forEach(b => b.setAttribute('aria-pressed', String(!!activos[b.dataset.formato])));
 }
 function enlazarBarra() {
   const barra = $('.edicion-barra'), botones = () => [...barra.querySelectorAll('button')];
   barra.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });   // el editor no pierde el foco ni la selección
-  barra.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; live.formato(b.dataset.formato); live.enfocar(); actualizarBarra(); });
+  barra.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.formato === 'imagen') return $('#imagen-fichero').click(); live.formato(b.dataset.formato); live.enfocar(); actualizarBarra(); });
   barra.addEventListener('keydown', e => {
     const bs = botones(), i = bs.indexOf(document.activeElement); if (i < 0) return;
     const j = { ArrowRight: (i + 1) % bs.length, ArrowLeft: (i - 1 + bs.length) % bs.length, Home: 0, End: bs.length - 1 }[e.key];
@@ -587,6 +589,40 @@ function enlazarBarra() {
     e.preventDefault(); bs.forEach((b, k) => { b.tabIndex = k === j ? 0 : -1; }); bs[j].focus();
   });
 }
+// ---------- meter imágenes (plan docs/planes/imagenes-editor.md, P8-P10, P13): el botón «Imagen» (selector del sistema) y soltar
+// ficheros en el editor. Aquí no se escribe nada en el cuaderno: el servidor dice dónde irá cada una, el texto lleva ya
+// el enlace definitivo y la imagen se ve desde la memoria hasta Aplicar.
+async function meterImagenes(ficheros, pos) {
+  if (!edicion || !live) return;
+  const { ruta, imagenes } = edicion, tope = Math.round(Imagenes.TOPE_IMAGEN / 1048576);
+  const validos = [];
+  for (const f of ficheros) {
+    if (!Imagenes.EXTENSIONES.includes(f.name.split('.').pop().toLowerCase())) { avisar(`Solo imágenes: ${Imagenes.EXTENSIONES.join(', ')}`); continue; }
+    if (f.size > Imagenes.TOPE_IMAGEN) { avisar(`${f.name} pasa de ${tope} MB`); continue; }
+    validos.push(f);
+  }
+  const lista = [], reservados = [...imagenes.values()].map(i => i.ruta);
+  try {
+    for (const f of validos) {   // en serie: cada destino cuenta lo que ya devolvió el anterior (dos captura.png nunca chocan)
+      const origen = enApp() && window.cuadernoApp.rutaDeFichero ? window.cuadernoApp.rutaDeFichero(f) : '';
+      const clave = origen || `${f.name}|${f.size}|${f.lastModified}`, alt = f.name.replace(/\.[^.]*$/, '');
+      if (imagenes.has(clave)) { const i = imagenes.get(clave); lista.push({ enlace: i.enlace, alt, pendiente: i.pendiente }); continue; }
+      const bytes = await f.arrayBuffer();
+      const d = await api('/api/imagen/destino', { nota: ruta, nombre: f.name, origen, reservados });
+      if (d.dentro) { lista.push({ enlace: d.enlace, alt, pendiente: null }); continue; }
+      const pendiente = { ruta: d.ruta, blob: new File([bytes], f.name, { type: f.type || 'application/octet-stream' }) };   // un File: guarda el nombre de origen para Aplicar
+      imagenes.set(clave, { enlace: d.enlace, ruta: d.ruta, pendiente });
+      reservados.push(d.ruta);
+      lista.push({ enlace: d.enlace, alt, pendiente });
+    }
+  } catch (e) { return avisarError('No se ha podido meter la imagen.', e.message); }
+  if (!edicion || edicion.ruta !== ruta || !lista.length) return;   // mientras se leía se salió del editor
+  live.insertarImagenes(lista, pos);
+}
+$('#imagen-fichero').addEventListener('change', e => { const ficheros = [...e.target.files]; e.target.value = ''; meterImagenes(ficheros); });
+// Soltar ficheros fuera del editor no debe sacar de la nota (el navegador abriría la imagen y se perdería lo escrito): con el
+// editor abierto se cancela el arrastre de ficheros, en la web y en la app. En dragover `files` viene vacía: se mira `types`.
+for (const tipo of ['dragover', 'drop']) document.addEventListener(tipo, e => { if (edicion && e.dataTransfer && e.dataTransfer.types.includes('Files')) e.preventDefault(); });
 const desplazamientoDeLinea = (texto, linea) => texto.split('\n').slice(0, linea).reduce((a, l) => a + l.length + 1, 0);
 async function entrarEdicion() {
   if (edicion || !rutaActual || $('#nota').hidden || $('#btn-editar').hidden || dialogoAbierto()) return;
@@ -598,12 +634,12 @@ async function entrarEdicion() {
   try { original = await textoFichero(ruta); live = live || await import('/public/live.js'); } catch (e) { return avisarError('No se ha podido abrir el editor.', e.message); }
   if (rutaActual !== ruta || edicion) return;   // mientras llegaba se cambió de nota
   const texto = original.replace(/\r\n/g, '\n'), linea = bloque ? +bloque.dataset.desde : 0;
-  edicion = { ruta, original, texto0: texto, linea, hash: location.hash };
+  edicion = { ruta, original, texto0: texto, linea, hash: location.hash, imagenes: new Map() };   // imagenes: la clave de cada fichero metido → { enlace, ruta, pendiente } (P9)
   $('#btn-editar').hidden = true;
   $('#nota').dataset.vista = 'edicion';
   $('#nota').style.setProperty('--alto-miga', `${$('.miga-barra').offsetHeight}px`);
   $('#nota').innerHTML = `${htmlBarra()}<div id="edicion-cm"></div><div class="edicion-pie"><div id="franja-edicion" role="alert" hidden></div><button type="button" id="edicion-cancelar" class="secundario">Cancelar</button><button type="button" id="edicion-aplicar" class="primario" disabled>Aplicar</button><span class="pista">${teclaAplicar} aplica · Esc cancela</span></div>`;
-  live.montar($('#edicion-cm'), texto, { plano: info.configuracion.editor === 'plano', ruta, propiedades: propiedadesActual, posicion: desplazamientoDeLinea(texto, linea), alCambiar: actualizarEstadoEdicion, alSeleccionar: actualizarBarra });
+  live.montar($('#edicion-cm'), texto, { plano: info.configuracion.editor === 'plano', ruta, propiedades: propiedadesActual, posicion: desplazamientoDeLinea(texto, linea), alCambiar: actualizarEstadoEdicion, alSeleccionar: actualizarBarra, alSoltarFicheros: meterImagenes });
   enlazarBarra();
   $('#edicion-cancelar').onclick = pedirSalida;
   $('#edicion-aplicar').onclick = aplicarEdicion;
@@ -620,17 +656,42 @@ async function salirEdicion() {
   if (!$('#btn-editar').hidden) $('#btn-editar').focus();
 }
 async function aplicarEdicion() {
-  if (!edicion) return;
+  if (!edicion || escribiendo) return;
   const { ruta, original } = edicion, texto = live.texto();
   if (texto === original.replace(/\r\n/g, '\n')) return salirEdicion();   // nada que escribir
+  await escribirConImagenes(ruta, texto, original);
+}
+// La única que escribe la nota desde el editor (Aplicar y «Sobrescribir»; plan docs/planes/imagenes-editor.md, P12): primero
+// sube, una a una, las imágenes pendientes que el texto sigue enlazando; si el servidor les cambió el nombre (alguien ocupó
+// el suyo), cambia sus enlaces en una sola pasada; y solo entonces escribe la nota. Si algo falla, lo subido en este intento
+// va a la papelera, la nota no se escribe y el editor se queda como estaba (texto y pendientes). Con `escribiendo` no hace
+// nada: dos ⌘ Enter seguidos no suben dos copias.
+async function escribirConImagenes(ruta, texto, original) {
+  if (escribiendo || !edicion) return;
   escribiendo = true;   // la recarga en vivo que provoca esta escritura no repinta ni compara: salirEdicion repinta al acabar
+  const subidas = [];
   try {
-    try { await api('/api/nota/escribir', { ruta, texto, original }); }
-    catch (e) { if (e.status === 409) return mostrarFranja('conflicto'); return avisarError('No se ha podido escribir la nota.', e.message); }
+    const cambios = new Map();
+    for (const p of live.pendientes()) {
+      // Se pide con el nombre de origen en la carpeta reservada: si alguien ocupó el reservado, el servidor da el siguiente
+      // libre de ese nombre (captura-3.png), no uno del reservado (captura-2-2.png).
+      const carpeta = p.ruta.split('/').slice(0, -1).join('/'), pedida = p.blob.name ? `${carpeta ? `${carpeta}/` : ''}${p.blob.name}` : p.ruta;
+      let d;
+      try { d = await api(`/api/imagen?nota=${encodeURIComponent(ruta)}&ruta=${encodeURIComponent(pedida)}`, p.blob); }
+      catch (e) { await soltarSubidas(subidas); return avisarError(`No se ha podido copiar la imagen «${p.ruta.split('/').pop()}»: la nota no se ha escrito.`, e.message); }
+      subidas.push(d.ruta);
+      if (d.enlace !== p.enlace) cambios.set(p.enlace, d.enlace);
+    }
+    try { await api('/api/nota/escribir', { ruta, texto: Imagenes.sustituirEnlaces(texto, cambios), original }); }
+    catch (e) { await soltarSubidas(subidas); if (e.status === 409) return mostrarFranja('conflicto'); return avisarError('No se ha podido escribir la nota.', e.message); }
     avisar('Nota escrita');
     await salirEdicion();
   } finally { escribiendo = false; }
   refrescarContadores();
+}
+// Lo subido en un intento que no llegó a escribir la nota va a la papelera (§9 Q1); si ni eso, se queda y se dice dónde.
+async function soltarSubidas(rutas) {
+  for (const r of rutas) { try { await api('/api/papelera', { ruta: r }); } catch (e) { avisarError(`No se ha podido mandar a ${PAPELERA} la imagen copiada: se queda en ${r}.`, e.message); } }
 }
 $('#btn-editar').onclick = entrarEdicion;
 // Esc cancela y Ctrl/⌘ Enter aplica, con el foco en el editor (en captura: el editor no debe insertar una línea con Mod-Enter).
@@ -686,10 +747,11 @@ document.addEventListener('click', async e => {
     try { await navigator.clipboard.writeText(texto); } catch { const t = document.createElement('textarea'); t.value = texto; document.body.append(t); t.select(); document.execCommand('copy'); t.remove(); }
     avisar('Tu texto está copiado'); await recargarDesdeDisco();
   } else if (b.id === 'franja-sobrescribir') {
+    if (escribiendo) return;
     const { ruta } = edicion, texto = live.texto();
-    try { const original = await textoFichero(ruta); await api('/api/nota/escribir', { ruta, texto, original }); }
-    catch (err) { return avisarError('No se ha podido escribir la nota.', err.message); }
-    avisar('Nota escrita'); await salirEdicion(); refrescarContadores();
+    let original;
+    try { original = await textoFichero(ruta); } catch (err) { return avisarError('No se ha podido escribir la nota.', err.message); }
+    await escribirConImagenes(ruta, texto, original);
   }
 });
 // La recarga en vivo con el editor abierto no repinta: se vuelve a pedir el texto y solo si difiere del que se abrió hay franja.

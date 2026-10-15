@@ -2,6 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { Cuaderno, ErrorConflicto, ErrorPeticion } = require('../cuaderno');
 const { crearCuaderno, NOTAS } = require('./ayuda');
@@ -242,7 +243,7 @@ test('títulos: el # de cada nota, sin wikilinks; las tareas llevan el Markdown 
 
 test('recorrido: cuenta notas, enlaces rotos y fallos', con({}, (c, cu) => {
   const r = cu.recorrido();
-  assert.equal(r.notas, 24);   // (2026-10-14: +1, insertar-imagen/con-attachments/nota.md, la nota de las imágenes del editor; 2026-10-13: +1, navegacion/una-nota-con-un-nombre-muy-largo-para-la-barra-superior.md, la nota de la miga larga de la barra superior; y antes +1, render/fragmentos-de-busqueda.md, la nota de la modal de búsqueda) las 8 del curso demo, las 8 de cuaderno-ejemplo (render/, estructura/), las 3 de las menciones (personas/, iniciativas/mudanza/) y la nota larga de lectura/ (2026-10-09: una nota nueva en el ejemplo, no un valor arreglado); sus enlaces resuelven todos: el único roto sigue siendo el de interes.md
+  assert.equal(r.notas, 25);   // (2026-10-14: +1, insertar-imagen/sin-carpeta/nota.md, la nota sin carpeta de imágenes; y +1, insertar-imagen/con-attachments/nota.md, la nota de las imágenes del editor; 2026-10-13: +1, navegacion/una-nota-con-un-nombre-muy-largo-para-la-barra-superior.md, la nota de la miga larga de la barra superior; y antes +1, render/fragmentos-de-busqueda.md, la nota de la modal de búsqueda) las 8 del curso demo, las 8 de cuaderno-ejemplo (render/, estructura/), las 3 de las menciones (personas/, iniciativas/mudanza/) y la nota larga de lectura/ (2026-10-09: una nota nueva en el ejemplo, no un valor arreglado); sus enlaces resuelven todos: el único roto sigue siendo el de interes.md
   assert.deepEqual(r.rotos, [{ ruta: 'conceptos/interes.md', destino: 'no-existe' }]);
   assert.deepEqual(r.fallos, []);
 }));
@@ -373,4 +374,142 @@ test('renderizar pinta igual que nota(): callout, fórmula e imagen relativa', c
   assert.equal(cu.renderizar(md, 'carpeta/n.md'), esperado);
   assert.equal(typeof cu.renderizar('hola', ''), 'string');
   assert.equal(typeof cu.renderizar('hola'), 'string');
+}));
+
+// destinoImagen: dónde va una imagen y con qué nombre; no escribe nada.
+test('destinoImagen: reutiliza attachments/ junto a la nota', con({}, (c, cu) => {
+  fs.mkdirSync(path.join(c.base, 'conceptos', 'attachments'));
+  const d = cu.destinoImagen('conceptos/interes.md', 'Mi captura.png');
+  assert.deepEqual(d, { dentro: false, ruta: 'conceptos/attachments/Mi captura.png', enlace: 'attachments/Mi%20captura.png' });
+}));
+
+test('destinoImagen: la carpeta conocida se compara sin mayúsculas y se usa el nombre del disco', con({}, (c, cu) => {
+  fs.mkdirSync(path.join(c.base, 'conceptos', 'Adjuntos'));
+  assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png').ruta, 'conceptos/Adjuntos/a.png');
+}));
+
+test('destinoImagen: con varias carpetas gana la primera del orden (imagenes antes que assets)', con({}, (c, cu) => {
+  for (const d of ['assets', 'imagenes']) fs.mkdirSync(path.join(c.base, 'conceptos', d));
+  assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png').ruta, 'conceptos/imagenes/a.png');
+}));
+
+test('destinoImagen: sin carpeta conocida propone imagenes/ y NO la crea', con({}, (c, cu) => {
+  const d = cu.destinoImagen('conceptos/interes.md', 'a.png');
+  assert.equal(d.ruta, 'conceptos/imagenes/a.png');
+  assert.equal(fs.existsSync(path.join(c.base, 'conceptos', 'imagenes')), false);
+}));
+
+test('destinoImagen: un archivo (no carpeta) llamado attachments no cuenta', con({}, (c, cu) => {
+  fs.writeFileSync(path.join(c.base, 'conceptos', 'attachments'), 'x');
+  assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png').ruta, 'conceptos/imagenes/a.png');
+}));
+
+test('destinoImagen: nombre que existe o reservado → -2; limpia el nombre', con({}, (c, cu) => {
+  fs.mkdirSync(path.join(c.base, 'conceptos', 'attachments'));
+  fs.writeFileSync(path.join(c.base, 'conceptos', 'attachments', 'a.png'), 'x');
+  assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png').ruta, 'conceptos/attachments/a-2.png');
+  assert.equal(cu.destinoImagen('conceptos/interes.md', 'b.png', { reservados: ['conceptos/attachments/b.png'] }).ruta, 'conceptos/attachments/b-2.png');
+  assert.equal(cu.destinoImagen('conceptos/interes.md', '../c:d?.png').ruta, 'conceptos/attachments/imagen.png');
+}));
+
+test('destinoImagen: origen dentro de la base → dentro:true y enlace relativo con ../ (sin copiar)', con({}, (c, cu) => {
+  const origen = path.join(c.base, 'material', 'reparto-50-30-20.png');
+  assert.ok(fs.existsSync(origen));
+  assert.deepEqual(cu.destinoImagen('conceptos/interes.md', 'reparto-50-30-20.png', { origen }), { dentro: true, enlace: '../material/reparto-50-30-20.png' });
+}));
+
+test('destinoImagen: origen fuera, relativo o que no existe → se copia', con({}, (c, cu) => {
+  const fuera = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'img-fuera-'));
+  try {
+    fs.writeFileSync(path.join(fuera, 'a.png'), 'x');
+    assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png', { origen: path.join(fuera, 'a.png') }).dentro, false);
+    assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png', { origen: 'material/reparto-50-30-20.png' }).dentro, false);
+    assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png', { origen: path.join(c.base, 'no-existe.png') }).dentro, false);
+    // un enlace simbólico dentro de la base que sale de ella no es «dentro»
+    fs.symlinkSync(path.join(fuera, 'a.png'), path.join(c.base, 'enlace.png'));
+    assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png', { origen: path.join(c.base, 'enlace.png') }).dentro, false);
+  } finally { fs.rmSync(fuera, { recursive: true, force: true }); }
+}));
+
+test('destinoImagen con kit: origen bajo la raíz pero fuera de la base → se copia', con({ kit: true }, (c, cu) => {
+  const origen = path.join(c.raiz, 'config', 'a.png');
+  fs.writeFileSync(origen, 'x');
+  assert.equal(cu.destinoImagen('conceptos/interes.md', 'a.png', { origen }).dentro, false);
+}));
+
+test('destinoImagen: lo que no es imagen o la nota fuera del cuaderno → ErrorPeticion', con({}, (c, cu) => {
+  assert.throws(() => cu.destinoImagen('conceptos/interes.md', 'a.pdf'), ErrorPeticion);
+  assert.throws(() => cu.destinoImagen('conceptos/interes.md', 'sin-extension'), ErrorPeticion);
+  assert.throws(() => cu.destinoImagen('../x.md', 'a.png'), ErrorPeticion);
+}));
+
+// guardarImagen: escribe la imagen junto a la nota, nunca encima de otra ni fuera de la base.
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+test('guardarImagen: crea imagenes/ junto a la nota y devuelve ruta y enlace', con({}, (c, cu) => {
+  const r = cu.guardarImagen('conceptos/interes.md', 'conceptos/imagenes/Mi captura.png', PNG);
+  assert.deepEqual(r, { ruta: 'conceptos/imagenes/Mi captura.png', enlace: 'imagenes/Mi%20captura.png' });
+  assert.deepEqual(fs.readFileSync(path.join(c.base, r.ruta)), PNG);
+}));
+
+test('guardarImagen: usa attachments/ si ya existe', con({}, (c, cu) => {
+  fs.mkdirSync(path.join(c.base, 'conceptos', 'attachments'));
+  assert.equal(cu.guardarImagen('conceptos/interes.md', 'conceptos/attachments/a.png', PNG).enlace, 'attachments/a.png');
+}));
+
+test('guardarImagen: con el nombre ocupado escribe -2 y el original sigue con sus bytes', con({}, (c, cu) => {
+  cu.guardarImagen('conceptos/interes.md', 'conceptos/imagenes/a.png', Buffer.from('original'));
+  const r = cu.guardarImagen('conceptos/interes.md', 'conceptos/imagenes/a.png', PNG);
+  assert.equal(r.ruta, 'conceptos/imagenes/a-2.png');
+  assert.equal(r.enlace, 'imagenes/a-2.png');
+  assert.equal(fs.readFileSync(path.join(c.base, 'conceptos/imagenes/a.png'), 'utf8'), 'original');
+  assert.equal(cu.guardarImagen('conceptos/interes.md', 'conceptos/imagenes/a.png', PNG).ruta, 'conceptos/imagenes/a-3.png');
+}));
+
+test('guardarImagen: nada fuera de la base ni fuera de la carpeta hija de la nota', con({}, (c, cu) => {
+  const n = 'conceptos/interes.md', antes = cu.listar().length;
+  for (const ruta of ['../fuera.png', 'conceptos/../../fuera.png', path.join(os.tmpdir(), 'fuera.png'), '/etc/fuera.png',
+    'otra/x.png', 'x.png', 'conceptos/x.png', 'conceptos/imagenes/sub/x.png', 'imagenes/x.png', '']) {
+    assert.throws(() => cu.guardarImagen(n, ruta, PNG), ErrorPeticion, `debía rechazar ${JSON.stringify(ruta)}`);
+  }
+  assert.throws(() => cu.guardarImagen('../n.md', 'conceptos/imagenes/x.png', PNG), ErrorPeticion);
+  assert.equal(fs.existsSync(path.join(c.base, 'otra')), false);
+  assert.equal(fs.existsSync(path.join(c.base, 'conceptos', 'imagenes')), false, 'ni siquiera crea la carpeta si algo falla');
+  assert.equal(cu.listar().length, antes);
+}));
+
+test('guardarImagen: solo extensiones de imagen', con({}, (c, cu) => {
+  for (const ruta of ['conceptos/imagenes/x.html', 'conceptos/imagenes/x.md', 'conceptos/imagenes/x', 'conceptos/imagenes/x.png.js'])
+    assert.throws(() => cu.guardarImagen('conceptos/interes.md', ruta, PNG), ErrorPeticion);
+  assert.equal(fs.existsSync(path.join(c.base, 'conceptos', 'imagenes')), false);
+}));
+
+test('guardarImagen: una carpeta que es un enlace simbólico hacia fuera de la base no deja escribir', con({}, (c, cu) => {
+  const fuera = fs.mkdtempSync(path.join(os.tmpdir(), 'cuaderno-fuera-'));
+  try {
+    fs.symlinkSync(fuera, path.join(c.base, 'conceptos', 'imagenes'));
+    assert.throws(() => cu.guardarImagen('conceptos/interes.md', 'conceptos/imagenes/x.png', PNG), ErrorPeticion);
+    assert.deepEqual(fs.readdirSync(fuera), []);
+    // y la carpeta de la nota misma, enlazada hacia fuera
+    fs.symlinkSync(fuera, path.join(c.base, 'enlace'));
+    fs.writeFileSync(path.join(fuera, 'n.md'), '# n');
+    assert.throws(() => cu.guardarImagen('enlace/n.md', 'enlace/imagenes/x.png', PNG), ErrorPeticion);
+    assert.deepEqual(fs.readdirSync(fuera), ['n.md']);
+  } finally { fs.rmSync(fuera, { recursive: true, force: true }); }
+}));
+
+test('guardarImagen: un enlace simbólico con el nombre de la imagen no se sigue (wx)', con({}, (c, cu) => {
+  const fuera = fs.mkdtempSync(path.join(os.tmpdir(), 'cuaderno-fuera-'));
+  try {
+    fs.mkdirSync(path.join(c.base, 'conceptos', 'imagenes'));
+    fs.symlinkSync(path.join(fuera, 'destino.png'), path.join(c.base, 'conceptos', 'imagenes', 'x.png'));
+    const r = cu.guardarImagen('conceptos/interes.md', 'conceptos/imagenes/x.png', PNG);
+    assert.equal(r.ruta, 'conceptos/imagenes/x-2.png');
+    assert.deepEqual(fs.readdirSync(fuera), []);
+  } finally { fs.rmSync(fuera, { recursive: true, force: true }); }
+}));
+
+test('guardarImagen: invalida el índice (la imagen entra en listar)', con({}, (c, cu) => {
+  cu.listar();
+  const r = cu.guardarImagen('conceptos/interes.md', 'conceptos/imagenes/a.png', PNG);
+  assert.ok(cu.listar().includes(r.ruta));
 }));

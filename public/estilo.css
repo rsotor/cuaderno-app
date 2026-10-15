@@ -470,6 +470,12 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 #edicion-cm .cm-line.live-hecha { color: var(--tinta-suave); text-decoration: line-through; }
 #edicion-cm .live-vineta { display: inline-block; width: 1.5em; text-align: center; color: var(--tinta-suave); }
 #edicion-cm .live-casilla { margin: 0 .5em 0 0; border: 1.5px solid var(--tinta-suave); transform: translateY(2px); cursor: pointer; }
+/* imágenes del editor: dentro de la anchura de la hoja; la pendiente y la que no está se ven igual de limpias que el resto */
+#edicion-cm .live-imagen-caja { white-space: normal; cursor: text; }
+#edicion-cm div.live-imagen-caja { display: flow-root; padding: 6px 0; }
+#edicion-cm .live-imagen { display: block; max-width: 100%; height: auto; border-radius: var(--radio); box-shadow: 0 0 0 1px var(--linea); }
+#edicion-cm span.live-imagen-caja .live-imagen { display: inline-block; vertical-align: bottom; }
+#edicion-cm .live-imagen-rota { display: inline-block; max-width: 100%; padding: 4px 10px; border: 1px dashed var(--tinta-suave); border-radius: var(--radio); color: var(--tinta-suave); font-size: 14px; }
 /* live preview (bloques): el widget es el HTML de la lectura; dentro, sin los márgenes de bloque de la hoja */
 /* Sin márgenes verticales en el widget (relleno, y flow-root para contener los de dentro): CodeMirror mide la altura de la caja
    sin ellos y, con ellos, el clic cae unas líneas más abajo de donde se pulsa (fallo del spike, 2026-10-09). */

@@ -76,6 +76,14 @@ El gesto de deslizar con el trackpad (Atrás y Adelante) solo llega a la app si 
 | ⌘R, ⌘+, ⌘−, ⌘0 | Ver → Recargar, Acercar, Alejar, Tamaño real | los del sistema |
 | ⌘K | — | reservada: será la paleta de acciones rápidas |
 
+## Imágenes en una nota
+
+En el editor de una nota (botón «Editar» o `e`), arrastra una imagen al texto o pulsa «Imagen» en la barra de formato y elige un
+fichero. Se ve al momento, desde donde esté, y no se escribe nada hasta «Aplicar»: entonces se copia junto a la nota, en su carpeta
+de imágenes (`attachments`, `adjuntos`, `imagenes`, `images` o `assets`, la que ya haya; si no hay, se crea `imagenes/`) y el enlace
+queda en Markdown estándar. Si el nombre ya existe se añade `-2`, `-3`…; nunca se sobrescribe. Una imagen que ya está dentro del
+cuaderno no se copia: se enlaza. Si «Descartar», no queda nada en el cuaderno.
+
 ## Estado
 
 En desarrollo. El plan, lo decidido y lo que falta están en [`docs/planes/plan-vivo.md`](docs/planes/plan-vivo.md).

@@ -433,7 +433,7 @@ test('rutas de lectura y de nota nueva: títulos, recorrido y crear una nota', a
     const t = await (await s.pedir('/api/titulos')).json();
     assert.equal(t['conceptos/capital.md'], 'Capital'); assert.equal(t['material/calculadora-50-30-20.html'], 'Calculadora 50/30/20');
     const r = await (await s.pedir('/api/recorrido')).json();
-    assert.equal(r.notas, 24); assert.deepEqual(r.fallos, []);   // 24 (2026-10-14: +insertar-imagen/con-attachments/nota.md); 23 (2026-10-13: +navegacion/una-nota-con-un-nombre-muy-largo-para-la-barra-superior.md, y antes +render/fragmentos-de-busqueda.md): con la nota larga de lectura/ (2026-10-09) y comentarios/nota-comentada.md
+    assert.equal(r.notas, 25); assert.deepEqual(r.fallos, []);   // 25 (2026-10-14: +insertar-imagen/sin-carpeta/nota.md); 24 (2026-10-14: +insertar-imagen/con-attachments/nota.md); 23 (2026-10-13: +navegacion/una-nota-con-un-nombre-muy-largo-para-la-barra-superior.md, y antes +render/fragmentos-de-busqueda.md): con la nota larga de lectura/ (2026-10-09) y comentarios/nota-comentada.md
     const n = await (await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).json();
     assert.equal(n.ruta, 'conceptos/Idea nueva.md'); assert.equal(s.c.leer('conceptos/Idea nueva.md'), '# Idea nueva\n\n');   // el título y una línea en blanco para escribir debajo
     assert.equal((await post('/api/nota/nueva', { titulo: 'Idea nueva', carpeta: 'conceptos' })).status, 400, 'una nota repetida no da error');
@@ -515,5 +515,92 @@ test('/api/comentario acepta la fecha (para deshacer un cierre con la del coment
     assert.match(s.c.leer('conceptos/capital.md'), /\[!comment\] Alumno \(2026-01-02\)\n> con fecha/);
     assert.equal((await post('/api/comentario', { ruta: 'conceptos/capital.md', desde: 0, hasta: 1, texto: 'fecha rara', original: '# Capital', fecha: 'ayer' })).status, 200);
     assert.doesNotMatch(s.c.leer('conceptos/capital.md'), /Alumno \(ayer\)/, 'una fecha que no es AAAA-MM-DD se ignora');
+  } finally { await s.cerrar(); }
+});
+
+test('POST /api/imagen/destino: dónde va la imagen y con qué nombre; una nota fuera del cuaderno → 400', async () => {
+  const s = await arrancar({ kit: false });
+  try {
+    const post = body => s.pedir('/api/imagen/destino', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await post({ nota: 'insertar-imagen/con-attachments/nota.md', nombre: 'Mi captura.png', origen: '', reservados: [] });
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), { dentro: false, ruta: 'insertar-imagen/con-attachments/attachments/Mi captura-2.png', enlace: 'attachments/Mi%20captura-2.png' });
+    assert.equal((await post({ nota: '../x.md', nombre: 'a.png' })).status, 400);
+    assert.equal((await post({ nota: 'inicio.md', nombre: 'a.pdf' })).status, 400);
+  } finally { await s.cerrar(); }
+});
+
+// POST /api/imagen: bytes en crudo, tope de 25 MB rechazado con un 413 que el cliente recibe de verdad.
+const http = require('node:http');
+const { TOPE_IMAGEN } = require('../public/imagenes');
+const subir = (s, query, { cabeceras = {}, trozos, declarar } = {}) => new Promise((ok, mal) => {
+  const req = http.request({ host: '127.0.0.1', port: s.puerto, path: `/api/imagen?${query}`, method: 'POST',
+    headers: { cookie: s.cookie, origin: `http://localhost:${s.puerto}`, ...(declarar !== undefined ? { 'content-length': declarar } : {}), ...cabeceras } }, res => {
+    const partes = []; res.on('data', d => partes.push(d)); res.on('end', () => ok({ status: res.statusCode, cuerpo: Buffer.concat(partes).toString() }));
+  });
+  req.on('error', mal);
+  (async () => { for (const t of trozos) { if (!req.write(t)) await new Promise(r => req.once('drain', r)); if (req.destroyed) return; } req.end(); })().catch(mal);
+});
+const q = (nota, ruta) => `nota=${encodeURIComponent(nota)}&ruta=${encodeURIComponent(ruta)}`;
+const NOTA = 'insertar-imagen/con-attachments/nota.md', DIR = 'insertar-imagen/con-attachments/attachments';
+
+test('POST /api/imagen: guarda los bytes, nunca encima de otra, y responde ruta y enlace', async () => {
+  const s = await arrancar({ kit: false });
+  try {
+    const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 9, 8, 7]);
+    const r = await s.pedir(`/api/imagen?${q(NOTA, `${DIR}/nueva foto.png`)}`, { method: 'POST', headers: { 'content-type': 'image/png' }, body: bytes });
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), { ruta: `${DIR}/nueva foto.png`, enlace: 'attachments/nueva%20foto.png' });
+    assert.deepEqual(fs.readFileSync(path.join(s.c.base, DIR, 'nueva foto.png')), bytes);
+    const otra = await s.pedir(`/api/imagen?${q(NOTA, `${DIR}/nueva foto.png`)}`, { method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: Buffer.from('otra') });
+    assert.equal((await otra.json()).ruta, `${DIR}/nueva foto-2.png`);
+    assert.deepEqual(fs.readFileSync(path.join(s.c.base, DIR, 'nueva foto.png')), bytes);
+    // lo que no es imagen o sale de la carpeta de la nota → 400 y nada en el disco
+    for (const ruta of [`${DIR}/x.html`, '../x.png', 'otra/x.png'])
+      assert.equal((await s.pedir(`/api/imagen?${q(NOTA, ruta)}`, { method: 'POST', headers: { 'content-type': 'image/png' }, body: bytes })).status, 400, ruta);
+    assert.equal(fs.existsSync(path.join(s.c.base, 'otra')), false);
+  } finally { await s.cerrar(); }
+});
+
+test('POST /api/imagen: un cuerpo JSON o de texto → 415; sin cookie o con Origin ajeno → 403', async () => {
+  const s = await arrancar({ kit: false });
+  try {
+    const ruta = `/api/imagen?${q(NOTA, `${DIR}/j.png`)}`;
+    assert.equal((await s.pedir(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, 415);
+    assert.equal((await s.pedir(ruta, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'x' })).status, 415);
+    assert.equal((await fetch(s.base + ruta, { method: 'POST', headers: { 'content-type': 'image/png' }, body: 'x' })).status, 403);
+    assert.equal((await s.pedir(ruta, { method: 'POST', headers: { 'content-type': 'image/png', origin: 'http://evil.example' }, body: 'x' })).status, 403);
+    assert.equal(fs.existsSync(path.join(s.c.base, DIR, 'j.png')), false);
+  } finally { await s.cerrar(); }
+});
+
+test('POST /api/imagen: con content-length mayor que el tope el cliente recibe un 413 (no un corte) y no se escribe nada', async () => {
+  const s = await arrancar({ kit: false });
+  try {
+    const r = await subir(s, q(NOTA, `${DIR}/grande.png`), { cabeceras: { 'content-type': 'image/png' }, declarar: TOPE_IMAGEN + 1, trozos: [...Array.from({ length: 25 }, () => Buffer.alloc(1 << 20, 1)), Buffer.alloc(1, 1)] });
+    assert.equal(r.status, 413);
+    assert.equal(fs.existsSync(path.join(s.c.base, DIR, 'grande.png')), false);
+    // y el servidor sigue atendiendo
+    assert.equal((await s.pedir('/api/info')).status, 200);
+  } finally { await s.cerrar(); }
+});
+
+test('POST /api/imagen: un cuerpo troceado sin content-length que pasa del tope → 413 recibido y nada en el disco', async () => {
+  const s = await arrancar({ kit: false });
+  try {
+    const trozo = Buffer.alloc(1 << 20, 2);
+    const r = await subir(s, q(NOTA, `${DIR}/grande.png`), { cabeceras: { 'content-type': 'image/png', 'transfer-encoding': 'chunked' }, trozos: Array.from({ length: 27 }, () => trozo) });
+    assert.equal(r.status, 413);
+    assert.equal(fs.existsSync(path.join(s.c.base, DIR, 'grande.png')), false);
+    assert.equal((await s.pedir('/api/info')).status, 200);
+  } finally { await s.cerrar(); }
+});
+
+test('POST /api/imagen: un cuerpo de justo el tope entra', async () => {
+  const s = await arrancar({ kit: false });
+  try {
+    const r = await s.pedir(`/api/imagen?${q(NOTA, `${DIR}/tope.png`)}`, { method: 'POST', headers: { 'content-type': 'image/png' }, body: Buffer.alloc(TOPE_IMAGEN, 3) });
+    assert.equal(r.status, 200);
+    assert.equal(fs.statSync(path.join(s.c.base, DIR, 'tope.png')).size, TOPE_IMAGEN);
   } finally { await s.cerrar(); }
 });

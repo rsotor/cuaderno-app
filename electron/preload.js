@@ -1,11 +1,11 @@
 'use strict';
 // Lo único que la pantalla ve de Electron (plan §2, fila «Pantalla»): window.cuadernoApp, con elegirCarpeta() (el
 // diálogo del sistema, por el canal IPC `elegir-carpeta` de electron/carpeta.js), alAccion(cb) (los mensajes `accion`
-// que manda el menú, electron/menu.js) y version (la de la app, que app.js pasa en additionalArguments). Corre en el sandbox del
+// que manda el menú, electron/menu.js), rutaDeFichero(file) (la ruta en disco de un File) y version (la de la app, que app.js pasa en additionalArguments). Corre en el sandbox del
 // renderer: aquí solo se puede hacer require('electron'), nada de fs ni path (tests/electron-carpeta.test.js lo vigila),
-// y la pantalla no ve ipcRenderer, solo estas tres cosas. Sin este fichero (la web), window.cuadernoApp no existe y la
+// y la pantalla no ve ipcRenderer, solo estas cuatro cosas. Sin este fichero (la web), window.cuadernoApp no existe y la
 // pantalla es la de siempre.
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const PREFIJO = '--cuaderno-version=';
 const version = (process.argv.find(a => a.startsWith(PREFIJO)) || PREFIJO).slice(PREFIJO.length) || null;
@@ -17,5 +17,8 @@ let alAccionCb = null;
 contextBridge.exposeInMainWorld('cuadernoApp', {
   elegirCarpeta: () => ipcRenderer.invoke('elegir-carpeta'),
   alAccion: cb => { const primera = alAccionCb === null; alAccionCb = cb; if (primera) ipcRenderer.on('accion', (_evento, nombre) => { if (alAccionCb) alAccionCb(nombre); }); },
+  // rutaDeFichero: la ruta en disco de un File elegido o soltado (la pantalla no la ve por sí sola; en el sandbox solo
+  // webUtils la da). Cadena vacía si el File no viene del disco (una captura pegada).
+  rutaDeFichero: f => webUtils.getPathForFile(f),
   version,
 });

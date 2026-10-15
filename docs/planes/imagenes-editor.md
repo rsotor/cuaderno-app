@@ -7,16 +7,42 @@ nota, y una ruta de la API que recibe bytes) · Rama: `imagenes-editor` (desde `
 ## 0. Estado del bloque
 
 **Ahora**
-- Plan escrito y revisado (2026-10-14): ronda completa del abogado del diablo hecha, 5 objeciones, 5 aplicadas (§10).
-  Falta el sí de Roberto y que confirme las respuestas por defecto de §9.
+- Bloque hecho (2026-10-14): plan aprobado por Roberto con las respuestas de §9, T1 a T9 hechas; T1 mergeada (#39), el
+  resto en el PR de `bloque/imagenes-2`. Crítica de diseño: `docs/diseno/critica-2026-10-14-imagenes.md`. Las capturas
+  de T5/T6 se sustituyeron por las de T9 (`pruebas/capturas-imagenes.js`).
+
+**Siguiente (al reanudar, 2026-10-15):** el PR #40 está rojo solo en Windows, por dos recorridos de
+  `tests/navegador/imagenes.test.js` (:318 y :346) que comparan el fichero con `\n` y en Windows el cuaderno de ejemplo
+  sale con CRLF (`'# Otra cosa\r\n'`). La app conserva el CRLF, que está bien: hay que arreglar la comparación del test
+  (normalizar los finales de línea al leer `notaEnDisco`), no el valor esperado. Mirar si otros recorridos ya lo hacen así.
+  Después: CI en verde, automerge (ya activado), `npm run instalar` y decir la versión. Ya arreglado (3d39231): un enlace
+  simbólico roto con el nombre de la imagen cuenta como ocupado (en Windows, `wx` lo seguía).
 
 **Hecho**
 - T1 (2026-10-14): `public/imagenes.js` (`resolver`, `aUrl`), `markdown.js` las usa para `![](…)` y `![[…]]`; ejemplo
   `insertar-imagen/con-attachments/`. Desvíos: `tests/empaquetado.test.js` aprende que un módulo de `public/` lo cubre
   `public/**`; los contadores de notas del recorrido (23 → 24) en `tests/cuaderno.test.js` y `tests/servidor.test.js`.
 
+- T2 (2026-10-14): `enlaceDe`, `limpiarNombre`, `libre`, `EXTENSIONES`, `CARPETAS`, `TOPE_IMAGEN` en `public/imagenes.js`;
+  `Cuaderno.destinoImagen` en `cuaderno.js`; `POST /api/imagen/destino` en `servidor.js`. Sin desvíos; ninguna cifra
+  existente cambió (el ejemplo no crece en T2).
+
+- T3 (2026-10-14): `Cuaderno.guardarImagen` en `cuaderno.js`; `POST /api/imagen` (en crudo, antes de `leerCuerpo`) con
+  `leerBytes`/`rechazar` en `servidor.js`. Desvío de P5: el 413 **no** lleva `connection: close` (con él Node cierra el socket
+  con el cliente aún subiendo y le llegaba `EPIPE`/`ECONNRESET`, test intermitente); basta `res.end()` + `req.resume()`
+  (sin `req.destroy()`), y el 413 llega siempre. Cobertura: servidor.js ramas 84,50 → 85,30 %.
+
+- T4 (2026-10-14): `rutaDeFichero` en `electron/preload.js` (`webUtils.getPathForFile`). Los tests de las claves del preload ganan la clave nueva y `webUtils` (función nueva, no un valor tocado para que pase). Sin desvíos.
+
+- T5 (2026-10-14): `public/live.js`: widget `Imagen`, `decosImagen`, extensión `imagenesPlano` (la imagen también en «Markdown plano», solo ella), `insertarImagenes`, `pendientes`, `alSoltarFicheros` (por `dataTransfer.types`), `destruir` revoca las URL; `.live-imagen*` en `estilo.css`; ejemplo `insertar-imagen/sin-carpeta/` (contadores de notas 24 → 25 en `cuaderno.test.js` y `servidor.test.js`: nota nueva, no un valor arreglado); recorrido `tests/navegador/imagenes.test.js`. Desvíos: con el crudo (línea del cursor y modo plano) la imagen es un widget de **bloque** tras la línea, no en línea (P7 decía `side: 1`, que se mantiene); `alSoltarFicheros` solo instala `dragover`/`drop` si se le pasa (la app lo pasa en T6; hasta entonces el soltar no cambia). Ningún test existente esperaba «ninguna img» en plano (no había): no se cambió ninguna expectativa. Capturas del después en `docs/capturas/imagenes/` para la crítica de T9.
+
+- T6 (2026-10-14): `public/app.js`: botón «Imagen» (`FORMATOS_BARRA`, quinto campo `accion`: sin `aria-pressed` en `htmlBarra`, fuera de `actualizarBarra` por `button[aria-pressed]`, el clic abre `#imagen-fichero`), `meterImagenes` (extensión y `TOPE_IMAGEN` con aviso, destinos **en serie** sumando a `reservados`, P9 por `origen` o `nombre|tamaño|fecha`, error del destino → `avisarError` y nada insertado), `alSoltarFicheros` en `live.montar`, y `dragover`/`drop` de `document` con `types.includes('Files')` mientras `edicion` (P13); `public/index.html`: `#imagen-fichero`. Recorridos en `tests/navegador/imagenes.test.js` (4 nuevos; el (6) mira `defaultPrevented` de eventos sintéticos sobre `document`). Cambia `tests/navegador/edicion.test.js` (la lista de botones gana `imagen` y el último de la barra, donde da la vuelta el foco, pasa de `codigo` a `imagen`: botón nuevo, no un valor arreglado). Desvío: soltar en la línea del título cae tras el `# ` (posición real de `posAtCoords`), así que el recorrido suelta en la línea del párrafo. Capturas en `docs/capturas/imagenes/despues-barra-imagen-{claro,oscuro}-2026-10-14.png`. Hasta T7, Aplicar aún no copia las pendientes.
+
+- T7 (2026-10-14): `public/app.js`: `escribirConImagenes` (P12), la única que escribe la nota desde el editor (Aplicar y «Sobrescribir»), con guarda de reentrada por `escribiendo`; `soltarSubidas` (papelera de lo subido en un intento fallido, Q1); `api()` acepta un `Blob` y lo manda en crudo. `public/imagenes.js`: `sustituirEnlaces(texto, mapa)` (la pasada única de P12(3), pieza pura con test de Node en `tests/imagenes.test.js`). Caso 35 en el índice del ejemplo; 8 recorridos «imágenes: aplicar…» en `tests/navegador/imagenes.test.js`; test con kit de verdad en `tests/guardar.test.js` (pasa con un curso temporal montado desde profesor-kit). Desvíos: (a) la pendiente guarda un `File` (con el nombre de origen) y Aplicar sube con ese nombre en la carpeta reservada, no con el reservado: con el reservado ocupado, `libre` del servidor daba `captura-2-2.png` y no el `captura-3.png` que piden (3) y (8); (b) `sustituirEnlaces` va en `public/imagenes.js` (P1) y no dentro de `app.js`; (c) la receta del curso con kit de `plan-vivo.md` §0 necesita copiar también `.base-kit/` (sin él, `guardar.js` se niega: `[pieza-ausente] .base-kit`); (d) **pendiente**: las capturas y la ronda de crítica de diseño que §5 T7 pone antes de su commit (no existe `pruebas/capturas-imagenes.js`; T7 no cambia nada visible), al coordinador.
+- T8 (2026-10-14): `tests/electron/imagenes.test.js` (4 recorridos) y caso 36 en el índice del ejemplo. **`setInputFiles` en Playwright-Electron sí da ruta con `webUtils.getPathForFile`** (no hizo falta el plan B): la rama «dentro del cuaderno → enlazar» queda probada en la app. Desvío: la app vacía el `<input>` tras leer el fichero, así que la sonda de la ruta se engancha al `change` en captura. (3) de §10 (`defaultPrevented` de `dragover` y `drop` sobre `document` con el editor sucio, la ventana no navega) también en la app. Sin cambios de código de la app.
+
 **Siguiente**
-- T2.
+- La ronda de crítica de diseño pendiente de T7 (d).
 
 ## 1. Objetivo, enfoque y restricciones
 
