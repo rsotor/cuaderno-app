@@ -966,8 +966,11 @@ function conectar(s) {
 }
 function crearSesion(modo) {
   const n = ++numSesion, elemento = document.createElement('div'); elemento.className = 'sesion'; elemento.hidden = true; $('#terminal').append(elemento);
-  const term = new Terminal({ fontFamily: variable('--mono'), fontSize: 13.5, lineHeight: 1.25, cursorBlink: true, cursorStyle: 'bar', scrollback: 5000, allowProposedApi: true, theme: temaTerminal() });
+  const term = new Terminal({ fontFamily: variable('--mono'), fontSize: 13.5, lineHeight: 1.25, cursorBlink: true, cursorStyle: 'bar', scrollback: 5000, allowProposedApi: true, macOptionClickForcesSelection: true, theme: temaTerminal() });
   const fit = new FitAddon.FitAddon(); term.loadAddon(fit); term.open(elemento);
+  // Pintar con la tarjeta gráfica (como VS Code): Claude Code redibuja sin parar y el pintado con HTML va a tirones.
+  // Si WebGL no está o pierde el contexto, xterm vuelve solo a su pintado normal.
+  try { const webgl = new WebglAddon.WebglAddon(); webgl.onContextLoss(() => webgl.dispose()); term.loadAddon(webgl); } catch { /* sin WebGL: pintado normal */ }
   const s = { id: n, modo, titulo: modo === 'profesor' ? 'Profesor' : (n === 1 ? 'Terminal' : `Terminal ${n}`), term, fit, ws: null, elemento, cerrada: false };
   term.attachCustomKeyEventHandler(e => {
     if ((e.ctrlKey || e.metaKey) && (e.key === '`' || e.key === '\\')) return false;   // Ctrl ` es de la app (abre y cierra el cajón); Ctrl \ la barra lateral
@@ -1369,7 +1372,7 @@ window.addEventListener('hashchange', () => {
 // de 0,5 s hasta 10 s, un solo socket y un solo temporizador a la vez; al volver a abrir resincroniza como si hubiera
 // llegado un cambio, para recoger lo que cambió mientras estaba caído.
 async function alCambiarDisco() { if (!cuaderno()) return; const antes = cuaderno().ruta; info = await api('/api/info'); if (!cuaderno() || cuaderno().ruta !== antes) { const propio = !!(cuadernoPedido && cuaderno() && cuadernoPedido.ruta === cuaderno().ruta && Date.now() < cuadernoPedido.hasta); cuadernoPedido = null; if (!propio) avisar(cuaderno() ? `Este servidor ha abierto otro cuaderno: ${cuaderno().nombre}. Esta pestaña pasa a él.` : 'El cuaderno se ha cerrado en otra pestaña'); cerrarSesiones(); await cargarCuaderno(); location.replace(cuaderno() && cuaderno().portada ? `#/n/${encodeURI(cuaderno().portada)}` : '#/'); enrutar(); return; } pintarEstado(); [arbol, titulos] = await Promise.all([api('/api/arbol'), api('/api/titulos')]); pintarArbol(arbol); refrescarBusqueda(); if (escribiendo) { /* lo está escribiendo la propia app: aplicarEdicion repinta al acabar */ } else if (rutaActual && !Comentar.ocupado() && !edicion && !(tarjetasEstado && tarjetasEstado.ruta === rutaActual)) abrirNota(rutaActual, null, { desdeCambios: true }); else if (edicion) comprobarDisco(); else if (enTareas()) abrirTareas(); refrescarContadores(); }
-let cambiosWs = null, cambiosEspera = 500, cambiosTemporizador = null, cambiosAbierto = false;
+let cambiosWs = null, cambiosEspera = 500, cambiosTemporizador = null, cambiosAbierto = false, cambiosAgrupar = null;
 function conectarCambios() {
   cambiosTemporizador = null;
   if (cambiosWs) return;
@@ -1377,7 +1380,8 @@ function conectarCambios() {
   try { c = new WebSocket(wsUrl('/cambios')); } catch { return; /* sin recarga */ }
   cambiosWs = c;
   c.onopen = () => { cambiosEspera = 500; if (cambiosAbierto) alCambiarDisco(); cambiosAbierto = true; };
-  c.onmessage = alCambiarDisco;
+  // Con Claude escribiendo ficheros llegan avisos seguidos: uno solo cada 300 ms, no un repintado por fichero.
+  c.onmessage = () => { clearTimeout(cambiosAgrupar); cambiosAgrupar = setTimeout(alCambiarDisco, 300); };
   c.onclose = () => {
     if (cambiosWs !== c) return;
     cambiosWs = null;
