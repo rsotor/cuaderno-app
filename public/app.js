@@ -1397,6 +1397,8 @@ function conectarCambios() {
   c.onclose = () => {
     if (cambiosWs !== c) return;
     cambiosWs = null;
+    clearTimeout(cambiosAgrupar);   // lo pendiente lo recoge la resincronización al reconectar
+
     if (cambiosTemporizador) return;
     cambiosTemporizador = setTimeout(conectarCambios, cambiosEspera);
     cambiosEspera = Math.min(cambiosEspera * 2, 10000);
