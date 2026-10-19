@@ -972,7 +972,19 @@ function crearSesion(modo) {
   // Si WebGL no está o pierde el contexto, xterm vuelve solo a su pintado normal.
   try { const webgl = new WebglAddon.WebglAddon(); webgl.onContextLoss(() => webgl.dispose()); term.loadAddon(webgl); } catch { /* sin WebGL: pintado normal */ }
   const s = { id: n, modo, titulo: modo === 'profesor' ? 'Profesor' : (n === 1 ? 'Terminal' : `Terminal ${n}`), term, fit, ws: null, elemento, cerrada: false };
+  // ⌘C con un programa que se queda el ratón (Claude Code a pantalla completa): lo resaltado es selección del programa, no
+  // de xterm, y el programa copia con Ctrl+C. Si acabas de arrastrar en la terminal y no has tecleado nada después, ⌘C le
+  // manda Ctrl+C; sin ese arrastre no, porque Ctrl+C sin selección interrumpe el programa.
+  elemento.addEventListener('mousedown', ev => { s.arrastre = { x: ev.clientX, y: ev.clientY, movido: false }; s.recienSeleccionado = false; }, true);
+  elemento.addEventListener('mousemove', ev => { if (s.arrastre && ev.buttons && Math.hypot(ev.clientX - s.arrastre.x, ev.clientY - s.arrastre.y) > 4) s.arrastre.movido = true; }, true);
+  window.addEventListener('mouseup', () => { if (s.arrastre) { s.recienSeleccionado = s.arrastre.movido; s.arrastre = null; } }, true);
   term.attachCustomKeyEventHandler(e => {
+    if (e.type === 'keydown' && e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'c') {
+      if (!term.hasSelection() && s.recienSeleccionado && term.modes.mouseTrackingMode !== 'none' && s.ws && s.ws.readyState === 1 && !s.cerrada) s.ws.send('\u0003');
+      s.recienSeleccionado = false;
+      return false;
+    }
+    if (e.type === 'keydown' && !['Meta', 'Shift', 'Control', 'Alt'].includes(e.key)) s.recienSeleccionado = false;
     if ((e.ctrlKey || e.metaKey) && (e.key === '`' || e.key === '\\')) return false;   // Ctrl ` es de la app (abre y cierra el cajón); Ctrl \ la barra lateral
     // En la app de escritorio, los atajos del menú (Ctrl/⌘ S, O, F, T, N y coma; electron/menu.js) no se los queda xterm: en
     // Windows y Linux Ctrl S es XOFF para la terminal y se comería el acelerador del menú antes de que llegue. Ctrl [ y ] (Atrás y

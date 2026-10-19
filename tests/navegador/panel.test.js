@@ -131,6 +131,21 @@ test('un solo botón, Terminal; el profesor (desde un Guardar que falla) convive
   const antes = pty.procesos[base].escrito.length;
   await e.pagina.keyboard.press('Shift+Enter'); await e.pagina.keyboard.press('Alt+Enter'); await e.pagina.keyboard.press('Enter');
   await hasta(() => pty.procesos[base].escrito.slice(antes) === '\n\n\r', 'terminal', `Shift/Option+Enter no mandan \\n (llegó ${JSON.stringify(pty.procesos[base].escrito.slice(antes))})`);
+  // ⌘C con un programa que se queda el ratón (Claude Code a pantalla completa): tras arrastrar, ⌘C le manda Ctrl+C (copia su
+  // selección); sin arrastrar, nada, porque Ctrl+C sin selección interrumpiría el programa.
+  pty.procesos[base].datos('\x1b[?1003h');
+  await hasta(() => e.pagina.evaluate(() => sesionActiva.term.modes.mouseTrackingMode === 'any'), 'terminal', 'el programa no se queda el ratón');
+  const pantalla = await e.pagina.locator('#terminal .sesion:not([hidden]) .xterm-screen').boundingBox();
+  const sinCtrlC = () => pty.procesos[base].escrito.split('\u0003').length - 1;
+  const ctrlCAntes = sinCtrlC();
+  await e.pagina.keyboard.press('Meta+C'); await e.pagina.waitForTimeout(200);
+  assert.equal(sinCtrlC(), ctrlCAntes, 'terminal: ⌘C sin haber arrastrado manda Ctrl+C e interrumpiría el programa');
+  await e.pagina.mouse.move(pantalla.x + 5, pantalla.y + 5); await e.pagina.mouse.down(); await e.pagina.mouse.move(pantalla.x + 120, pantalla.y + 5, { steps: 6 }); await e.pagina.mouse.up();
+  await e.pagina.keyboard.press('Meta+C');
+  await hasta(() => sinCtrlC() === ctrlCAntes + 1, 'terminal', 'tras arrastrar, ⌘C no manda Ctrl+C al programa');
+  await e.pagina.keyboard.press('Meta+C'); await e.pagina.waitForTimeout(200);
+  assert.equal(sinCtrlC(), ctrlCAntes + 1, 'terminal: un segundo ⌘C sin arrastrar otra vez manda otro Ctrl+C');
+  pty.procesos[base].datos('\x1b[?1003l');
   // Un Guardar que falla ofrece «Abrir con el profesor»: la única puerta al profesor que queda fuera del botón Terminal.
   await e.pagina.evaluate(() => mostrarResultado('Guardar', { codigo: 1, salida: 'conflicto' }));
   await e.pagina.click('#resultado-profesor');
