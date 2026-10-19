@@ -110,7 +110,10 @@ test('un ancho guardado que no cabe (3000 px) se acota al abrir, no se aplica ta
 });
 
 // ---------- sesiones de terminal
-const filas = () => e.pagina.locator('#terminal .sesion:not([hidden]) .xterm-rows');
+// Lo que enseña la sesión activa, leído del búfer de xterm: con el pintado por WebGL no hay filas en el HTML.
+const textoTerminal = () => e.pagina.evaluate(() => { const s = sesionActiva; if (!s) return ''; const b = s.term.buffer.active, lineas = [];
+  for (let i = 0; i < b.length; i++) lineas.push(b.getLine(i).translateToString(true)); return lineas.join('\n'); });
+const enTerminal = async (re, que) => { let texto = ''; await hasta(async () => { texto = await textoTerminal(); return re.test(texto); }, 'terminal', () => `${que}: se esperaba ${re}, hay «${texto.trim().slice(-120)}»`); };
 const pestanas = () => e.pagina.locator('.sesion-pestana');
 const recargar = async () => { await e.pagina.reload(); await e.pagina.locator('#miga strong').waitFor(); };
 
@@ -122,11 +125,27 @@ test('un solo botón, Terminal; el profesor (desde un Guardar que falla) convive
   await hasta(() => e.pagina.evaluate(() => document.activeElement.classList.contains('xterm-helper-textarea')), 'terminal', 'al abrir, el foco no está en la terminal');
   await e.pagina.keyboard.type('hola');
   await hasta(() => pty.procesos[base].escrito.includes('hola'), 'terminal', `lo tecleado no llega a la pty (llegó «${pty.procesos[base].escrito}»)`);
-  await conTexto(filas(), /hola/, 'terminal', 'el eco en la pantalla');
+  await enTerminal(/hola/, 'el eco en la pantalla');
+  assert.ok(await e.pagina.locator('#terminal .sesion:not([hidden]) .xterm-screen canvas').count() > 0, 'terminal: no se pinta con WebGL (no hay canvas en la pantalla de xterm)');
   // Shift y Option+Enter: salto de línea (\n) para Claude Code o Codex, no el \r de Enter que envía el mensaje.
   const antes = pty.procesos[base].escrito.length;
   await e.pagina.keyboard.press('Shift+Enter'); await e.pagina.keyboard.press('Alt+Enter'); await e.pagina.keyboard.press('Enter');
   await hasta(() => pty.procesos[base].escrito.slice(antes) === '\n\n\r', 'terminal', `Shift/Option+Enter no mandan \\n (llegó ${JSON.stringify(pty.procesos[base].escrito.slice(antes))})`);
+  // ⌘C con un programa que se queda el ratón (Claude Code a pantalla completa): tras arrastrar, ⌘C le manda Ctrl+C (copia su
+  // selección); sin arrastrar, nada, porque Ctrl+C sin selección interrumpiría el programa.
+  pty.procesos[base].datos('\x1b[?1003h');
+  await hasta(() => e.pagina.evaluate(() => sesionActiva.term.modes.mouseTrackingMode === 'any'), 'terminal', 'el programa no se queda el ratón');
+  const pantalla = await e.pagina.locator('#terminal .sesion:not([hidden]) .xterm-screen').boundingBox();
+  const sinCtrlC = () => pty.procesos[base].escrito.split('\u0003').length - 1;
+  const ctrlCAntes = sinCtrlC();
+  await e.pagina.keyboard.press('Meta+C'); await e.pagina.waitForTimeout(200);
+  assert.equal(sinCtrlC(), ctrlCAntes, 'terminal: ⌘C sin haber arrastrado manda Ctrl+C e interrumpiría el programa');
+  await e.pagina.mouse.move(pantalla.x + 5, pantalla.y + 5); await e.pagina.mouse.down(); await e.pagina.mouse.move(pantalla.x + 120, pantalla.y + 5, { steps: 6 }); await e.pagina.mouse.up();
+  await e.pagina.keyboard.press('Meta+C');
+  await hasta(() => sinCtrlC() === ctrlCAntes + 1, 'terminal', 'tras arrastrar, ⌘C no manda Ctrl+C al programa');
+  await e.pagina.keyboard.press('Meta+C'); await e.pagina.waitForTimeout(200);
+  assert.equal(sinCtrlC(), ctrlCAntes + 1, 'terminal: un segundo ⌘C sin arrastrar otra vez manda otro Ctrl+C');
+  pty.procesos[base].datos('\x1b[?1003l');
   // Un Guardar que falla ofrece «Abrir con el profesor»: la única puerta al profesor que queda fuera del botón Terminal.
   await e.pagina.evaluate(() => mostrarResultado('Guardar', { codigo: 1, salida: 'conflicto' }));
   await e.pagina.click('#resultado-profesor');
@@ -138,7 +157,7 @@ test('un solo botón, Terminal; el profesor (desde un Guardar que falla) convive
   assert.equal(pty.procesos[base].muerto, false, 'terminal: abrir al profesor ha matado el shell');
   await e.pagina.click('.sesion-pestana:not(.activa) [data-activar]');
   await conTexto(e.pagina.locator('.sesion-pestana.activa'), /^Terminal/, 'terminal', 'volver a la pestaña del shell');
-  await conTexto(filas(), /hola/, 'terminal', 'lo escrito en el shell tras volver a él');
+  await enTerminal(/hola/, 'lo escrito en el shell tras volver a él');
   // Ninguna sesión ha mandado nunca un tamaño de 0 columnas o filas (la pestaña oculta mide 0).
   const ceros = pty.procesos.slice(base).flatMap(p => p.redimensiones).filter(r => !(r.cols > 0 && r.rows > 0));
   assert.deepEqual(ceros, [], `terminal: se han mandado tamaños a 0 a la pty: ${JSON.stringify(ceros)}`);
@@ -151,7 +170,7 @@ test('si el programa termina, la pestaña lo dice y Enter abre otra igual; cerra
   await hasta(() => pty.procesos.length === base + 1, 'terminal', 'abrir el panel no abre una pty');
   pty.procesos[base].salir();
   await visible(e.pagina.locator('.sesion-pestana.cerrada'), 'terminal', 'la pestaña marcada como cerrada');
-  await conTexto(filas(), /terminal cerrada/, 'terminal', 'el aviso de terminal cerrada');
+  await enTerminal(/terminal cerrada/, 'el aviso de terminal cerrada');
   await e.pagina.click('#terminal .sesion:not([hidden])'); await e.pagina.keyboard.press('Enter');
   await hasta(() => pty.procesos.length === base + 2, 'terminal', 'Enter en una terminal cerrada no abre otra');
   await oculto(e.pagina.locator('.sesion-pestana.cerrada'), 'terminal', 'la marca de cerrada tras reabrir');
