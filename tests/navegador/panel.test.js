@@ -145,7 +145,17 @@ test('un solo botón, Terminal; el profesor (desde un Guardar que falla) convive
   await hasta(() => sinCtrlC() === ctrlCAntes + 1, 'terminal', 'tras arrastrar, ⌘C no manda Ctrl+C al programa');
   await e.pagina.keyboard.press('Meta+C'); await e.pagina.waitForTimeout(200);
   assert.equal(sinCtrlC(), ctrlCAntes + 1, 'terminal: un segundo ⌘C sin arrastrar otra vez manda otro Ctrl+C');
-  pty.procesos[base].datos('\x1b[?1003l');
+  // Rueda con el ratón en manos del programa (y codificación SGR, la de Claude Code): un paso por fila desplazada, también
+  // con los deltas pequeños del trackpad (xterm solo mandaba uno por evento y descartaba los pequeños).
+  pty.procesos[base].datos('\x1b[?1006h');
+  await hasta(() => e.pagina.evaluate(() => sesionActiva.term._core.coreMouseService.activeEncoding === 'SGR'), 'terminal', 'el programa no pide SGR');
+  const altoFila = pantalla.height / await e.pagina.evaluate(() => sesionActiva.term.rows);
+  const pasosRueda = () => (pty.procesos[base].escrito.match(/\x1b\[<65;/g) || []).length;
+  const ruedaAntes = pasosRueda();
+  await e.pagina.mouse.move(pantalla.x + 20, pantalla.y + 20);
+  for (let i = 0; i < 40; i++) await e.pagina.mouse.wheel(0, altoFila / 4);
+  await hasta(() => pasosRueda() - ruedaAntes === 10, 'terminal', () => `40 eventos de un cuarto de fila deberían dar 10 pasos de rueda; llegaron ${pasosRueda() - ruedaAntes}`);
+  pty.procesos[base].datos('\x1b[?1006l\x1b[?1003l');
   // Un Guardar que falla ofrece «Abrir con el profesor»: la única puerta al profesor que queda fuera del botón Terminal.
   await e.pagina.evaluate(() => mostrarResultado('Guardar', { codigo: 1, salida: 'conflicto' }));
   await e.pagina.click('#resultado-profesor');
