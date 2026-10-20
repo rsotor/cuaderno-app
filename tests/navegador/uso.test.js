@@ -74,6 +74,21 @@ test('árbol: las carpetas se pliegan y despliegan, y una nota dentro cambia de 
   assert.equal(scroll, 0, `nota: una nota nueva debería empezar arriba y está en ${scroll}`);
 });
 
+test('nota nueva desde una carpeta: su «+» abre el modal con esa carpeta elegida, sin plegarla ni desplegarla, y la nota se crea dentro', async () => {
+  await e.ir('#/n/conceptos/capital.md');
+  const carpeta = e.pagina.locator('#arbol details[data-carpeta="sesiones"]');
+  const abierta = await carpeta.evaluate(d => d.open);
+  await carpeta.locator(':scope > summary').hover();
+  await e.pagina.click('#arbol button[data-nota-en="sesiones"]');
+  await visible(e.pagina.locator('#nueva-nota-nombre'), 'nueva nota', 'el campo del título');
+  assert.equal(await e.pagina.inputValue('#nueva-nota-carpeta'), 'sesiones', 'nueva nota: la carpeta no es la del «+» pulsado');
+  assert.equal(await carpeta.evaluate(d => d.open), abierta, 'nueva nota: el «+» pliega o despliega la carpeta');
+  await e.pagina.keyboard.type('Desde la carpeta');
+  await e.pagina.keyboard.press('Enter');
+  await hashCumple(e.pagina, /^#\/n\/sesiones\/Desde%20la%20carpeta\.md$/, 'nueva nota');
+  await hasta(() => fs.existsSync(path.join(e.c.base, 'sesiones/Desde la carpeta.md')), 'nueva nota', 'el fichero no está en la carpeta del «+»');
+});
+
 test('nota nueva: el botón abre el modal, Enter la crea en la carpeta de la nota abierta y la abre; tareas.md no sale en el árbol', async () => {
   await e.ir('#/n/conceptos/capital.md');
   assert.equal(await e.pagina.locator('#arbol a.hoja[data-ruta="tareas.md"]').count(), 0, 'árbol: tareas.md se ve en el panel Tareas, no dos veces');

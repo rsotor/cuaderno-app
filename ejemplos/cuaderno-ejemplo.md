@@ -29,6 +29,7 @@ nuevo entra en una nota o carpeta nueva, con su fila aquí y su test. Las rutas 
 | Barra superior con una ruta larguísima: la miga se corta con «…» y no empuja a «Editar» ni al menú «…» de la nota, que se quedan a la derecha (sin cifras: su nombre es lo que se prueba) | `navegacion/una-nota-con-un-nombre-muy-largo-para-la-barra-superior.md` | `tests/navegador/navegacion.test.js` |
 | Imagen con la ruta codificada como la escribe Obsidian (`attachments/Mi%20captura.png`, carpeta `attachments/` junto a la nota) | `insertar-imagen/con-attachments/` | `tests/imagenes.test.js`, `tests/markdown.test.js`, `tests/servidor.test.js`, `tests/navegador/imagenes.test.js` |
 | Nota sin carpeta de imágenes junto a ella (la primera imagen que se mete crea `imagenes/`) | `insertar-imagen/sin-carpeta/` | `tests/navegador/imagenes.test.js` |
+| «+» en una carpeta del árbol: «Nueva nota» con esa carpeta ya elegida, la nota se crea dentro | `sesiones/` | `tests/navegador/uso.test.js` |
 
 ## Casos de uso y su recorrido
 
