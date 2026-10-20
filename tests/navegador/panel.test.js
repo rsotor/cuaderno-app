@@ -164,6 +164,24 @@ test('un solo botón, Terminal; el profesor (desde un Guardar que falla) convive
   assert.ok(pty.procesos.slice(base).every(p => p.redimensiones.length > 0), 'terminal: alguna sesión no ha recibido ningún tamaño');
 });
 
+test('si se cae la conexión (el Mac se duerme), la pestaña se reengancha sola a la misma pty y no la da por cerrada', async () => {
+  await e.ir('#/'); await abrirPanel();
+  const base = pty.procesos.length;
+  await e.pagina.click('#btn-nueva-sesion');
+  await hasta(() => pty.procesos.length === base + 1, 'terminal', 'no se abre la pty');
+  await hasta(() => e.pagina.evaluate(() => sesionActiva.ws && sesionActiva.ws.readyState === 1), 'terminal', 'el socket no abre');
+  const p = pty.procesos[base];
+  await e.pagina.evaluate(() => sesionActiva.ws.close(1000));   // la caída, vista desde la pestaña
+  await hasta(() => e.pagina.evaluate(() => sesionActiva.ws && sesionActiva.ws.readyState === 1 && !sesionActiva.reconectando), 'terminal', 'la pestaña no se reengancha');
+  p.datos('tras la caída');
+  await enTerminal(/tras la caída/, 'lo que escribe la pty tras reengancharse');
+  assert.equal(pty.procesos.length, base + 1, 'terminal: reengancharse abrió otra pty');
+  assert.equal(p.muerto, false, 'terminal: la caída mató la pty');
+  assert.equal(await e.pagina.locator('.sesion-pestana.activa.cerrada').count(), 0, 'terminal: la pestaña se da por cerrada');
+  await e.pagina.keyboard.type('sigo');
+  await hasta(() => p.escrito.includes('sigo'), 'terminal', 'lo tecleado tras reengancharse no llega a la misma pty');
+});
+
 test('si el programa termina, la pestaña lo dice y Enter abre otra igual; cerrar la última deja el aviso y + abre una', async () => {
   await e.ir('#/'); await recargar(); const base = pty.procesos.length;
   await abrirPanel();
