@@ -987,6 +987,25 @@ function crearSesion(modo) {
   elemento.addEventListener('mousedown', ev => { s.arrastre = { x: ev.clientX, y: ev.clientY, movido: false }; s.recienSeleccionado = false; }, true);
   elemento.addEventListener('mousemove', ev => { if (s.arrastre && ev.buttons && Math.hypot(ev.clientX - s.arrastre.x, ev.clientY - s.arrastre.y) > 4) s.arrastre.movido = true; }, true);
   window.addEventListener('mouseup', () => { if (s.arrastre) { s.recienSeleccionado = s.arrastre.movido; s.arrastre = null; } }, true);
+  // Rueda con un programa que se queda el ratón (Claude Code a pantalla completa): xterm manda un paso por evento y descarta
+  // los deltas pequeños, así que un gesto de trackpad de 12 líneas llegaba como 3 pasos. Aquí: un paso por cada fila de
+  // desplazamiento (en codificación SGR, la de Claude Code; con otra, lo hace xterm como siempre). Shift: la rueda es de xterm.
+  let ruedaAcumulada = 0;
+  term.attachCustomWheelEventHandler(ev => {
+    const raton = term._core && term._core.coreMouseService;
+    if (term.modes.mouseTrackingMode === 'none' || !raton || raton.activeEncoding !== 'SGR' || ev.shiftKey || !s.ws || s.ws.readyState !== 1 || s.cerrada) return true;
+    const caja = elemento.querySelector('.xterm-screen').getBoundingClientRect(), altoFila = caja.height / term.rows;
+    ruedaAcumulada += ev.deltaMode === 1 ? ev.deltaY * altoFila : ev.deltaMode === 2 ? ev.deltaY * caja.height : ev.deltaY;
+    const pasos = Math.trunc(ruedaAcumulada / altoFila);
+    if (pasos) {
+      ruedaAcumulada -= pasos * altoFila;
+      const col = Math.min(term.cols, Math.max(1, Math.floor((ev.clientX - caja.left) / (caja.width / term.cols)) + 1));
+      const fila = Math.min(term.rows, Math.max(1, Math.floor((ev.clientY - caja.top) / altoFila) + 1));
+      s.ws.send(`\x1b[<${pasos > 0 ? 65 : 64};${col};${fila}M`.repeat(Math.min(Math.abs(pasos), 10)));
+    }
+    ev.preventDefault();
+    return false;
+  });
   term.attachCustomKeyEventHandler(e => {
     if (e.type === 'keydown' && e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'c') {
       if (!term.hasSelection() && s.recienSeleccionado && term.modes.mouseTrackingMode !== 'none' && s.ws && s.ws.readyState === 1 && !s.cerrada) s.ws.send('\u0003');
