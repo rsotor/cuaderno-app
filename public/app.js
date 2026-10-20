@@ -94,7 +94,10 @@ function pintarCarpetas(lista) {
   $('#nueva-nota-carpeta').innerHTML = `<option value="">(raíz del cuaderno)</option>` + carpetas.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
 }
 function abrirNuevaNota(titulo = '', carpeta = rutaActual ? rutaActual.split('/').slice(0, -1).join('/') : '') {
-  $('#nueva-nota-nombre').value = titulo; $('#nueva-nota-carpeta').value = carpeta;
+  const sel = $('#nueva-nota-carpeta');
+  // Una carpeta que no sale en el desplegable (crítica de diseño 2026-10-20): se añade, para no crear la nota en otra.
+  if (carpeta && ![...sel.options].some(o => o.value === carpeta)) sel.add(new Option(carpeta, carpeta));
+  $('#nueva-nota-nombre').value = titulo; sel.value = carpeta;
   abrirModal('#nueva-nota', '#nueva-nota-nombre');
 }
 async function crearNota(titulo, carpeta) {

@@ -141,7 +141,7 @@ button.papelera:hover { color: var(--mal); background: rgba(127,127,127,.15); }
 button.nota-aqui:focus-visible, button.mostrar:focus-visible, button.ocultar:focus-visible, button.papelera:focus-visible { opacity: 1; }
 #arbol .fila .acciones-fila { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; }
 #arbol summary .acciones-fila { margin-left: auto; display: flex; gap: 6px; }
-#arbol .acciones-fila .papelera { margin-left: 4px; }   /* sin confirmar, la separación es lo que evita mandar a la papelera por un píxel */
+#arbol .acciones-fila :is(.papelera, .nota-aqui) { margin-left: 4px; }   /* sin confirmar, la separación es lo que evita mandar a la papelera por un píxel */
 #arbol .fila:hover :is(.mostrar, .ocultar, .papelera), #arbol .fila:focus-within :is(.mostrar, .ocultar, .papelera), #arbol summary:hover :is(.nota-aqui, .mostrar, .ocultar), #arbol summary:focus-within :is(.nota-aqui, .mostrar, .ocultar) { opacity: 1; }
 @media (hover: none) { button.nota-aqui, button.mostrar, button.ocultar, button.papelera { opacity: 1; } }
 /* ficheros que no son notas */
