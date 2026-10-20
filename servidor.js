@@ -55,12 +55,24 @@ function estadoGit(raiz) {
 // Lo que la app de escritorio pide distinto (electron/hijo.js lo pasa; la web, nada): `shellLogin`, la terminal lanza la
 // shell como shell de login (`-l`, en Mac y Linux: la misma terminal que la del sistema; en Windows no cambia nada), y
 // `enApp`, el texto del 403 sin cookie no manda a la terminal (en la app no hay terminal desde la que arrancar).
-function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null, ejecutar = null, ejecutarNode = null, plataforma = process.platform, fuentes = [__dirname, PUBLICO], shellLogin = false, enApp = false }) {
+// El entorno de la terminal: el del servidor sin las marcas de una sesión de Claude Code. Si la app se arranca desde la
+// terminal de Claude (`npm run app`), el Claude de dentro las heredaba, se creía una sesión hija y no guardaba la
+// conversación (Roberto, 2026-10-20: «Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION»).
+const MARCAS_DE_SESION = ['CLAUDECODE', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_EXECPATH',
+  'CLAUDE_CODE_SESSION_ATTENDED', 'CLAUDE_CODE_MESSAGING_TOKEN', 'CLAUDE_CODE_MESSAGING_SOCKET', 'CLAUDE_PID', 'CLAUDE_JOB_DIR', 'CLAUDE_EFFORT', 'AI_AGENT'];
+function entornoTerminal(env) {
+  const r = { ...env, TERM: 'xterm-256color', COLORTERM: 'truecolor' };
+  for (const k of MARCAS_DE_SESION) delete r[k];
+  return r;
+}
+
+function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes(16).toString('hex'), pty = null, lanzar = null, ejecutar = null, ejecutarNode = null, plataforma = process.platform, fuentes = [__dirname, PUBLICO], shellLogin = false, enApp = false, anotar = () => {}, esperaHuerfana = 10 * 60 * 1000 }) {
   const estado = { cuaderno, kit };
   // Con qué Node corren las herramientas del kit y el corrector (null: el de este proceso, como en la web). La app de
   // escritorio inyecta el binario de Electron con ELECTRON_RUN_AS_NODE=1 (guardar.js y formulario.js lo explican).
   const nodo = { ejecutarNode };
-  const oyentes = new Set(), terminales = new Set();   // pestañas que escuchan cambios; conexiones de terminal abiertas
+  const oyentes = new Set();   // pestañas que escuchan cambios
+  const sesionesPty = new Map();   // id de la sesión (lo pone la pestaña) → { term, ws, pendiente, bytes, huerfana }
   const avisarCambio = f => { for (const ws of oyentes) ws.send(JSON.stringify({ fichero: f })); };
   if (cuaderno) cuaderno.vigilar(avisarCambio);
 
@@ -71,7 +83,7 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
     const k = detectar(raiz);
     if (!fs.existsSync(k.base)) throw new ErrorPeticion('esa carpeta no tiene notas');
     if (estado.cuaderno) estado.cuaderno.cerrar();
-    for (const ws of terminales) ws.close();   // las terminales eran del cuaderno anterior: al cerrar el ws muere su pty
+    for (const [id, se] of sesionesPty) terminarSesion(id, se, 'cambio de cuaderno');   // las terminales eran del cuaderno anterior
     estado.kit = k; estado.cuaderno = new Cuaderno(raiz, k.base);
     estado.cuaderno.vigilar(avisarCambio);
     avisarCambio('');   // las demás pestañas abiertas se enteran de que el cuaderno es otro
@@ -283,32 +295,69 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
 
   // ---------- terminal (pty) por WebSocket, abierta en la raíz del cuaderno. ?profesor=1 lanza el comando del
   // profesor directamente (el del adaptador del kit, o el configurado por el usuario sin kit): nunca se teclea a ciegas.
+  // La pty no muere con la conexión (Roberto, 2026-10-20: al dormir el Mac se caía el socket y con él Claude): cada
+  // sesión lleva un id que pone la pestaña; si el socket se cae, la pty sigue, guarda lo que escribe (hasta MAX_PENDIENTE)
+  // y la pestaña se reengancha con ?sesion=<id>&reanudar=1. Muere si la pestaña la cierra (código 4000), si cambia el
+  // cuaderno, si el programa termina (la pestaña recibe 4001) o si nadie vuelve en `esperaHuerfana` (tiempo de reloj
+  // del proceso: con el Mac dormido no corre). Reanudar una que ya no existe: 4004.
+  const MAX_PENDIENTE = 2 * 1024 * 1024;
+  const terminarSesion = (id, se, motivo) => {
+    sesionesPty.delete(id); clearTimeout(se.huerfana);
+    anotar(`terminal ${id.slice(0, 8)} cerrada: ${motivo}`);
+    try { se.term.kill(); } catch { /* ya había muerto */ }
+    if (se.ws && se.ws.readyState <= 1) se.ws.close(4001, 'fin');
+  };
   const wssPty = new WebSocketServer({ noServer: true });
   wssPty.on('connection', (ws, req) => {
-    if (!pty) { ws.send('\r\n[la terminal no está disponible en este arranque]\r\n'); return ws.close(); }
-    if (!estado.cuaderno) { ws.send('\r\n[no hay ningún cuaderno abierto]\r\n'); return ws.close(); }
+    if (!pty) { ws.send('\r\n[la terminal no está disponible en este arranque]\r\n'); return ws.close(4001); }
+    if (!estado.cuaderno) { ws.send('\r\n[no hay ningún cuaderno abierto]\r\n'); return ws.close(4001); }
     const url = new URL(req.url, 'http://x');
-    const profesor = url.searchParams.get('profesor') === '1';
-    const shell = plataforma === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash');
-    const argsShell = shellLogin && plataforma !== 'win32' ? ['-l'] : [];   // shell de login solo en la app (plan §2, fila Terminal)
-    const comando = comandoProfesor();
-    const opciones = { name: 'xterm-256color', cols: 100, rows: 28, cwd: estado.cuaderno.raiz, env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } };
-    let term;
-    try {
-      if (profesor) {
-        if (!comando) { ws.send('\r\n[este cuaderno no tiene profesor configurado]\r\n'); return ws.close(); }
-        const [cmd, ...args] = comando.split(/\s+/);
-        term = pty.spawn(cmd, args, opciones);
-      } else term = pty.spawn(shell, argsShell, opciones);
-    } catch (e) {
-      ws.send(`\r\n[no se ha podido abrir ${profesor ? comando : shell}: ${e.message}]\r\n`); return ws.close();
+    const id = url.searchParams.get('sesion') || crypto.randomBytes(8).toString('hex');
+    let se = sesionesPty.get(id);
+    if (se) {   // reenganche: la pty seguía viva; lo que escribió sin nadie mirando sale ahora
+      clearTimeout(se.huerfana); se.huerfana = null;
+      if (se.ws && se.ws !== ws && se.ws.readyState <= 1) { se.ws.removeAllListeners('close'); se.ws.close(4002); }
+      se.ws = ws;
+      anotar(`terminal ${id.slice(0, 8)} reconectada${se.bytes ? ` (${se.bytes} bytes guardados)` : ''}`);
+      if (se.pendiente.length) { ws.send(se.pendiente.join('')); se.pendiente = []; se.bytes = 0; }
+    } else {
+      if (url.searchParams.get('reanudar') === '1') { anotar(`terminal ${id.slice(0, 8)}: no se puede reanudar, ya no existe`); return ws.close(4004, 'no existe'); }
+      const profesor = url.searchParams.get('profesor') === '1';
+      const shell = plataforma === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash');
+      const argsShell = shellLogin && plataforma !== 'win32' ? ['-l'] : [];   // shell de login solo en la app (plan §2, fila Terminal)
+      const comando = comandoProfesor();
+      const opciones = { name: 'xterm-256color', cols: 100, rows: 28, cwd: estado.cuaderno.raiz, env: entornoTerminal(process.env) };
+      let term;
+      try {
+        if (profesor) {
+          if (!comando) { ws.send('\r\n[este cuaderno no tiene profesor configurado]\r\n'); return ws.close(4001); }
+          const [cmd, ...args] = comando.split(/\s+/);
+          term = pty.spawn(cmd, args, opciones);
+        } else term = pty.spawn(shell, argsShell, opciones);
+      } catch (e) {
+        ws.send(`\r\n[no se ha podido abrir ${profesor ? comando : shell}: ${e.message}]\r\n`); return ws.close(4001);
+      }
+      se = { term, ws, pendiente: [], bytes: 0, huerfana: null };
+      sesionesPty.set(id, se);
+      anotar(`terminal ${id.slice(0, 8)} abierta (${profesor ? 'profesor' : 'shell'})`);
+      term.onData(d => {
+        if (se.ws && se.ws.readyState === 1) return se.ws.send(d);
+        se.pendiente.push(d); se.bytes += d.length;
+        while (se.bytes > MAX_PENDIENTE && se.pendiente.length > 1) se.bytes -= se.pendiente.shift().length;
+      });
+      term.onExit(({ exitCode, signal } = {}) => { if (sesionesPty.get(id) === se) terminarSesion(id, se, `el programa terminó (código ${exitCode}${signal ? `, señal ${signal}` : ''})`); });
     }
-    terminales.add(ws);
-    term.onData(d => ws.readyState === 1 && ws.send(d));
-    term.onExit(() => ws.close());
-    ws.on('message', m => { const s = m.toString(); if (s.startsWith('\u0001')) { try { const { cols, rows } = JSON.parse(s.slice(1)); term.resize(cols, rows); } catch { /* ignorado */ } } else term.write(s); });
-    ws.on('close', () => { terminales.delete(ws); term.kill(); });
+    ws.on('message', m => { const t = m.toString(); if (t.startsWith('\u0001')) { try { const { cols, rows } = JSON.parse(t.slice(1)); se.term.resize(cols, rows); } catch { /* ignorado */ } } else se.term.write(t); });
+    ws.on('close', codigo => {
+      if (se.ws !== ws || sesionesPty.get(id) !== se) return;
+      se.ws = null;
+      if (codigo === 4000) return terminarSesion(id, se, 'la cerró la pestaña');
+      anotar(`terminal ${id.slice(0, 8)}: se cayó la conexión (código ${codigo}); la pty sigue a la espera`);
+      se.huerfana = setTimeout(() => terminarSesion(id, se, 'nadie volvió a conectarse'), esperaHuerfana);
+    });
   });
+  // Al cerrar el servidor, ninguna pty queda viva.
+  server.on('close', () => { for (const [id, se] of sesionesPty) terminarSesion(id, se, 'el servidor se cierra'); });
 
   // ---------- recarga en vivo
   const wssCambios = new WebSocketServer({ noServer: true });
@@ -330,4 +379,4 @@ function crearServidor({ cuaderno = null, kit = null, token = crypto.randomBytes
   return server;
 }
 
-module.exports = { crearServidor, estadoGit, COOKIE };
+module.exports = { crearServidor, estadoGit, entornoTerminal, COOKIE };

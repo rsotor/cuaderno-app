@@ -965,14 +965,37 @@ function redimensionar(s) {
   s.fit.fit();
   if (s.term.cols > 0 && s.term.rows > 0 && s.ws && s.ws.readyState === 1) s.ws.send('\u0001' + JSON.stringify({ cols: s.term.cols, rows: s.term.rows }));
 }
-function conectar(s) {
+// Cada sesión lleva su id: si el socket se cae (el Mac se duerme, la red cambia) la pty sigue en el servidor y la
+// pestaña se reengancha sola con el mismo id, sin escribir nada en la pantalla del programa. Solo es «cerrada» si el
+// programa terminó (4001), si la pty ya no existe (4004) o si la pestaña la cierra (4000, cerrarSesion).
+function conectar(s, reanudar = false) {
+  if (!reanudar) { s.idPty = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)).replace(/-/g, ''); s.esperaReconexion = 500; }
   s.cerrada = false; s.pendiente = ''; pintarSesiones();
-  const ws = new WebSocket(wsUrl(s.modo === 'profesor' ? '/pty?profesor=1' : '/pty')); s.ws = ws;
+  const consulta = new URLSearchParams({ sesion: s.idPty }); if (s.modo === 'profesor') consulta.set('profesor', '1'); if (reanudar) consulta.set('reanudar', '1');
+  const ws = new WebSocket(wsUrl(`/pty?${consulta}`)); s.ws = ws;
   // Lo tecleado antes de que el canal abra no se pierde: espera y sale junto en cuanto abre.
-  ws.onopen = () => { redimensionar(s); if (s.pendiente) { ws.send(s.pendiente); s.pendiente = ''; } };
+  ws.onopen = () => { s.esperaReconexion = 500; s.reconectando = false; pintarSesiones(); redimensionar(s); if (s.pendiente) { ws.send(s.pendiente); s.pendiente = ''; } };
   ws.onmessage = e => s.term.write(e.data);
-  ws.onclose = () => { if (s.ws !== ws) return; s.cerrada = true; s.term.write('\r\n[terminal cerrada: Enter abre otra igual]\r\n'); pintarSesiones(); };
+  ws.onclose = e => {
+    if (s.ws !== ws) return;
+    if (e.code !== 4001 && e.code !== 4004 && sesiones.includes(s)) {
+      s.reconectando = true; pintarSesiones();
+      clearTimeout(s.temporizador);
+      s.temporizador = setTimeout(() => { if (s.ws === ws) conectar(s, true); }, s.esperaReconexion);
+      s.esperaReconexion = Math.min(s.esperaReconexion * 2, 5000);
+      return;
+    }
+    s.cerrada = true; s.reconectando = false;
+    // Si el programa tenía el ratón (Claude a pantalla completa), se le quita: la rueda y la selección vuelven a xterm.
+    s.term.write('\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?25h');
+    s.term.write(e.code === 4004 ? '\r\n[esta terminal se perdió mientras no había conexión: Enter abre otra igual]\r\n' : '\r\n[terminal cerrada: Enter abre otra igual]\r\n');
+    pintarSesiones();
+  };
 }
+// Al volver de reposo o recuperar la red, no esperar al siguiente intento: reengancharse ya.
+const reengancharYa = () => { for (const s of sesiones) if (s.reconectando && s.ws && s.ws.readyState === 3) { clearTimeout(s.temporizador); s.esperaReconexion = 500; conectar(s, true); } };
+window.addEventListener('online', reengancharYa);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) reengancharYa(); });
 function crearSesion(modo) {
   const n = ++numSesion, elemento = document.createElement('div'); elemento.className = 'sesion'; elemento.hidden = true; $('#terminal').append(elemento);
   const term = new Terminal({ fontFamily: variable('--mono'), fontSize: 13.5, lineHeight: 1.25, cursorBlink: true, cursorStyle: 'bar', scrollback: 5000, allowProposedApi: true, macOptionClickForcesSelection: true, theme: temaTerminal() });
@@ -1038,7 +1061,7 @@ function activarSesion(s) {
   requestAnimationFrame(() => { redimensionar(s); s.term.focus(); });
 }
 function cerrarSesion(s) {
-  const ws = s.ws; s.ws = null; if (ws) ws.close();
+  const ws = s.ws; s.ws = null; clearTimeout(s.temporizador); if (ws) ws.close(4000);
   s.term.dispose(); s.elemento.remove();
   sesiones = sesiones.filter(o => o !== s);
   if (sesionActiva === s) { sesionActiva = null; if (sesiones.length) return activarSesion(sesiones[sesiones.length - 1]); }
@@ -1046,7 +1069,7 @@ function cerrarSesion(s) {
 }
 function cerrarSesiones() { for (const s of [...sesiones]) cerrarSesion(s); }
 function pintarSesiones() {
-  $('.sesiones').innerHTML = sesiones.map(s => `<div class="sesion-pestana${s === sesionActiva ? ' activa' : ''}${s.cerrada ? ' cerrada' : ''}" role="tab" aria-selected="${s === sesionActiva}"><button type="button" data-activar="${s.id}">${esc(s.titulo)}</button><button type="button" data-cerrar="${s.id}" aria-label="Cerrar ${esc(s.titulo)}">×</button></div>`).join('');
+  $('.sesiones').innerHTML = sesiones.map(s => `<div class="sesion-pestana${s === sesionActiva ? ' activa' : ''}${s.cerrada ? ' cerrada' : ''}" role="tab" aria-selected="${s === sesionActiva}"><button type="button" data-activar="${s.id}">${esc(s.titulo)}${s.reconectando ? '<span class="reconectando"> · reconectando…</span>' : ''}</button><button type="button" data-cerrar="${s.id}" aria-label="Cerrar ${esc(s.titulo)}">×</button></div>`).join('');
   $('.sin-sesiones').hidden = sesiones.length > 0;
 }
 $('.sesiones').addEventListener('click', e => {

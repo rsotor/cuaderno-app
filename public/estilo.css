@@ -340,6 +340,7 @@ body.redimensionando[data-panel="abajo"] { cursor: row-resize; }
 .sesion-pestana.activa { background: var(--terminal-fondo); color: #e6e9ef; }
 .sesion-pestana.activa button { color: inherit; }
 .sesion-pestana.cerrada [data-activar] { opacity: .55; text-decoration: line-through; }
+.sesion-pestana .reconectando { color: var(--tinta-suave); font-style: italic; }
 .sesion-pestana [data-cerrar] { min-width: 24px; padding: 2px 4px; }
 #terminal .sesion { height: 100%; }
 .sin-sesiones { color: #b4b9c2; font-size: 13.5px; padding: 18px 4px; margin: 0; }

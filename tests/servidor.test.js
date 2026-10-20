@@ -604,3 +604,102 @@ test('POST /api/imagen: un cuerpo de justo el tope entra', async () => {
     assert.equal(fs.statSync(path.join(s.c.base, DIR, 'tope.png')).size, TOPE_IMAGEN);
   } finally { await s.cerrar(); }
 });
+
+// ---------- la pty sobrevive a la conexión (Roberto, 2026-10-20: al dormir el Mac se caía el socket y con él Claude)
+function ptyViva() {
+  const procesos = [];
+  return { procesos, spawn(cmd, args, o) {
+    const p = { o, escrito: '', muerta: false, datos: null, salida: null,
+      onData(f) { p.datos = f; }, onExit(f) { p.salida = f; }, write(t) { p.escrito += t; }, resize() {},
+      kill() { if (!p.muerta) { p.muerta = true; if (p.salida) p.salida({ exitCode: 0, signal: 1 }); } } };
+    procesos.push(p); return p;
+  } };
+}
+async function servidorConPty(opciones = {}) {
+  const WebSocket = require('ws');
+  const c = crearCuaderno({ kit: false }), pty = ptyViva(), registro = [];
+  const server = crearServidor({ cuaderno: new Cuaderno(c.raiz, c.base), kit: detectar(c.raiz), token: 'ab'.repeat(16), pty, anotar: l => registro.push(l), ...opciones });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const puerto = server.address().port;
+  // Abre /pty con la consulta dada; devuelve el socket, lo recibido y una promesa con el código de cierre.
+  const abrir = consulta => new Promise((ok, mal) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${puerto}/pty?${consulta}`, { headers: { cookie: `cuaderno=${server.token}`, origin: `http://127.0.0.1:${puerto}` } });
+    const r = { ws, recibido: '', cerrado: new Promise(f => ws.on('close', codigo => f(codigo))) };
+    ws.on('message', m => { r.recibido += m.toString(); });
+    ws.on('open', () => ok(r)); ws.on('error', mal);
+  });
+  const fin = async () => { await new Promise(r => server.close(r)); c.borrar(); };
+  return { pty, registro, abrir, fin, server };
+}
+const esperar = async (f, que) => { const t = Date.now() + 3000; while (!f()) { if (Date.now() > t) throw new Error(`no llega: ${que}`); await new Promise(r => setTimeout(r, 10)); } };
+
+test('terminal: si se cae la conexión, la pty sigue, guarda lo que escribe y se lo da a la pestaña que se reengancha con el mismo id', async () => {
+  const s = await servidorConPty();
+  try {
+    const a = await s.abrir('sesion=uno');
+    await esperar(() => s.pty.procesos.length === 1, 'la pty');
+    const p = s.pty.procesos[0];
+    a.ws.close(1001); assert.equal(await a.cerrado, 1001);
+    await esperar(() => s.registro.some(l => /uno: se cayó la conexión \(código 1001\)/.test(l)), 'el registro de la caída');
+    assert.equal(p.muerta, false, 'la caída del socket mató la pty');
+    p.datos('mientras no había nadie');
+    const b = await s.abrir('sesion=uno&reanudar=1');
+    await esperar(() => b.recibido.includes('mientras no había nadie'), 'lo guardado al reengancharse');
+    assert.equal(s.pty.procesos.length, 1, 'reengancharse abrió otra pty');
+    b.ws.send('hola'); await esperar(() => p.escrito === 'hola', 'lo tecleado tras reengancharse');
+    assert.ok(s.registro.some(l => /uno reconectada \(\d+ bytes guardados\)/.test(l)), s.registro.join('\n'));
+    b.ws.close(4000); await b.cerrado;
+    await esperar(() => p.muerta, 'cerrar la pestaña (4000) mata la pty');
+    assert.ok(s.registro.some(l => /uno cerrada: la cerró la pestaña/.test(l)));
+  } finally { await s.fin(); }
+});
+
+test('terminal: reanudar una sesión que no existe da 4004; si el programa termina, la pestaña recibe 4001; nadie vuelve en el plazo → la pty muere', async () => {
+  const s = await servidorConPty({ esperaHuerfana: 50 });
+  try {
+    const x = await s.abrir('sesion=nada&reanudar=1');
+    assert.equal(await x.cerrado, 4004);
+    assert.equal(s.pty.procesos.length, 0, 'reanudar una que no existe lanza una pty');
+    const a = await s.abrir('sesion=dos');
+    await esperar(() => s.pty.procesos.length === 1, 'la pty');
+    s.pty.procesos[0].kill();
+    assert.equal(await a.cerrado, 4001);
+    assert.ok(s.registro.some(l => /dos cerrada: el programa terminó \(código 0, señal 1\)/.test(l)), s.registro.join('\n'));
+    const b = await s.abrir('sesion=tres');
+    await esperar(() => s.pty.procesos.length === 2, 'la segunda pty');
+    b.ws.close(1000); await b.cerrado;
+    await esperar(() => s.pty.procesos[1].muerta, 'la pty huérfana muere al pasar el plazo');
+    assert.ok(s.registro.some(l => /tres cerrada: nadie volvió a conectarse/.test(l)));
+  } finally { await s.fin(); }
+});
+
+test('terminal: cambiar de cuaderno o cerrar el servidor mata las ptys, también las que esperaban sin conexión', async () => {
+  const s = await servidorConPty();
+  const otro = crearCuaderno({ kit: false });
+  try {
+    const a = await s.abrir('sesion=cuatro');
+    await esperar(() => s.pty.procesos.length === 1, 'la pty');
+    a.ws.close(1001); await a.cerrado;
+    s.server.abrir(otro.raiz);
+    await esperar(() => s.pty.procesos[0].muerta, 'cambiar de cuaderno mata la pty que esperaba');
+    const b = await s.abrir('sesion=cinco');
+    await esperar(() => s.pty.procesos.length === 2, 'la segunda pty');
+    b.ws.close(1001); await b.cerrado;
+  } finally { await s.fin(); otro.borrar(); }
+  assert.equal(s.pty.procesos[1].muerta, true, 'cerrar el servidor deja una pty viva');
+});
+
+test('terminal: el entorno no lleva las marcas de una sesión de Claude Code (si no, el Claude de dentro no guarda la conversación)', async () => {
+  const { entornoTerminal } = require('../servidor');
+  const e = entornoTerminal({ PATH: '/bin', HOME: '/h', CLAUDECODE: '1', CLAUDE_CODE_CHILD_SESSION: '1', CLAUDE_CODE_SESSION_ID: 'x', CLAUDE_CODE_ENTRYPOINT: 'cli', CLAUDE_PID: '9', AI_AGENT: 'c', CLAUDE_CODE_USE_BEDROCK: '1', TERM: 'dumb' });
+  assert.deepEqual(e, { PATH: '/bin', HOME: '/h', CLAUDE_CODE_USE_BEDROCK: '1', TERM: 'xterm-256color', COLORTERM: 'truecolor' });
+  const s = await servidorConPty();
+  const antes = process.env.CLAUDE_CODE_CHILD_SESSION;
+  process.env.CLAUDE_CODE_CHILD_SESSION = '1';
+  try {
+    const a = await s.abrir('sesion=seis');
+    await esperar(() => s.pty.procesos.length === 1, 'la pty');
+    assert.equal(s.pty.procesos[0].o.env.CLAUDE_CODE_CHILD_SESSION, undefined, 'la pty hereda CLAUDE_CODE_CHILD_SESSION');
+    a.ws.close(4000); await a.cerrado;
+  } finally { if (antes === undefined) delete process.env.CLAUDE_CODE_CHILD_SESSION; else process.env.CLAUDE_CODE_CHILD_SESSION = antes; await s.fin(); }
+});
