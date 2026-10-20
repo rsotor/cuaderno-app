@@ -93,8 +93,7 @@ function pintarCarpetas(lista) {
   const carpetas = [...new Set(lista.map(p => p.split('/').slice(0, -1).join('/')).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
   $('#nueva-nota-carpeta').innerHTML = `<option value="">(raíz del cuaderno)</option>` + carpetas.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
 }
-function abrirNuevaNota(titulo = '') {
-  const carpeta = rutaActual ? rutaActual.split('/').slice(0, -1).join('/') : '';
+function abrirNuevaNota(titulo = '', carpeta = rutaActual ? rutaActual.split('/').slice(0, -1).join('/') : '') {
   $('#nueva-nota-nombre').value = titulo; $('#nueva-nota-carpeta').value = carpeta;
   abrirModal('#nueva-nota', '#nueva-nota-nombre');
 }
@@ -105,6 +104,11 @@ async function crearNota(titulo, carpeta) {
   return true;
 }
 $('#btn-nueva-nota').onclick = () => abrirNuevaNota();
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-nota-en]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();   // dentro del summary: que no pliegue ni despliegue la carpeta
+  abrirNuevaNota('', b.dataset.notaEn);
+});
 $('#nueva-nota-cancelar').onclick = () => cerrarModal('#nueva-nota');
 $('#nueva-nota-form').addEventListener('submit', e => { e.preventDefault(); crearNota($('#nueva-nota-nombre').value, $('#nueva-nota-carpeta').value); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#nueva-nota').hidden) cerrarModal('#nueva-nota'); });
@@ -251,7 +255,9 @@ const botonMostrar = (ruta, nombre) => `<button type="button" class="mostrar" da
 const botonOcultar = (ruta, nombre) => `<button type="button" class="ocultar" data-ocultar="${esc(ruta)}" title="Ocultar aquí (solo en la app; se recupera en Ajustes)" aria-label="Ocultar ${esc(String(nombre).replace(/<[^>]*>/g, ''))}">${icono('ojo-tachado')}</button>`;
 // En un fichero, además, la papelera, la última y algo separada (crítica 2026-10-08: sin confirmar, el hueco es lo que la protege).
 // Los botones de la fila no son paradas de Tab (hallazgo 7, revisión de diseño 2026-10-09: cada carpeta eran tres): se llega a ellos con la flecha derecha desde la fila.
-const botonesFila = (ruta, nombre, esFichero = false) => `<span class="acciones-fila">${(botonOcultar(ruta, nombre) + botonMostrar(ruta, nombre) + (esFichero ? botonPapelera(ruta, nombre) : '')).replace(/<button /g, '<button tabindex="-1" ')}</span>`;
+// En una carpeta, al final (donde el fichero lleva la papelera), «Nota nueva aquí»: abre «Nueva nota» con esa carpeta ya elegida (Roberto, 2026-10-19).
+const botonNotaAqui = (ruta, nombre) => `<button type="button" class="nota-aqui" data-nota-en="${esc(ruta)}" title="Nota nueva en esta carpeta" aria-label="Nota nueva en ${esc(String(nombre).replace(/<[^>]*>/g, ''))}">${icono('mas')}</button>`;
+const botonesFila = (ruta, nombre, esFichero = false) => `<span class="acciones-fila">${(botonOcultar(ruta, nombre) + botonMostrar(ruta, nombre) + (esFichero ? botonPapelera(ruta, nombre) : botonNotaAqui(ruta, nombre))).replace(/<button /g, '<button tabindex="-1" ')}</span>`;
 // Ocultar (o volver a mostrar) una carpeta o un fichero del árbol y del buscador; solo en la app, por cuaderno.
 async function ocultar(ruta, si) {
   try { await api('/api/ocultar', { ruta, ocultar: si }); } catch (e) { return avisarError(si ? 'No se ha podido ocultar.' : 'No se ha podido volver a mostrar.', e.message); }
