@@ -31,14 +31,14 @@
     "@xterm/addon-webgl": "0.19.0",
     "@xterm/xterm": "^6.0.0",
     "katex": "^0.19.0",
-    "markdown-it": "^15.0.2",
+    "markdown-it": "^15.0.3",
     "node-pty": "^1.1.0",
     "ws": "^8.22.0"
   },
   "devDependencies": {
     "electron": "44.7.0",
     "electron-builder": "26.15.3",
-    "playwright": "1.64.0"
+    "playwright": "1.64.1"
   },
   "main": "electron/main.js"
 }
